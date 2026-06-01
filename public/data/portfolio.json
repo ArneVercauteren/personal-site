@@ -1,0 +1,50 @@
+{
+  "as_of": "2026-06-01",
+  "base_currency": "USD",
+  "strategies": [
+    {
+      "id": "open_momentum_v1",
+      "name": "Momentum (Open)",
+      "visibility": "open",
+      "equity_curve": [
+        { "d": "2026-01-02", "v": 100000.0 },
+        { "d": "2026-02-02", "v": 102350.0 },
+        { "d": "2026-03-02", "v": 101120.0 },
+        { "d": "2026-04-01", "v": 104880.0 },
+        { "d": "2026-05-01", "v": 106540.0 },
+        { "d": "2026-06-01", "v": 108120.0 }
+      ],
+      "stats": { "cagr": 0.081, "sharpe": 0.65, "max_dd": -0.062 },
+      "positions": [
+        { "ticker": "AAPL", "weight": 0.06 },
+        { "ticker": "MSFT", "weight": 0.055 },
+        { "ticker": "NVDA", "weight": 0.05 },
+        { "ticker": "JPM", "weight": 0.045 },
+        { "ticker": "XOM", "weight": 0.04 }
+      ],
+      "formula_ref": "/projects/darwin"
+    },
+    {
+      "id": "balanced_king_v3",
+      "name": "Balanced King",
+      "visibility": "secured",
+      "equity_curve": [
+        { "d": "2026-01-02", "v": 100000.0 },
+        { "d": "2026-02-02", "v": 101780.0 },
+        { "d": "2026-03-02", "v": 103410.0 },
+        { "d": "2026-04-01", "v": 102990.0 },
+        { "d": "2026-05-01", "v": 106220.0 },
+        { "d": "2026-06-01", "v": 109350.0 }
+      ],
+      "stats": { "cagr": 0.094, "sharpe": 0.71, "max_dd": -0.041 },
+      "exposure": [
+        { "group": "Technology", "weight": 0.32 },
+        { "group": "Health Care", "weight": 0.18 },
+        { "group": "Financials", "weight": 0.15 },
+        { "group": "Industrials", "weight": 0.12 },
+        { "group": "Energy", "weight": 0.09 },
+        { "group": "Consumer Staples", "weight": 0.14 }
+      ]
+    }
+  ]
+}

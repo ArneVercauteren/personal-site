@@ -1,0 +1,16 @@
+// The standing paper-only disclaimer. Required on every page that shows
+// portfolio data. See docs/concepts/paper-trading-only.md.
+export function Disclaimer() {
+  return (
+    <div className="panel border-accent/30 bg-accent/5 p-4 text-sm text-ink-muted">
+      <span className="font-mono text-xs uppercase tracking-widest text-accent">
+        Disclaimer
+      </span>
+      <p className="mt-1">
+        This is a <span className="text-ink">simulated paper portfolio</span> —
+        no broker, no real money, no orders. It is <strong>not investment
+        advice</strong>.
+      </p>
+    </div>
+  );
+}
