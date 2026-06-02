@@ -86,7 +86,11 @@ set when the strategy is deployed from Darwin and shown on the site:
       "base_currency": "USD",
       "rebalance_cadence_days": 42,
       "deployed_on": "2026-05-01",
-      "cost_model": {"commission_bps": 1.0, "slippage_bps": 5.0},
+      "cost_model": {"commission_bps": 1.0, "slippage_bps": 5.0,
+                     "spread_ref_price": 50.0, "volume_impact_coef": 0.5,
+                     "vol_scaled_cost_enable": true, "vol_cost_k": 0.75,
+                     "vol_cost_realized_window": 63, "vol_cost_long_window": 252,
+                     "vol_cost_mult_max": 3.0},
       "blurb": "Balanced risk/return king from epoch 7."
     }
   ]
@@ -97,6 +101,12 @@ This metadata is **not sensitive** — it describes *how the sim is run* (capita
 assumptions), not the formula or the basket — so it is published for secured strategies too.
 `cost_model` here is the same assumption the Darwin section's Methodology page documents, so the
 two stay consistent.
+
+`cost_model` carries the full **Darwin cost model** (`paper_trading/costs.py`): `commission_bps`
+and `slippage_bps` are required; `spread_ref_price`, `volume_impact_coef`, and the
+`vol_*` crisis-scaling fields are optional and fall back to Darwin's engine defaults. The
+simulator charges these as a per-rebalance equity haircut (turnover-scaled commission +
+price-scaled slippage + sqrt volume impact), matching how the strategy was backtested in Darwin.
 
 ## Changing the contract — checklist
 

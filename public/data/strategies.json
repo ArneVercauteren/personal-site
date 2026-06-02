@@ -9,7 +9,17 @@
       "base_currency": "USD",
       "rebalance_cadence_days": 30,
       "deployed_on": "2026-01-02",
-      "cost_model": { "commission_bps": 1.0, "slippage_bps": 5.0 },
+      "cost_model": {
+        "commission_bps": 1.0,
+        "slippage_bps": 5.0,
+        "spread_ref_price": 50.0,
+        "volume_impact_coef": 0.5,
+        "vol_scaled_cost_enable": true,
+        "vol_cost_k": 0.75,
+        "vol_cost_realized_window": 63,
+        "vol_cost_long_window": 252,
+        "vol_cost_mult_max": 3.0
+      },
       "blurb": "A fully open momentum strategy — formula and basket published for anyone to audit."
     },
     {
@@ -20,7 +30,17 @@
       "base_currency": "USD",
       "rebalance_cadence_days": 42,
       "deployed_on": "2026-01-02",
-      "cost_model": { "commission_bps": 1.0, "slippage_bps": 5.0 },
+      "cost_model": {
+        "commission_bps": 1.0,
+        "slippage_bps": 5.0,
+        "spread_ref_price": 50.0,
+        "volume_impact_coef": 0.5,
+        "vol_scaled_cost_enable": true,
+        "vol_cost_k": 0.75,
+        "vol_cost_realized_window": 63,
+        "vol_cost_long_window": 252,
+        "vol_cost_mult_max": 3.0
+      },
       "blurb": "Balanced risk/return king from epoch 7. Performance and sector exposure shown; basket held private."
     }
   ]

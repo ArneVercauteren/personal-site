@@ -26,7 +26,13 @@ import os
 import numpy as np
 import pandas as pd
 
-__all__ = ["get_ohlcv", "get_price_history", "long_to_wide", "use_synthetic"]
+__all__ = [
+    "get_ohlcv",
+    "get_price_history",
+    "long_to_wide",
+    "wide_raw_and_dollar_volume",
+    "use_synthetic",
+]
 
 _OHLCV_COLUMNS = ["date", "ticker", "open", "high", "low", "close", "adj_close", "volume"]
 
@@ -68,6 +74,24 @@ def long_to_wide(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     common = opens.dropna(how="any").index.intersection(closes.dropna(how="any").index)
     tickers = list(closes.columns)
     return opens.loc[common, tickers], closes.loc[common, tickers]
+
+
+def wide_raw_and_dollar_volume(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """`(raw_close, dollar_volume)` wide frames for the Darwin cost model.
+
+    The cost model scales slippage by **nominal** share price and sizes market
+    impact against **review-date dollar volume** — both of which are raw-price
+    notions, so this returns the *unadjusted* close and `close × volume` (the
+    same `adv = price × volume` Darwin's engine uses). Indexed by date, columns
+    by ticker; callers align to the simulator's trading-day index.
+    """
+    raw_close = df.pivot_table(index="date", columns="ticker", values="close").sort_index()
+    dv = df.copy()
+    dv["dollar_volume"] = dv["close"] * dv["volume"]
+    dollar_volume = dv.pivot_table(
+        index="date", columns="ticker", values="dollar_volume"
+    ).sort_index()
+    return raw_close, dollar_volume
 
 
 def get_price_history(

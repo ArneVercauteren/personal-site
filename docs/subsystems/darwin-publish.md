@@ -35,9 +35,91 @@ Adapt existing tooling rather than writing from scratch:
 
 - It treats `paper_trading/strategies/*.json` as an input contract: a stable, documented JSON shape the [updater](paper-trading-updater.md) knows how to evaluate.
 
+## The export format (the exact JSON the site needs)
+
+A deployed strategy is one `*.json` file matching the strategy-spec the updater reads
+(`paper_trading/update.py` / the secured `update_secured.py`). Same shape for open and secured;
+`visibility` and *where it's pushed* differ. Exact shape:
+
+```json
+{
+  "id": "balanced_king_v3",
+  "name": "Balanced King",
+  "visibility": "secured",                       // "open" → public repo; "secured" → private repo
+  "blurb": "Balanced risk/return king from epoch 7.",
+  "deployed_on": "2026-06-02",                    // export date; sim starts here
+  "next_rebalance_date": "2026-07-14",            // deployed_on + cadence (secured only needs this)
+  "portfolio_size": 100000,
+  "base_currency": "USD",
+  "rebalance_cadence_days": 42,
+  "cost_model": {                                 // the Darwin run's actual cost config (see below)
+    "commission_bps": 5.0, "slippage_bps": 5.0,
+    "spread_ref_price": 50.0, "volume_impact_coef": 0.5,
+    "vol_scaled_cost_enable": true, "vol_cost_k": 0.75,
+    "vol_cost_realized_window": 63, "vol_cost_long_window": 252, "vol_cost_mult_max": 3.0
+  },
+  "universe": ["AAPL", "MSFT", "..."],            // the strategy's tradable set
+  "formula": { "mode": "top_n", "top_n": 8, "kind": "...", "children": [] },  // open only*
+  "formula_ref": "/projects/darwin"                // open only: link to the public writeup
+}
+```
+
+\* **Secured exports must omit `formula` and `formula_ref`** — only the private repo ever holds
+the tree. The secured file still carries everything else (so the private sim can run it from the
+private repo). Open exports include the tree (it's published for auditability).
+
+The `formula` tree is exactly what `paper_trading`'s vendored evaluator already consumes, so the
+exporter should reuse Darwin's existing serializer **`src/dsl/serialize.py::to_dict(strategy)`**
+(it emits the `{mode, top_n, kind, name, params, children}` tree, including the top-level
+selection mode) rather than hand-building JSON.
+
+### cost_model — pull from the run, don't hard-code
+
+To stay faithful to the backtest the king was selected on, the exporter reads the **actual** cost
+config of that run, not literals:
+
+| Field | Darwin source |
+|---|---|
+| `commission_bps` | the run's `--cost-bps` (CLI default **5.0**) |
+| `slippage_bps` | the run's `--slip-bps` (CLI default **5.0**) |
+| `spread_ref_price`, `volume_impact_coef` | `cfg.financial_realism` (defaults 50.0, 0.5) |
+| `vol_scaled_cost_enable`, `vol_cost_k`, `vol_cost_realized_window`, `vol_cost_long_window`, `vol_cost_mult_max` | `cfg.backtest_diag` (defaults true, 0.75, 63, 252, 3.0) |
+
+> **Open decision — impact sizing.** Darwin's volume-impact term sizes against
+> `cfg.financial_realism.portfolio_size` (**$1,000,000**), while the live paper sim sizes against
+> the strategy's own `portfolio_size` (e.g. $100k). sqrt-impact scales with √size, so a smaller
+> book pays less. Either set the deployed `portfolio_size` to match Darwin's, or add a separate
+> `impact_portfolio_size` field to `cost_model`. Decide at deploy time; default to the strategy's
+> own `portfolio_size` (what it actually trades).
+
+## UI export button (Darwin frontend)
+
+The Darwin UI already has a generic export dropdown — **`ui/frontend/components/ExportMenu.tsx`** —
+whose items are either a synchronous backend download (`path`) or an async job. Adding "deploy to
+site" is small:
+
+1. **Backend (FastAPI):** add a `fmt=site` branch (or a dedicated `/api/strategies/{id}/deploy`
+   route) in **`ui/backend/routes/exports.py`**. It loads the king, calls
+   `serialize.to_dict(strategy)` for the tree, reads the run's cost config + metadata, assembles
+   the spec above, and returns it as a JSON download. Two variants: `visibility=open` (includes the
+   tree) and `visibility=secured` (strips `formula`/`formula_ref`).
+2. **Frontend:** add an `ExportItem` to the strategy surface's `ExportMenu`, e.g.
+   `{ group: "Deploy to site", label: "Open strategy (full)", path: "/api/strategies/<id>/export?fmt=site&visibility=open" }`
+   and a second item for `visibility=secured`. Clicking downloads the ready-to-commit `*.json`.
+3. **Where it lands:** the downloaded file is dropped into the **public** repo's
+   `paper_trading/strategies/` (open) or the **private** repo's `strategies/` (secured). A later
+   `scripts/deploy_to_site.py` can automate that placement + cadence stamping; the button gives the
+   correct file today.
+
+This keeps Darwin's UI as the single deploy surface and produces the *exact* spec the updater
+already knows how to run — no second format to maintain.
+
 ## To fill this in
 
-When the publish script is written (in Darwin), document here: the exact scrubbed JSON shape, how a king is marked "deployed", and the push mechanism (commit vs. artifact). Keep the authoritative implementation notes in the Darwin repo; this page records the *contract* from the website's side.
+When `scripts/deploy_to_site.py` / the `fmt=site` endpoint are written (in Darwin), document here:
+how a king is marked "deployed", and the push mechanism (commit vs. artifact). Keep the
+authoritative implementation notes in the Darwin repo; this page records the *contract* from the
+website's side.
 
 ## Source files
 

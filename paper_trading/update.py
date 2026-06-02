@@ -89,11 +89,20 @@ def run() -> str:
             # The evaluator needs the long OHLCV frame.
             long = prices.get_ohlcv(spec["universe"], start, end)
             opens, closes = prices.long_to_wide(long)
-            result = portfolio.simulate(spec, opens, closes, prices_long=long)
+            raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
+            result = portfolio.simulate(
+                spec, opens, closes, prices_long=long,
+                dollar_volume=dollar_volume, raw_closes=raw_closes,
+            )
         else:
             start = (pd.Timestamp(spec["deployed_on"]) - pd.Timedelta(days=WARMUP_DAYS)).strftime("%Y-%m-%d")
-            opens, closes = prices.get_price_history(spec["universe"], start, end)
-            result = portfolio.simulate(spec, opens, closes)
+            long = prices.get_ohlcv(spec["universe"], start, end)
+            opens, closes = prices.long_to_wide(long)
+            raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
+            result = portfolio.simulate(
+                spec, opens, closes,
+                dollar_volume=dollar_volume, raw_closes=raw_closes,
+            )
         latest_date = max(latest_date, result.as_of)
 
         entry = {

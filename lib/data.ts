@@ -67,6 +67,21 @@ export interface PortfolioFile {
 export interface CostModel {
   commission_bps: number;
   slippage_bps: number;
+  /**
+   * Optional Darwin cost-model parameters. Omitted fields fall back to Darwin's
+   * engine defaults in paper_trading/costs.py, so older specs keep working.
+   * See docs/concepts/data-contract.md and the Darwin methodology section.
+   */
+  /** Reference share price for price-scaled slippage (default 50). */
+  spread_ref_price?: number;
+  /** sqrt market-impact coefficient (default 0.5). */
+  volume_impact_coef?: number;
+  /** Crisis-aware vol cost scaling (defaults: enabled, k=0.75, 63/252d, max 3). */
+  vol_scaled_cost_enable?: boolean;
+  vol_cost_k?: number;
+  vol_cost_realized_window?: number;
+  vol_cost_long_window?: number;
+  vol_cost_mult_max?: number;
 }
 
 export interface StrategyMeta {

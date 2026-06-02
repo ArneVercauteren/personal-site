@@ -53,11 +53,12 @@ via `portfolio_state_override`, so a formula referencing `current_portfolio_draw
 
 **Parity boundary (what's guaranteed):** selection + target weights are *bit-exact* with Darwin's
 own evaluator (gated by `tests/test_evaluator_parity.py`); portfolio-state features match the
-engine's definitions (gated by `tests/test_portfolio_state.py`). The **equity curve** uses this
-repo's transparent cost model (commission+slippage bps on turnover) — not the native engine's full
-cost machinery (price-scaled slippage, volume impact, daily Sharpe grid). Market segmentation is
-disabled (global cross-sectional rank); `market_*` features need a benchmark series (v1 passes
-none → those features are NaN, handled).
+engine's definitions (gated by `tests/test_portfolio_state.py`). The **equity curve** now charges
+Darwin's full cost model — turnover-scaled commission, price-scaled slippage, sqrt volume impact,
+and the crisis-aware volatility multiplier (`costs.py`, gated by `tests/test_costs.py`) — so paper
+costs match the backtest the strategy was selected on. Market segmentation is disabled (global
+cross-sectional rank); `market_*` features need a benchmark series (v1 passes none → those features
+are NaN, handled).
 
 ## How a run works
 
@@ -66,16 +67,30 @@ none → those features are NaN, handled).
    (momentum). DSL warmup is sized from the formula's longest feature window.
 2. Re-evaluate on each rebalance date → target holdings: the DSL tree via the vendored evaluator
    (`signals.evaluate_formula`) or the momentum rule (`signals.evaluate`).
-3. Apply fills at the next bar's open with commission + slippage (`portfolio.simulate`).
+3. Apply fills at the next bar's open, then charge the Darwin cost haircut for that rebalance
+   (`portfolio.simulate` + `costs.py`).
 4. Mark to market daily; build the equity curve and recompute CAGR / Sharpe / max-DD.
 5. Merge the open entries into `public/data/{portfolio,strategies,trades}.json`.
 6. (In CI) commit the JSON if it changed → Vercel redeploys.
 
 ## Cost model
 
-Per `cost_model` in each strategy spec (`commission_bps`, `slippage_bps`). Buys fill at
-`open × (1 + slippage)`, sells at `open × (1 − slippage)`; commission is charged on traded
-notional. These are the **same** assumptions the Darwin Methodology page documents (plan §6.5).
+Darwin-faithful, in `paper_trading/costs.py` (ported from Darwin's `native_eval.c` cost block and
+`cost_models.py`). At each rebalance the simulator fills to target weights cost-free at the open,
+then applies a multiplicative **equity haircut**:
+
+```
+turnover    = Σ |target_w − prev_w|
+haircut      = (commission_bps·m + slippage_bps·m·price_scale)/1e4 · turnover   # commission + price-scaled slippage
+             + Σ_j dw_j · volume_impact_coef · sqrt(dw_j·portfolio_size / adv_j)   # sqrt market impact
+equity      *= (1 − haircut)
+```
+
+where `price_scale = max(spread_ref_price / harmonic_mean_price, 0.1)` (cheaper books pay more),
+`adv_j` is the review-date dollar volume (`raw_close × volume`), and `m` is the crisis-aware
+volatility multiplier `clip(1 + k·sqrt(realized_vol/long_vol), 1, mult_max)`. Parameters come from
+each spec's `cost_model`; omitted ones use Darwin's engine defaults. These are the **same**
+assumptions the Darwin Methodology page documents (plan §6.5).
 
 ## Rebalance cadence
 

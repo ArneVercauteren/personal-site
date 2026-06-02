@@ -189,7 +189,17 @@ named after your strategy's id (here `balanced_king_v3.json`):
   "portfolio_size": 100000,
   "base_currency": "USD",
   "rebalance_cadence_days": 42,
-  "cost_model": { "commission_bps": 1.0, "slippage_bps": 5.0 },
+  "cost_model": {
+    "commission_bps": 1.0,
+    "slippage_bps": 5.0,
+    "spread_ref_price": 50.0,
+    "volume_impact_coef": 0.5,
+    "vol_scaled_cost_enable": true,
+    "vol_cost_k": 0.75,
+    "vol_cost_realized_window": 63,
+    "vol_cost_long_window": 252,
+    "vol_cost_mult_max": 3.0
+  },
   "universe": ["AAPL", "MSFT", "NVDA", "JPM", "XOM", "UNH", "JNJ", "PG"],
   "formula": { "...": "the scrubbed DSL tree — see the note below" }
 }
@@ -208,7 +218,7 @@ What each field means:
 | `portfolio_size` | The pretend starting capital (e.g. $100,000). It's simulated — no real money. |
 | `base_currency` | The currency, e.g. `USD`. |
 | `rebalance_cadence_days` | How often it rebalances, in days (42 ≈ every 6 weeks). |
-| `cost_model` | Pretend trading costs, in "basis points" (1 bp = 0.01%). Makes the simulation realistic. |
+| `cost_model` | The Darwin cost model: commission + slippage in basis points (1 bp = 0.01%), plus price-scaled slippage, volume-impact, and volatility-scaling parameters. These match the costs the strategy was backtested under in Darwin. Only `commission_bps`/`slippage_bps` are required; the rest default to Darwin's engine values. |
 | `universe` | The list of stocks the strategy is allowed to choose from. |
 | `formula` | The actual strategy logic, as a structured "tree." **This is the secret.** |
 

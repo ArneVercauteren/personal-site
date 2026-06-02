@@ -21,6 +21,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from . import costs
 from . import portfolio_state as ps
 from . import signals
 
@@ -54,36 +55,86 @@ def _rebalance_dates(index: pd.DatetimeIndex, deployed_on: pd.Timestamp, cadence
     return out
 
 
+def _market_returns(closes: pd.DataFrame) -> pd.Series:
+    """Equal-weighted market daily-return proxy (mean across tickers).
+
+    Feeds the volatility cost multiplier, mirroring Darwin's market proxy
+    (`nanmean` of per-ticker returns) in `cost_models.py`.
+    """
+    return closes.pct_change().mean(axis=1)
+
+
+def _review_maps(day, names, raw_closes, closes, dollar_volume):
+    """Per-ticker review-date `(price, dollar_volume)` for the cost model.
+
+    Price uses nominal (raw) close when available — the price-scaled slippage is
+    a nominal-price notion — else the adjusted close. Dollar volume is None when
+    no volume frame was supplied, which makes the cost model skip the impact term.
+    """
+    price = {}
+    for t in names:
+        if raw_closes is not None and t in raw_closes.columns and day in raw_closes.index:
+            v = raw_closes.at[day, t]
+            price[t] = float(v) if pd.notna(v) else float(closes.at[day, t])
+        else:
+            price[t] = float(closes.at[day, t])
+
+    dvol = None
+    if dollar_volume is not None:
+        dvol = {}
+        for t in names:
+            if t in dollar_volume.columns and day in dollar_volume.index:
+                val = dollar_volume.at[day, t]
+                dvol[t] = float(val) if pd.notna(val) else None
+            else:
+                dvol[t] = None
+    return price, dvol
+
+
 def simulate(
     strategy: dict,
     opens: pd.DataFrame,
     closes: pd.DataFrame,
     prices_long: pd.DataFrame | None = None,
+    dollar_volume: pd.DataFrame | None = None,
+    raw_closes: pd.DataFrame | None = None,
 ) -> SimResult:
     """Simulate a strategy. Dispatches on the spec:
 
     * ``formula`` (a DSL tree) → the real vendored Darwin evaluator, with
       engine-faithful portfolio-state threading. Requires ``prices_long``.
     * ``signal`` (a momentum block) → the lightweight built-in path.
+
+    Costs are charged the Darwin way (see `costs.py`): a per-rebalance equity
+    haircut from turnover-scaled commission + price-scaled slippage + sqrt volume
+    impact. `dollar_volume` (review-date `price × volume`) and `raw_closes`
+    (nominal price) feed that model; both are optional — without `dollar_volume`
+    the impact term is skipped, and without `raw_closes` the adjusted close is
+    used for price scaling.
     """
     if "formula" in strategy:
         if prices_long is None:
             raise ValueError(
                 f"{strategy['id']}: DSL strategies require prices_long (long OHLCV)."
             )
-        return _simulate_dsl(strategy, opens, closes, prices_long)
-    return _simulate_signal(strategy, opens, closes)
+        return _simulate_dsl(strategy, opens, closes, prices_long, dollar_volume, raw_closes)
+    return _simulate_signal(strategy, opens, closes, dollar_volume, raw_closes)
 
 
-def _simulate_signal(strategy: dict, opens: pd.DataFrame, closes: pd.DataFrame) -> SimResult:
+def _simulate_signal(
+    strategy: dict,
+    opens: pd.DataFrame,
+    closes: pd.DataFrame,
+    dollar_volume: pd.DataFrame | None = None,
+    raw_closes: pd.DataFrame | None = None,
+) -> SimResult:
     capital = float(strategy["portfolio_size"])
     deployed_on = pd.Timestamp(strategy["deployed_on"])
     cadence = int(strategy["rebalance_cadence_days"])
-    cm = strategy["cost_model"]
-    commission = float(cm["commission_bps"]) / 1e4
-    slippage = float(cm["slippage_bps"]) / 1e4
+    cfg = costs.CostModel.from_spec(strategy["cost_model"])
     signal = strategy["signal"]
     tickers = list(closes.columns)
+    market_rets = _market_returns(closes)
 
     sim_index = closes.loc[deployed_on:].index
     if len(sim_index) == 0:
@@ -95,30 +146,43 @@ def _simulate_signal(strategy: dict, opens: pd.DataFrame, closes: pd.DataFrame) 
 
     cash = capital
     shares = {t: 0.0 for t in tickers}
-    target_weights: dict[str, float] = {}
+    pending_target: dict[str, float] = {}
+    pending_cost = 0.0
     last_trades: list[dict] = []
 
     curve: list[dict] = []
     equity_values: list[float] = []
 
     for i, day in enumerate(sim_index):
-        # Execute the previous rebalance's target at today's open.
-        if target_weights and i > 0:
-            equity_open = cash + sum(
-                shares[t] * opens.at[day, t] for t in tickers
+        # Execute the previous rebalance's target at today's open, then charge
+        # the Darwin equity haircut computed on the review date.
+        if pending_target and i > 0:
+            equity_open = cash + sum(shares[t] * opens.at[day, t] for t in tickers)
+            shares, cash, trades = _apply_targets(
+                pending_target, shares, cash, opens.loc[day], equity_open, tickers,
             )
-            new_shares, cash, trades = _apply_targets(
-                target_weights, shares, cash, opens.loc[day],
-                equity_open, commission, slippage, tickers,
-            )
-            shares = new_shares
+            cash -= equity_open * pending_cost
             if trades:
                 last_trades = [dict(d=day.strftime("%Y-%m-%d"), **tr) for tr in trades]
-            target_weights = {}
+            pending_target = {}
+            pending_cost = 0.0
 
         # Decide a new target on rebalance days (filled next open).
         if day in rebal_dates:
-            target_weights = signals.evaluate(signal, closes, day)
+            target = signals.evaluate(signal, closes, day)
+            equity_now = cash + sum(shares[t] * closes.at[day, t] for t in tickers)
+            prior_w = {
+                t: (shares[t] * closes.at[day, t]) / equity_now
+                for t in tickers
+                if equity_now > 0 and shares[t] * closes.at[day, t] > 0
+            }
+            names = set(prior_w) | set(target)
+            price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
+            vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
+            pending_cost = costs.rebalance_cost_fraction(
+                prior_w, target, price, dvol, capital, cfg, vol_mult
+            )["total_fraction"]
+            pending_target = target
 
         equity_close = cash + sum(shares[t] * closes.at[day, t] for t in tickers)
         equity_values.append(equity_close)
@@ -142,6 +206,8 @@ def _simulate_dsl(
     opens: pd.DataFrame,
     closes: pd.DataFrame,
     prices_long: pd.DataFrame,
+    dollar_volume: pd.DataFrame | None = None,
+    raw_closes: pd.DataFrame | None = None,
 ) -> SimResult:
     """Simulate a real DSL king via the vendored evaluator.
 
@@ -154,11 +220,10 @@ def _simulate_dsl(
     capital = float(strategy["portfolio_size"])
     deployed_on = pd.Timestamp(strategy["deployed_on"])
     cadence = int(strategy["rebalance_cadence_days"])
-    cm = strategy["cost_model"]
-    commission = float(cm["commission_bps"]) / 1e4
-    slippage = float(cm["slippage_bps"]) / 1e4
+    cfg = costs.CostModel.from_spec(strategy["cost_model"])
     formula = strategy["formula"]
     universe = list(closes.columns)
+    market_rets = _market_returns(closes)
 
     sim_index = closes.loc[deployed_on:].index
     if len(sim_index) == 0:
@@ -173,6 +238,7 @@ def _simulate_dsl(
     cash = capital
     shares = {t: 0.0 for t in universe}
     pending_target: dict[str, float] | None = None
+    pending_cost = 0.0
     equity_at_prev_rebal: float | None = None
     last_trades: list[dict] = []
 
@@ -180,16 +246,18 @@ def _simulate_dsl(
     equity_values: list[float] = []
 
     for i, day in enumerate(sim_index):
-        # Execute the previous rebalance's target at today's open.
+        # Execute the previous rebalance's target at today's open, then charge
+        # the Darwin equity haircut computed on the review date.
         if pending_target is not None and i > 0:
             equity_open = cash + sum(shares[t] * opens.at[day, t] for t in universe)
             shares, cash, trades = _apply_targets(
-                pending_target, shares, cash, opens.loc[day],
-                equity_open, commission, slippage, universe,
+                pending_target, shares, cash, opens.loc[day], equity_open, universe,
             )
+            cash -= equity_open * pending_cost
             if trades:
                 last_trades = [dict(d=day.strftime("%Y-%m-%d"), **tr) for tr in trades]
             pending_target = None
+            pending_cost = 0.0
 
         # Rebalance decision on review days (filled at next open).
         if day in rebal_set:
@@ -221,6 +289,13 @@ def _simulate_dsl(
             )
             target = {t: float(w) for t, w in res["final_weights"].items() if w > 0}
             state.push_turnover(target, prior_w)
+
+            names = set(prior_w) | set(target)
+            price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
+            vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
+            pending_cost = costs.rebalance_cost_fraction(
+                prior_w, target, price, dvol, capital, cfg, vol_mult
+            )["total_fraction"]
             pending_target = target
             equity_at_prev_rebal = equity_now
 
@@ -241,12 +316,13 @@ def _simulate_dsl(
     )
 
 
-def _apply_targets(targets, shares, cash, open_px, equity, commission, slippage, tickers):
-    """Move holdings toward `targets` at today's open, charging costs.
+def _apply_targets(targets, shares, cash, open_px, equity, tickers):
+    """Move holdings toward `targets` at today's open (cost-free fills).
 
-    Buys fill at open*(1+slippage), sells at open*(1-slippage); commission is
-    charged on traded notional. Returns (new_shares, new_cash, trades) where each
-    trade records the *change in weight* for the ticker.
+    Fills happen at the open with no per-share slippage or commission — costs are
+    charged separately as a Darwin-style equity haircut (see `costs.py`), so the
+    fill itself is equity-neutral. Returns (new_shares, new_cash, trades) where
+    each trade records the *change in weight* for the ticker.
     """
     new_shares = dict(shares)
     trades: list[dict] = []
@@ -262,20 +338,10 @@ def _apply_targets(targets, shares, cash, open_px, equity, commission, slippage,
 
         target_val = tgt_w * equity
         delta_val = target_val - cur_val
-        if delta_val > 0:  # buy
-            fill = px * (1 + slippage)
-            qty = delta_val / fill
-            new_shares[t] = shares[t] + qty
-            cash -= qty * fill
-            cash -= abs(qty * fill) * commission
-            side = "buy"
-        else:  # sell
-            fill = px * (1 - slippage)
-            qty = (-delta_val) / fill
-            new_shares[t] = shares[t] - qty
-            cash += qty * fill
-            cash -= abs(qty * fill) * commission
-            side = "sell"
+        qty = delta_val / px
+        new_shares[t] = shares[t] + qty
+        cash -= qty * px
+        side = "buy" if delta_val > 0 else "sell"
 
         trades.append(
             {"ticker": t, "side": side, "weight": round(abs(delta_w), 4)}
