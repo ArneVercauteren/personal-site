@@ -34,11 +34,15 @@ personal-site/                          (PUBLIC repo)
 │  ├─ data.ts                          # THE DATA CONTRACT — typed loaders
 │  ├─ content.ts                       # MDX/frontmatter loading
 │  └─ format.ts                        # %, $, date helpers
-├─ paper_trading/                       (planned) Tier-2b ENGINE + OPEN strategies (not secret)
+├─ paper_trading/                       Tier-2b ENGINE + OPEN strategies (not secret)
 │  ├─ requirements.txt  update.py  prices.py  portfolio.py  signals.py
+│  ├─ costs.py  secured.py             # Darwin cost model; secured sanitizer + leak guard
+│  ├─ universe.py  update_universe.py  ticker_sectors.json  # self-refreshing universe + sector map
+│  ├─ darwin_eval/                     # vendored Darwin DSL evaluator
+│  ├─ tests/                           # pytest suite
 │  └─ strategies/                      # OPEN (public) formulas only
 ├─ public/
-│  ├─ data/{portfolio.json,trades.json,strategies.json}  # published snapshots (sample data)
+│  ├─ data/{portfolio.json,trades.json,strategies.json,universe.json}  # published snapshots
 │  ├─ resume.pdf                       (planned)
 │  └─ art/  audio/                     (planned) static media for Studio
 ├─ docs/                                # this tree

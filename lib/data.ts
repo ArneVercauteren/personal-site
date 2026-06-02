@@ -76,6 +76,9 @@ export interface CostModel {
   spread_ref_price?: number;
   /** sqrt market-impact coefficient (default 0.5). */
   volume_impact_coef?: number;
+  /** Authoritative book size the volume-impact term sizes trades against
+   *  (default Darwin's $1,000,000), independent of the traded portfolio_size. */
+  impact_portfolio_size?: number;
   /** Crisis-aware vol cost scaling (defaults: enabled, k=0.75, 63/252d, max 3). */
   vol_scaled_cost_enable?: boolean;
   vol_cost_k?: number;

@@ -30,7 +30,7 @@ def test_flat_commission_and_slippage():
     cfg = _cfg(commission_bps=10.0, slippage_bps=5.0)  # spread_ref=0 → no price scaling
     res = rebalance_cost_fraction(
         {"A": 0.5, "B": 0.5}, {"A": 0.7, "B": 0.3},
-        {"A": 100.0, "B": 100.0}, None, 100_000.0, cfg, vol_cost_mult=1.0,
+        {"A": 100.0, "B": 100.0}, None, cfg, vol_cost_mult=1.0,
     )
     assert res["turnover"] == pytest.approx(0.4)
     assert res["effective_slippage_bps"] == pytest.approx(5.0)
@@ -42,7 +42,7 @@ def test_flat_commission_and_slippage():
 def test_price_scaled_slippage_cheap_book_pays_more():
     cfg = _cfg(slippage_bps=5.0, spread_ref_price=50.0)
     res = rebalance_cost_fraction(
-        {}, {"A": 0.5, "B": 0.5}, {"A": 25.0, "B": 25.0}, None, 100_000.0, cfg, 1.0,
+        {}, {"A": 0.5, "B": 0.5}, {"A": 25.0, "B": 25.0}, None, cfg, 1.0,
     )
     # harmonic mean price = 25 → scale = 50/25 = 2 → eff slippage 10 bps; turnover 1.0
     assert res["effective_slippage_bps"] == pytest.approx(10.0)
@@ -52,26 +52,42 @@ def test_price_scaled_slippage_cheap_book_pays_more():
 def test_price_scale_floor_at_0_1():
     cfg = _cfg(slippage_bps=5.0, spread_ref_price=50.0)
     res = rebalance_cost_fraction(
-        {}, {"A": 1.0}, {"A": 1000.0}, None, 100_000.0, cfg, 1.0,
+        {}, {"A": 1.0}, {"A": 1000.0}, None, cfg, 1.0,
     )
     # scale = 50/1000 = 0.05 < 0.1 → floored to 0.1 → eff slippage 0.5 bps
     assert res["effective_slippage_bps"] == pytest.approx(0.5)
 
 
 def test_volume_impact_sqrt_term():
-    cfg = _cfg(volume_impact_coef=0.5)
+    cfg = _cfg(volume_impact_coef=0.5, impact_portfolio_size=100_000.0)
     res = rebalance_cost_fraction(
-        {}, {"A": 0.5}, {"A": 100.0}, {"A": 5e8}, 100_000.0, cfg, 1.0,
+        {}, {"A": 0.5}, {"A": 100.0}, {"A": 5e8}, cfg, 1.0,
     )
     # dw=0.5, trade_value=50_000, adv=5e8 → impact=0.5*sqrt(1e-4)=0.005 → 0.5*0.005
     assert res["volume_impact_fraction"] == pytest.approx(0.0025)
     assert res["commission_slippage_fraction"] == 0.0
 
 
+def test_impact_portfolio_size_sizes_trades():
+    # Same trade, 4× the impact book → 2× the impact (sqrt scaling).
+    small = _cfg(volume_impact_coef=0.5, impact_portfolio_size=100_000.0)
+    big = _cfg(volume_impact_coef=0.5, impact_portfolio_size=400_000.0)
+    args = ({}, {"A": 0.5}, {"A": 100.0}, {"A": 5e8})
+    r_small = rebalance_cost_fraction(*args, small, 1.0)["volume_impact_fraction"]
+    r_big = rebalance_cost_fraction(*args, big, 1.0)["volume_impact_fraction"]
+    assert r_big == pytest.approx(2.0 * r_small)
+
+
+def test_impact_portfolio_size_defaults_to_darwin_1m():
+    from paper_trading.costs import CostModel, DEFAULT_IMPACT_PORTFOLIO_SIZE
+    cfg = CostModel.from_spec({"commission_bps": 1.0, "slippage_bps": 5.0})
+    assert cfg.impact_portfolio_size == DEFAULT_IMPACT_PORTFOLIO_SIZE == 1_000_000.0
+
+
 def test_missing_adv_penalty():
     cfg = _cfg(volume_impact_coef=0.5)
     res = rebalance_cost_fraction(
-        {}, {"A": 0.4}, {"A": 100.0}, {"A": 0.0}, 100_000.0, cfg, 1.0,
+        {}, {"A": 0.4}, {"A": 100.0}, {"A": 0.0}, cfg, 1.0,
     )
     # adv 0 → penalty dw * 0.05 = 0.4 * 0.05
     assert res["volume_impact_fraction"] == pytest.approx(0.02)
@@ -80,15 +96,16 @@ def test_missing_adv_penalty():
 def test_no_volume_frame_skips_impact():
     cfg = _cfg(volume_impact_coef=0.5)
     res = rebalance_cost_fraction(
-        {}, {"A": 1.0}, {"A": 100.0}, None, 100_000.0, cfg, 1.0,
+        {}, {"A": 1.0}, {"A": 100.0}, None, cfg, 1.0,
     )
     assert res["volume_impact_fraction"] == 0.0
 
 
 def test_vol_mult_scales_commission_slippage_but_not_impact():
-    cfg = _cfg(commission_bps=10.0, slippage_bps=10.0, volume_impact_coef=0.5)
+    cfg = _cfg(commission_bps=10.0, slippage_bps=10.0, volume_impact_coef=0.5,
+               impact_portfolio_size=100_000.0)
     res = rebalance_cost_fraction(
-        {}, {"A": 1.0}, {"A": 100.0}, {"A": 1e7}, 100_000.0, cfg, vol_cost_mult=2.0,
+        {}, {"A": 1.0}, {"A": 100.0}, {"A": 1e7}, cfg, vol_cost_mult=2.0,
     )
     # commission+slippage scaled ×2: (20 + 20)/1e4 * 1.0 = 0.004
     assert res["commission_slippage_fraction"] == pytest.approx(0.004)

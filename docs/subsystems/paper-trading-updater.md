@@ -62,9 +62,11 @@ are NaN, handled).
 
 ## How a run works
 
-1. For each spec in `paper_trading/strategies/*.json`, fetch daily bars for its universe over
-   `[deployed_on − warmup, today]` — `prices.get_ohlcv` (DSL) or `prices.get_price_history`
-   (momentum). DSL warmup is sized from the formula's longest feature window.
+1. For each spec in `paper_trading/strategies/*.json`, resolve its universe
+   (`universe.resolve_universe` — the spec's explicit list, else the shared self-refreshing
+   `public/data/universe.json`; see [universe.md](universe.md)) and fetch daily bars for it over
+   `[deployed_on − warmup, today]` via `prices.get_ohlcv`. DSL warmup is sized from the formula's
+   longest feature window.
 2. Re-evaluate on each rebalance date → target holdings: the DSL tree via the vendored evaluator
    (`signals.evaluate_formula`) or the momentum rule (`signals.evaluate`).
 3. Apply fills at the next bar's open, then charge the Darwin cost haircut for that rebalance
@@ -82,7 +84,7 @@ then applies a multiplicative **equity haircut**:
 ```
 turnover    = Σ |target_w − prev_w|
 haircut      = (commission_bps·m + slippage_bps·m·price_scale)/1e4 · turnover   # commission + price-scaled slippage
-             + Σ_j dw_j · volume_impact_coef · sqrt(dw_j·portfolio_size / adv_j)   # sqrt market impact
+             + Σ_j dw_j · volume_impact_coef · sqrt(dw_j·impact_portfolio_size / adv_j)   # sqrt market impact
 equity      *= (1 − haircut)
 ```
 

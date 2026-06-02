@@ -46,6 +46,11 @@ DEFAULT_VOL_COST_K = 0.75
 DEFAULT_VOL_COST_REALIZED_WINDOW = 63
 DEFAULT_VOL_COST_LONG_WINDOW = 252
 DEFAULT_VOL_COST_MULT_MAX = 3.0
+# The book size the sqrt volume-impact term sizes trades against. Darwin's
+# backtests use FinancialRealism.portfolio_size ($1M), independent of the
+# strategy's displayed/traded capital, so the live paper cost matches the
+# backtest. Authoritative per-spec via cost_model.impact_portfolio_size.
+DEFAULT_IMPACT_PORTFOLIO_SIZE = 1_000_000.0
 
 MISSING_ADV_PENALTY = 0.05   # native_eval.c: traded name with no ADV → 5% slippage
 MIN_PRICE_SCALE = 0.1        # native_eval.c: price-scale floor (no upper cap)
@@ -63,6 +68,7 @@ class CostModel:
     slippage_bps: float
     spread_ref_price: float = DEFAULT_SPREAD_REF_PRICE
     volume_impact_coef: float = DEFAULT_VOLUME_IMPACT_COEF
+    impact_portfolio_size: float = DEFAULT_IMPACT_PORTFOLIO_SIZE
     vol_scaled_cost_enable: bool = True
     vol_cost_k: float = DEFAULT_VOL_COST_K
     vol_cost_realized_window: int = DEFAULT_VOL_COST_REALIZED_WINDOW
@@ -76,6 +82,7 @@ class CostModel:
             slippage_bps=float(cm["slippage_bps"]),
             spread_ref_price=float(cm.get("spread_ref_price", DEFAULT_SPREAD_REF_PRICE)),
             volume_impact_coef=float(cm.get("volume_impact_coef", DEFAULT_VOLUME_IMPACT_COEF)),
+            impact_portfolio_size=float(cm.get("impact_portfolio_size", DEFAULT_IMPACT_PORTFOLIO_SIZE)),
             vol_scaled_cost_enable=bool(cm.get("vol_scaled_cost_enable", True)),
             vol_cost_k=float(cm.get("vol_cost_k", DEFAULT_VOL_COST_K)),
             vol_cost_realized_window=int(cm.get("vol_cost_realized_window", DEFAULT_VOL_COST_REALIZED_WINDOW)),
@@ -126,7 +133,6 @@ def rebalance_cost_fraction(
     target_w: dict[str, float],
     review_price: dict[str, float],
     review_dollar_volume: dict[str, float] | None,
-    portfolio_size: float,
     cfg: CostModel,
     vol_cost_mult: float = 1.0,
 ) -> dict:
@@ -139,7 +145,9 @@ def rebalance_cost_fraction(
     `review_price` / `review_dollar_volume` are keyed by ticker at the review
     date. When `review_dollar_volume` is None the volume-impact term is skipped
     entirely (mirrors Darwin running with no volume array), rather than charging
-    the missing-ADV penalty.
+    the missing-ADV penalty. The volume-impact term sizes trades against
+    `cfg.impact_portfolio_size` (the authoritative cost-model book size), not the
+    strategy's traded capital — so live paper impact matches the backtest.
     """
     names = set(prev_w) | set(target_w)
     turnover = sum(abs(target_w.get(t, 0.0) - prev_w.get(t, 0.0)) for t in names)
@@ -173,7 +181,7 @@ def rebalance_cost_fraction(
                 continue
             adv = review_dollar_volume.get(t)
             if adv is not None and adv > 0.0 and np.isfinite(adv):
-                impact = cfg.volume_impact_coef * float(np.sqrt(dw * portfolio_size / adv))
+                impact = cfg.volume_impact_coef * float(np.sqrt(dw * cfg.impact_portfolio_size / adv))
                 volume_impact_fraction += dw * impact
             else:
                 volume_impact_fraction += dw * MISSING_ADV_PENALTY

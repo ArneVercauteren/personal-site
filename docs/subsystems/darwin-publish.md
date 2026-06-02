@@ -54,11 +54,12 @@ A deployed strategy is one `*.json` file matching the strategy-spec the updater 
   "rebalance_cadence_days": 42,
   "cost_model": {                                 // the Darwin run's actual cost config (see below)
     "commission_bps": 5.0, "slippage_bps": 5.0,
-    "spread_ref_price": 50.0, "volume_impact_coef": 0.5,
+    "spread_ref_price": 50.0, "volume_impact_coef": 0.5, "impact_portfolio_size": 1000000,
     "vol_scaled_cost_enable": true, "vol_cost_k": 0.75,
     "vol_cost_realized_window": 63, "vol_cost_long_window": 252, "vol_cost_mult_max": 3.0
   },
-  "universe": ["AAPL", "MSFT", "..."],            // the strategy's tradable set
+  "universe": [],                                 // usually empty → resolves to the shared universe
+                                                  //   (see subsystems/universe.md); set a list to pin one
   "formula": { "mode": "top_n", "top_n": 8, "kind": "...", "children": [] },  // BOTH open + secured
   "formula_ref": "/projects/darwin"                // open only: link to the public writeup
 }
@@ -85,15 +86,14 @@ config of that run, not literals:
 |---|---|
 | `commission_bps` | the run's `--cost-bps` (CLI default **5.0**) |
 | `slippage_bps` | the run's `--slip-bps` (CLI default **5.0**) |
-| `spread_ref_price`, `volume_impact_coef` | `cfg.financial_realism` (defaults 50.0, 0.5) |
+| `spread_ref_price`, `volume_impact_coef`, `impact_portfolio_size` | `cfg.realism` (defaults 50.0, 0.5, **$1,000,000**) |
 | `vol_scaled_cost_enable`, `vol_cost_k`, `vol_cost_realized_window`, `vol_cost_long_window`, `vol_cost_mult_max` | `cfg.backtest_diag` (defaults true, 0.75, 63, 252, 3.0) |
 
-> **Open decision — impact sizing.** Darwin's volume-impact term sizes against
-> `cfg.financial_realism.portfolio_size` (**$1,000,000**), while the live paper sim sizes against
-> the strategy's own `portfolio_size` (e.g. $100k). sqrt-impact scales with √size, so a smaller
-> book pays less. Either set the deployed `portfolio_size` to match Darwin's, or add a separate
-> `impact_portfolio_size` field to `cost_model`. Decide at deploy time; default to the strategy's
-> own `portfolio_size` (what it actually trades).
+**Impact sizing (resolved).** The volume-impact term sizes trades against the authoritative
+`cost_model.impact_portfolio_size`, **not** the strategy's traded `portfolio_size`. The export
+emits it from `cfg.realism.portfolio_size` (Darwin's **$1,000,000** default), so live paper impact
+matches the backtest regardless of the displayed book. Override it per-spec only if you deliberately
+want a different impact assumption.
 
 ## UI export button (Darwin frontend)
 
@@ -113,7 +113,9 @@ site" is small:
 3. **Where it lands:** the downloaded file is dropped into the **public** repo's
    `paper_trading/strategies/` (open) or the **private** repo's `strategies/` (secured). A later
    `scripts/deploy_to_site.py` can automate that placement; the button gives the correct file today.
-   `universe` and `portfolio_size` are deploy-time choices the operator finalizes in the file.
+   `universe` is normally left empty — it resolves to the shared self-refreshing universe
+   ([universe.md](universe.md)) so a king deployed once stays current; set a list only to pin one.
+   `portfolio_size` is the deploy-time book size the operator sets in the file.
 
 **Status: built** (Darwin repo) — `ui/backend/exports/site.py`, the `site-spec` route, and the two
 `StrategyDrawer` menu items. This keeps Darwin's UI as the single deploy surface and produces the

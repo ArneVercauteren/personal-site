@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import portfolio, prices
+from . import portfolio, prices, universe
 from .darwin_eval.select_on_date import collect_all_needed_features, required_history_days
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -80,6 +80,8 @@ def run() -> str:
 
     for spec in specs:
         end = pd.Timestamp.today().strftime("%Y-%m-%d")
+        # Explicit spec universe, else the shared self-refreshing universe.
+        tickers = universe.resolve_universe(spec)
 
         if "formula" in spec:
             # Real DSL king: warm up enough history for the longest feature window.
@@ -87,7 +89,7 @@ def run() -> str:
             warmup = max(WARMUP_DAYS, int(required_history_days(needed) * 1.6) + 30)
             start = (pd.Timestamp(spec["deployed_on"]) - pd.Timedelta(days=warmup)).strftime("%Y-%m-%d")
             # The evaluator needs the long OHLCV frame.
-            long = prices.get_ohlcv(spec["universe"], start, end)
+            long = prices.get_ohlcv(tickers, start, end)
             opens, closes = prices.long_to_wide(long)
             raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
             result = portfolio.simulate(
@@ -96,7 +98,7 @@ def run() -> str:
             )
         else:
             start = (pd.Timestamp(spec["deployed_on"]) - pd.Timedelta(days=WARMUP_DAYS)).strftime("%Y-%m-%d")
-            long = prices.get_ohlcv(spec["universe"], start, end)
+            long = prices.get_ohlcv(tickers, start, end)
             opens, closes = prices.long_to_wide(long)
             raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
             result = portfolio.simulate(

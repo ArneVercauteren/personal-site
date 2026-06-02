@@ -40,7 +40,7 @@ Condensed in [docs/playbook/ai-workflow.md](../docs/playbook/ai-workflow.md). Su
 
 1. Locate the tier — site (Tier 1), updater (Tier 2), or publish step (Tier 3). Name it before editing.
 2. Read the relevant `docs/subsystems/` page and any `docs/concepts/` it links.
-3. If you touch the JSON shape, change `lib/data.ts` (reader) and the writer(s) — the open updater in `paper_trading/` and the secured sanitizer in the private repo — in lockstep. The contract is the coupling point.
+3. If you touch the JSON shape, change `lib/data.ts` (reader) and the writer(s) — the open updater in `paper_trading/` and the secured updater in the private repo (which calls the shared sanitizer `paper_trading/secured.py`) — in lockstep. The contract is the coupling point.
 4. Confirm no secret, key, broker path, formula, or ticker weight entered the public repo.
 5. Confirm the public site stays read-only, secured entries expose no `positions`/formula, and the paper-only disclaimer is intact.
 6. Run lint + build (and the updater locally if you touched `paper_trading/`).
@@ -71,6 +71,7 @@ Full build / dev commands: [docs/reference/build-and-dev.md](../docs/reference/b
 | Open vs secured strategies | [docs/concepts/open-vs-secured-strategies.md](../docs/concepts/open-vs-secured-strategies.md) |
 | The JSON the site reads | [docs/concepts/data-contract.md](../docs/concepts/data-contract.md) |
 | Open-strategy simulator/engine (Tier 2b) | [docs/subsystems/paper-trading-updater.md](../docs/subsystems/paper-trading-updater.md) |
+| Tradable universe (self-refreshing) | [docs/subsystems/universe.md](../docs/subsystems/universe.md) |
 | Secured pipeline (private repo, Tier 2a) | [docs/subsystems/secured-updater.md](../docs/subsystems/secured-updater.md) |
 | Scheduled job / CI cron | [docs/subsystems/scheduled-job.md](../docs/subsystems/scheduled-job.md) |
 | Darwin → site publish step (Tier 3) | [docs/subsystems/darwin-publish.md](../docs/subsystems/darwin-publish.md) |

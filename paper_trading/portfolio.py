@@ -180,7 +180,7 @@ def _simulate_signal(
             price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
             vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
             pending_cost = costs.rebalance_cost_fraction(
-                prior_w, target, price, dvol, capital, cfg, vol_mult
+                prior_w, target, price, dvol, cfg, vol_mult
             )["total_fraction"]
             pending_target = target
 
@@ -294,7 +294,7 @@ def _simulate_dsl(
             price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
             vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
             pending_cost = costs.rebalance_cost_fraction(
-                prior_w, target, price, dvol, capital, cfg, vol_mult
+                prior_w, target, price, dvol, cfg, vol_mult
             )["total_fraction"]
             pending_target = target
             equity_at_prev_rebal = equity_now

@@ -30,6 +30,7 @@ The full design rationale lives in [plans_and_text_files/PERSONAL_WEBSITE_PLAN.m
 | The JSON shape the site reads/writes | [concepts/data-contract.md](concepts/data-contract.md) |
 | Open vs secured strategies (security boundary) | [concepts/open-vs-secured-strategies.md](concepts/open-vs-secured-strategies.md) |
 | The open-strategy simulator/engine (Tier 2b) | [subsystems/paper-trading-updater.md](subsystems/paper-trading-updater.md) → [concepts/paper-trading-only.md](concepts/paper-trading-only.md) |
+| The tradable universe (self-refreshing) | [subsystems/universe.md](subsystems/universe.md) |
 | The secured pipeline (private repo, Tier 2a) | [subsystems/secured-updater.md](subsystems/secured-updater.md) → [concepts/open-vs-secured-strategies.md](concepts/open-vs-secured-strategies.md) |
 | The scheduled GitHub Actions job | [subsystems/scheduled-job.md](subsystems/scheduled-job.md) → [concepts/static-first.md](concepts/static-first.md) |
 | The Darwin → site publish step (Tier 3) | [subsystems/darwin-publish.md](subsystems/darwin-publish.md) → [concepts/separation-from-darwin.md](concepts/separation-from-darwin.md) |

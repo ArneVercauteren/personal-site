@@ -1,0 +1,55 @@
+name: Universe — monthly refresh
+
+# Rebuilds the shared tradable universe (public/data/universe.json) from the
+# Nasdaq Trader symbol directory + liquidity filters. Heavy (fetches bars for a
+# few thousand names), so it runs monthly — independent of the daily mark, which
+# only reads the committed file. See docs/subsystems/universe.md.
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"     # 06:00 UTC on the 1st of each month
+  workflow_dispatch:
+    inputs:
+      cap:
+        description: "Max number of tickers to keep (most liquid first)"
+        required: false
+        default: "1200"
+
+concurrency:
+  group: universe-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r paper_trading/requirements.txt
+
+      - name: Rebuild the shared universe
+        env:
+          UNIVERSE_CAP: ${{ github.event.inputs.cap || '1200' }}
+        run: python -m paper_trading.update_universe
+
+      - name: Commit refreshed universe (if changed)
+        run: |
+          git config user.name "universe-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add public/data/universe.json
+          if git diff --staged --quiet; then
+            echo "No universe changes; nothing to commit."
+          else
+            git commit -m "data: refresh tradable universe [skip ci]"
+            git push
+          fi

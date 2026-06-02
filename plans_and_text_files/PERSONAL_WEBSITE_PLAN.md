@@ -151,7 +151,9 @@ The dashboard renders two visibly distinct kinds of strategy. The distinction is
 - **Formula:** private. Never published, never in the public repo.
 - **Weights:** private. Never published as individual tickers.
 - **Disclosure:** **aggregate exposure only** — sector / asset-class allocation (e.g.
-  "Technology 32%, Healthcare 18%"), plus the equity curve and headline stats.
+  "Technology 32%, Healthcare 18%"), plus the equity curve and headline stats. The breakdown is an
+  **approximation** (SEC-derived sector map; unmapped names bucket into "Other"), and the live donut
+  says so.
 - **Where it runs:** a **private** repo's GitHub Actions (Tier 2a). It holds the formulas,
   does both the rebalance and the daily mark, maps tickers → sector and aggregates the
   weights, then pushes only the sanitized snapshot to the public repo.
@@ -174,7 +176,7 @@ metadata, set when it's deployed and shown on the site. This is published in
 | `base_currency` | `USD` | |
 | `rebalance_cadence_days` | `42` | how often it rebalances (≈ every 1–2 months) |
 | `deployed_on` | `2026-05-01` | when it went live on the site |
-| `cost_model` | `{commission_bps: 1.0, slippage_bps: 5.0}` | the fill assumptions used (also surfaced in §6.5) |
+| `cost_model` | `{commission_bps, slippage_bps, spread_ref_price, volume_impact_coef, impact_portfolio_size, vol_*}` | the full Darwin cost model (see §6.5); only the two bps fields are required, the rest default to Darwin's engine values |
 | `blurb` | "Balanced risk/return king…" | one-line description |
 
 None of this is sensitive — it describes *how the sim is run*, not the formula or the basket —
@@ -188,8 +190,11 @@ The `/darwin` page carries a **Methodology** subsection that explains, in plain 
   at the next bar's open; the train/OOS firewall (fitness clamped to the training cutoff, OOS
   used only for replay); non-overlapping regime windows; what CAGR / Sharpe / max-drawdown /
   Calmar mean here.
-- **The cost model** — commission (bps) and slippage (bps) applied per fill, how the fill price
-  is derived (next-open + slippage), and why realistic costs matter for an honest equity curve.
+- **The cost model** — the **Darwin-faithful** model (`paper_trading/costs.py`): a per-rebalance
+  equity haircut from turnover-scaled commission + **price-scaled slippage** (cheaper books pay
+  more) + **sqrt volume impact** (sized against `impact_portfolio_size`, default Darwin's $1M) +
+  a **crisis-aware volatility multiplier**. Same formulas as Darwin's `native_eval.c`, so the live
+  paper curve carries the same costs the strategy was backtested under.
 
 These are the *same* assumptions the live paper sim uses (§6.4 `cost_model`), so the
 methodology page and the live numbers stay consistent. Authored as MDX under
@@ -216,9 +221,34 @@ live solely in the private repo.
    sanitized JSON pushed from the private repo to the public repo.
 5. **Commit** → Vercel redeploys automatically.
 
-**Signal evaluation parity:** start with a lightweight pure-Python re-implementation of the
-deployed formulas (plan option A). Vendor Darwin's compiler/backtester (option B) only if
-parity drift matters. Either way the evaluation *code* may be public; the *formulas* are not.
+**Signal evaluation parity:** **done via option B** — Darwin's DSL evaluator is vendored into
+`paper_trading/darwin_eval/` (with an engine-faithful `portfolio_state.py`) and **parity-tested**
+against Darwin's own `select_tickers_on_date` (`tests/test_evaluator_parity.py`). Selection + target
+weights are bit-exact with Darwin; the evaluation *code* is public, the *formulas* are not. (The
+lighter option A is no longer the path.)
+
+### 7.1 Tradable universe (self-refreshing, Darwin-independent)
+
+Each deployed strategy needs a *current* set of tickers to pick from each rebalance. Snapshotting
+Darwin's universe at deploy time is **rejected**: it inherits Darwin's data age (a king deployed
+off six-month-old data could never hold anything newer) and would pull a keyed paid feed +
+Darwin's data into the public repo. Instead the universe is built in the public repo from public,
+keyless sources and the **same filters Darwin uses**, and refreshes on its own schedule:
+
+1. **Listings:** the **Nasdaq Trader symbol directory** (`nasdaqlisted.txt` + `otherlisted.txt`) —
+   every NYSE/NASDAQ/AMEX symbol, updated each trading day, free + keyless (yfinance has no listing
+   endpoint, so the symbol list comes from the exchanges' own files).
+2. **Symbol filters:** drop test issues, warrants/units/rights/preferred, leveraged/inverse
+   (regexes vendored from Darwin's `ticker_filtering.py`).
+3. **Liquidity/price:** last close ≥ $10 and trailing median dollar volume ≥ $5M (Darwin's
+   `FinancialRealism` thresholds), ranked by liquidity and capped (default top ~1,200) so daily
+   fetches stay bounded. The evaluator's `eligibility.py` re-applies these at every rebalance.
+
+A **monthly** workflow (`update_universe.py` → `universe-refresh.yml`) does the heavy fetch and
+commits `public/data/universe.json`; the daily updater just reads it (`universe.resolve_universe`).
+A strategy with an explicit non-empty `universe` keeps it; one that omits it resolves to the shared
+file. So a king is deployed **once** and new tickers flow in via the monthly refresh — the Darwin
+deploy stays decoupled from universe upkeep. See `docs/subsystems/universe.md`.
 
 ---
 
@@ -248,30 +278,28 @@ The public repo never receives, and its git history never contains, any formula 
 
 ### 8.1 Deploying a strategy from Darwin (Tier 3)
 
-Deployment is a one-shot operator action driven by a script in the **Darwin** repo, adapted
-from existing tooling rather than written from scratch:
+Deployment is a one-shot operator action from the **Darwin UI**, now **built** as an export button:
 
-- **Reuse `scripts/select_on_date_yf.py`** (wrapping `src/backtest/select_on_date.py`) for the
-  **rebalance evaluation**. It already evaluates a strategy formula on a given date using
-  pure-Python feature computation + keyless yfinance — no feature store, no native engine, no
-  secrets. This *is* the "option A" evaluator, so the private repo's `rebalance.yml` runs the
-  same code Darwin uses for picks. (`scripts/reconcile_portfolio_to_target.py` is a secondary
-  reference for turning target picks into weights.)
-- **Add `scripts/deploy_to_site.py`** (new, in the Darwin repo) that, given a chosen king + a
-  few parameters, does the deploy:
-  1. Scrubs the king to a portable formula JSON (no internal paths / secrets).
-  2. Attaches the §6.4 metadata: `portfolio_size`, `base_currency`, `rebalance_cadence_days`,
-     `visibility` (open/secured), `cost_model`, `blurb`.
-  3. Pushes the scrubbed formula + metadata into the **private** repo's `strategies/`
-     (secured) — or opens a PR to the **public** repo's `paper_trading/strategies/` (open).
-  4. **Registers the rebalance cadence.** Each strategy's `rebalance_cadence_days` +
-     `next_rebalance_date` live in its metadata; the private repo's `rebalance.yml` runs on a
-     daily cron and rebalances exactly the strategies whose `next_rebalance_date` is due, then
-     advances it by the cadence. So one workflow serves many strategies at independent
-     cadences — the deploy script just stamps the cadence and ensures the workflow exists.
+- **The "Deploy to site" export (built).** Darwin's strategy drawer (`StrategyDrawer.tsx`) has two
+  `ExportMenu` items — *Open strategy (public repo)* and *Secured strategy (private repo)* — backed
+  by `GET /api/strategies/{id}/site-spec` (`ui/backend/exports/site.py`). It assembles the exact
+  strategy-spec JSON the updater runs:
+  1. **Formula** from the strategy's round-trippable `raw_json` (Darwin's `src/dsl/serialize.py`) —
+     scrubbed, portable. Carried in **both** open and secured exports (the secured file lives in the
+     private repo and is *run* there; the security boundary is enforced at publish via
+     `assert_sanitized`, not by omitting the formula).
+  2. **§6.4 metadata** + the full **`cost_model`** read live from the engine config (`cfg.realism`,
+     `cfg.backtest_diag`; commission/slippage = Darwin's `5/5` CLI defaults).
+  3. **`visibility`** chosen by which menu item; open also gets a public `formula_ref`.
+  4. **`universe` left empty** → resolves to the shared self-refreshing universe (§7.1), so a king
+     deployed once stays current. **Cadence:** `rebalance_cadence_days` + `next_rebalance_date` are
+     stamped so the daily cron rebalances strategies when due.
+- The operator drops the downloaded file into the public repo's `paper_trading/strategies/` (open) or
+  the private repo's `strategies/` (secured). A future `scripts/deploy_to_site.py` can automate that
+  placement; the button produces the correct file today.
 
-This keeps Darwin's involvement to a single deploy action per strategy; the recurring
-rebalance + daily mark are fully automatic thereafter (§2).
+This keeps Darwin's involvement to a single click per strategy; the recurring rebalance + daily mark
+are fully automatic thereafter (§2). See `docs/subsystems/darwin-publish.md`.
 
 ---
 
@@ -303,12 +331,15 @@ personal-site/
 │  └─ format.ts                        # %, $, date helpers
 ├─ paper_trading/                      # Tier-2 ENGINE (not secret; runs OPEN strategies here)
 │  ├─ requirements.txt  update.py  prices.py  portfolio.py  signals.py
+│  ├─ costs.py  secured.py             # Darwin cost model; secured sanitizer + leak guard
+│  ├─ universe.py  update_universe.py  ticker_sectors.json   # self-refreshing universe + sector map
+│  ├─ darwin_eval/                     # vendored Darwin DSL evaluator (option B)
 │  └─ strategies/                      # OPEN (public) formulas only
 ├─ public/
-│  ├─ data/{portfolio.json,trades.json,strategies.json}
+│  ├─ data/{portfolio.json,trades.json,strategies.json,universe.json}
 │  ├─ resume.pdf
 │  └─ art/  audio/
-├─ .github/workflows/open-strategies-update.yml
+├─ .github/workflows/{open-strategies-update.yml, universe-refresh.yml}
 ├─ docs/  plans_and_text_files/  scripts/
 ```
 
@@ -361,7 +392,11 @@ Secured formulas/weights are **not** here — they live in the private repo (§8
       "base_currency": "USD",
       "rebalance_cadence_days": 42,
       "deployed_on": "2026-05-01",
-      "cost_model": {"commission_bps": 1.0, "slippage_bps": 5.0},
+      "cost_model": {"commission_bps": 5.0, "slippage_bps": 5.0,
+                     "spread_ref_price": 50.0, "volume_impact_coef": 0.5,
+                     "impact_portfolio_size": 1000000, "vol_scaled_cost_enable": true,
+                     "vol_cost_k": 0.75, "vol_cost_realized_window": 63,
+                     "vol_cost_long_window": 252, "vol_cost_mult_max": 3.0},
       "blurb": "Balanced risk/return king from epoch 7."
     }
   ]
@@ -399,13 +434,18 @@ Out of scope for v1. The static design covers the stated goals at ~$10/yr.
    with one open + one secured entry).
 7. **Build dashboard components** against the sample JSON (equity curve, stats, exposure
    donut, positions table, disclaimer). Site looks "live" before any pipeline exists.
-8. **Open updater**: write `paper_trading/`, run locally, wire `open-strategies-update.yml`.
-9. **Secured pipeline**: stand up the private repo (§8); wire rebalance + daily crons; push
-   sanitized JSON to the public repo.
-10. **Darwin deploy script** (Tier 3): add `scripts/deploy_to_site.py` (adapting
-    `select_on_date_yf.py` for the rebalance eval), export a deployed king's scrubbed formula +
-    metadata into the private repo, and stamp its rebalance cadence (§8.1).
-11. **Iterate**: more strategies, drawdown chart, trade log, more writeups/art/music.
+8. **Open updater** *(done)*: `paper_trading/` engine — vendored Darwin DSL evaluator (option B),
+   the Darwin-faithful cost model (`costs.py`, §6.5), the secured sanitizer (`secured.py`), and
+   `open-strategies-update.yml`.
+9. **Self-refreshing universe** *(done)*: `universe.py` + `update_universe.py` +
+   `universe-refresh.yml` (monthly), resolved by both updaters (§7.1).
+10. **Darwin deploy (Tier 3)** *(done, UI export)*: the "Deploy to site" button — `site-spec`
+    endpoint + `StrategyDrawer` items — exports a king's scrubbed formula + metadata + cost model and
+    stamps its cadence (§8.1). A `scripts/deploy_to_site.py` to auto-place the file is optional/later.
+11. **Secured pipeline** *(in progress)*: the private repo `personal-site-trading` is scaffolded
+    (`update_secured.py`, `push_to_public.py`, `daily.yml`, PAT secret); remaining: drop in a real
+    secured king spec and run the daily cron end-to-end (§8).
+12. **Iterate**: more strategies, drawdown chart, trade log, more writeups/art/music.
 
 ---
 
@@ -429,9 +469,18 @@ Out of scope for v1. The static design covers the stated goals at ~$10/yr.
 - **Theme:** dark / technical throughout (see §5, `docs/reference/design-system.md`).
 - **Nav:** grouped, Studio hub for music + art (see §4, `docs/reference/site-map.md`).
 - **Secured disclosure:** aggregate sector/asset-class exposure only; never individual
-  tickers (see §6).
+  tickers (see §6). Exposure is an **approximation** — unmapped tickers bucket into "Other", and
+  the live donut says so.
 - **Secured auto-run:** a private GitHub repo's Actions (see §8).
-- **Signal evaluation:** reuse Darwin's `select_on_date` pure-Python evaluator (option A) (see §8.1).
+- **Signal evaluation:** **option B** — Darwin's DSL evaluator vendored into
+  `paper_trading/darwin_eval/` and parity-tested (see §7, §8.1). Not the lighter option A.
+- **Cost model:** **Darwin-faithful** (`paper_trading/costs.py`): per-rebalance equity haircut with
+  price-scaled slippage + sqrt volume impact + volatility multiplier; full params in `cost_model`
+  (see §6.5, §10).
+- **Sector map / grouping:** SEC-derived map imported from Darwin (`paper_trading/ticker_sectors.json`,
+  ~6.2k tickers), bundled in the public engine; GICS-style sector groups, "Other" for unmapped.
+- **Default `portfolio_size` / `cost_model`:** Darwin's engine defaults — `portfolio_size` $100k,
+  commission/slippage `5/5` bps, `impact_portfolio_size` $1M, and the realism/vol defaults (see §6.5).
 - **Rebalance cadence:** **per-strategy**, set at deploy time via `rebalance_cadence_days` in
   each strategy's metadata; a single daily workflow rebalances whichever strategies are due
   (see §8.1). No global cadence.
@@ -439,11 +488,13 @@ Out of scope for v1. The static design covers the stated goals at ~$10/yr.
   date — published in `strategies.json` (see §6.4).
 - **Darwin section:** includes a Methodology subsection detailing the backtesting and cost
   models (see §6.5).
+- **Tradable universe:** self-refreshing in the public repo (Nasdaq Trader listings + Darwin
+  filters), rebuilt monthly, *not* snapshotted from Darwin — keeps it current and Darwin-independent
+  (see §7.1, `docs/subsystems/universe.md`).
+- **Darwin deploy:** a UI export button (`site-spec` endpoint + drawer items), **built** (see §8.1).
 
 ### Still open (confirm before/while building)
 
 - Domain name + TLD.
-- Default `portfolio_size` and `cost_model` (commission bps, slippage bps) for new deployments.
 - Which 1–2 strategies are the "open" advertisements, and which kings are secured.
 - Music hosting: third-party embeds vs self-hosted audio in `public/audio/`.
-- Exposure grouping dimension: GICS sector vs broader asset class.

@@ -88,6 +88,7 @@ set when the strategy is deployed from Darwin and shown on the site:
       "deployed_on": "2026-05-01",
       "cost_model": {"commission_bps": 1.0, "slippage_bps": 5.0,
                      "spread_ref_price": 50.0, "volume_impact_coef": 0.5,
+                     "impact_portfolio_size": 1000000,
                      "vol_scaled_cost_enable": true, "vol_cost_k": 0.75,
                      "vol_cost_realized_window": 63, "vol_cost_long_window": 252,
                      "vol_cost_mult_max": 3.0},
@@ -103,10 +104,13 @@ assumptions), not the formula or the basket — so it is published for secured s
 two stay consistent.
 
 `cost_model` carries the full **Darwin cost model** (`paper_trading/costs.py`): `commission_bps`
-and `slippage_bps` are required; `spread_ref_price`, `volume_impact_coef`, and the
-`vol_*` crisis-scaling fields are optional and fall back to Darwin's engine defaults. The
+and `slippage_bps` are required; `spread_ref_price`, `volume_impact_coef`, `impact_portfolio_size`,
+and the `vol_*` crisis-scaling fields are optional and fall back to Darwin's engine defaults. The
 simulator charges these as a per-rebalance equity haircut (turnover-scaled commission +
 price-scaled slippage + sqrt volume impact), matching how the strategy was backtested in Darwin.
+`impact_portfolio_size` is the **authoritative** book size the volume-impact term sizes trades
+against (default Darwin's $1,000,000) — kept separate from the strategy's traded `portfolio_size`
+so the impact magnitude matches the backtest regardless of the displayed capital.
 
 ## Changing the contract — checklist
 
