@@ -59,14 +59,17 @@ A deployed strategy is one `*.json` file matching the strategy-spec the updater 
     "vol_cost_realized_window": 63, "vol_cost_long_window": 252, "vol_cost_mult_max": 3.0
   },
   "universe": ["AAPL", "MSFT", "..."],            // the strategy's tradable set
-  "formula": { "mode": "top_n", "top_n": 8, "kind": "...", "children": [] },  // open only*
+  "formula": { "mode": "top_n", "top_n": 8, "kind": "...", "children": [] },  // BOTH open + secured
   "formula_ref": "/projects/darwin"                // open only: link to the public writeup
 }
 ```
 
-\* **Secured exports must omit `formula` and `formula_ref`** — only the private repo ever holds
-the tree. The secured file still carries everything else (so the private sim can run it from the
-private repo). Open exports include the tree (it's published for auditability).
+**Both open and secured exports carry `formula`** — the updater *runs* the tree, so the file the
+private repo holds must contain it. The security boundary is enforced **later**, at publish time:
+the secured pipeline strips the formula/positions from the *public snapshot* (`assert_sanitized`),
+never letting them reach the public site. The only export-time differences are `visibility` and the
+open-only public `formula_ref`. The secured file is kept secret simply by living **only in the
+private repo**; the open file's formula is published for auditability.
 
 The `formula` tree is exactly what `paper_trading`'s vendored evaluator already consumes, so the
 exporter should reuse Darwin's existing serializer **`src/dsl/serialize.py::to_dict(strategy)`**
@@ -98,21 +101,23 @@ The Darwin UI already has a generic export dropdown — **`ui/frontend/component
 whose items are either a synchronous backend download (`path`) or an async job. Adding "deploy to
 site" is small:
 
-1. **Backend (FastAPI):** add a `fmt=site` branch (or a dedicated `/api/strategies/{id}/deploy`
-   route) in **`ui/backend/routes/exports.py`**. It loads the king, calls
-   `serialize.to_dict(strategy)` for the tree, reads the run's cost config + metadata, assembles
-   the spec above, and returns it as a JSON download. Two variants: `visibility=open` (includes the
-   tree) and `visibility=secured` (strips `formula`/`formula_ref`).
-2. **Frontend:** add an `ExportItem` to the strategy surface's `ExportMenu`, e.g.
-   `{ group: "Deploy to site", label: "Open strategy (full)", path: "/api/strategies/<id>/export?fmt=site&visibility=open" }`
-   and a second item for `visibility=secured`. Clicking downloads the ready-to-commit `*.json`.
+1. **Backend (FastAPI):** `GET /api/strategies/{id}/site-spec` in **`ui/backend/routes/exports.py`**,
+   backed by **`ui/backend/exports/site.py`**. It loads the king (`adapters.get_strategy`), uses the
+   strategy's round-trippable `raw_json` tree, reads the engine's cost config + `rebalance_days`
+   metadata, and returns the spec above as a JSON download. Query params: `visibility=open|secured`,
+   `universe` (comma-separated), `portfolio_size`, `commission_bps`, `slippage_bps`, `blurb`,
+   `formula_ref`. Both variants include `formula`; secured just omits the public `formula_ref`.
+2. **Frontend:** two `ExportItem`s under a "Deploy to site" group in `StrategyDrawer.tsx`'s
+   `ExportMenu` — "Open strategy (public repo)" and "Secured strategy (private repo)" — each a
+   direct download from the endpoint with the matching `visibility`.
 3. **Where it lands:** the downloaded file is dropped into the **public** repo's
    `paper_trading/strategies/` (open) or the **private** repo's `strategies/` (secured). A later
-   `scripts/deploy_to_site.py` can automate that placement + cadence stamping; the button gives the
-   correct file today.
+   `scripts/deploy_to_site.py` can automate that placement; the button gives the correct file today.
+   `universe` and `portfolio_size` are deploy-time choices the operator finalizes in the file.
 
-This keeps Darwin's UI as the single deploy surface and produces the *exact* spec the updater
-already knows how to run — no second format to maintain.
+**Status: built** (Darwin repo) — `ui/backend/exports/site.py`, the `site-spec` route, and the two
+`StrategyDrawer` menu items. This keeps Darwin's UI as the single deploy surface and produces the
+*exact* spec the updater already runs — no second format to maintain.
 
 ## To fill this in
 

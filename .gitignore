@@ -29,3 +29,7 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+# Claude Code — keep shared launch.json, ignore personal/local files
+.claude/settings.local.json
+.claude/*.local.json
