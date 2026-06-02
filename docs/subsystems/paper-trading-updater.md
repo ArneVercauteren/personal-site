@@ -1,8 +1,8 @@
 # Subsystem — Paper-trading updater / engine (Tier 2b, public)
 
-> **Status: stub.** The updater isn't built yet. This page states what it will own; fill it in the same change that builds it.
+> **Status: built.** The open-strategy engine lives in `paper_trading/` and is run by [`open-strategies-update.yml`](scheduled-job.md).
 
-## What this will own
+## What it owns
 
 The Python simulator engine, and the **open**-strategy writer that runs it in the public repo.
 It turns deployed strategies + price data into the JSON the site reads — the **writer** side
@@ -13,39 +13,106 @@ The **engine is not secret** and may be open source. Secured strategies reuse th
 from a private repo — see [secured-updater.md](secured-updater.md) and
 [open-vs-secured-strategies.md](../concepts/open-vs-secured-strategies.md).
 
-## Planned shape
+## Module responsibilities
 
-- `paper_trading/update.py` — entry point (run locally and by GitHub Actions); writes `public/data/*.json`.
-- `paper_trading/prices.py` — swappable price-data adapter (keyless source to start, e.g. yfinance).
-- `paper_trading/signals.py` — evaluate each deployed strategy's signal → target holdings.
-- `paper_trading/portfolio.py` — apply fills with commission/slippage, advance the equity curve, recompute CAGR/Sharpe/max-DD.
-- `paper_trading/strategies/<king>.json` — scrubbed king exports pushed from Darwin (Tier 3).
-- `paper_trading/requirements.txt`.
+- `paper_trading/update.py` — entry point (`python -m paper_trading.update`). Loads strategy
+  specs, runs the sim, and **merges** the results into `public/data/*.json` by id (see
+  "Merge, not overwrite" below). Run locally or by GitHub Actions.
+- `paper_trading/prices.py` — keyless price adapter. `get_ohlcv(...)` → long-format OHLCV (what
+  the DSL evaluator consumes); `get_price_history(...)` → adjusted `(opens, closes)` wide frames
+  (the simulator's accounting). `PAPER_TRADING_SYNTHETIC=1` swaps in deterministic synthetic bars
+  for offline dev/tests; CI never sets it, so committed data always comes from real prices.
+- `paper_trading/signals.py` — two evaluation paths. `evaluate(signal, closes, asof)` is the
+  built-in **option A** momentum rule (`cross_sectional_momentum`). `evaluate_formula(...)` runs a
+  real Darwin king's **DSL tree** via the vendored evaluator; `formula_state_features(...)` reports
+  which portfolio-state features a formula needs.
+- `paper_trading/darwin_eval/` — the **vendored, scrubbed copy of Darwin's pure-Python evaluator**
+  (`select_on_date` + `select_helpers` + `tree_eval` + `eligibility` + `indicator_constants` +
+  `dsl_compat`). A copy, not an import (see [separation-from-darwin.md](../concepts/separation-from-darwin.md)).
+  `select_tickers_on_date` gains a `portfolio_state_override` hook for injected state.
+- `paper_trading/portfolio_state.py` — `PortfolioState`, an exact port of the engine's
+  (`native_eval.c`) path-dependent feature semantics: drawdown, invested/cash/holdings, and the
+  trailing turnover/volatility/hit-rate ring buffers (cap 64, sample-std, hit-rate).
+- `paper_trading/portfolio.py` — `simulate(strategy, opens, closes, prices_long=None)` dispatches
+  on the spec: a `formula` (DSL tree) → `_simulate_dsl` (real evaluator + engine-faithful state
+  threading); a `signal` block → `_simulate_signal` (momentum). Both rebalance on cadence (filled
+  at the **next** open), mark daily, and return curve/stats/positions/trades.
+- `paper_trading/strategies/<id>.json` — open strategy specs (a `formula` DSL tree *or* a `signal`
+  block, plus §6.4 metadata and a `universe`). Open formulas only; secured kings never live here.
+- `paper_trading/requirements.txt` — yfinance, pandas, numpy. `requirements-dev.txt` adds pytest.
 
-## How a run works (planned, from plan §5)
+## DSL path — real king formulas + engine-faithful state
 
-1. Fetch latest daily bars for the universe (`prices.py`).
-2. Re-evaluate each strategy's signal → target holdings (`signals.py`).
-3. Apply fills at the next bar's open with simple costs (`portfolio.py`).
-4. Append today's mark-to-market equity point; recompute stats.
-5. Write `public/data/*.json`.
-6. (In CI) commit the JSON → Vercel redeploys.
+For a `formula` spec the simulator evaluates the **actual Darwin DSL tree** each rebalance via the
+vendored `select_tickers_on_date`. The "prior weights" fed in are the **drifted actual** holdings
+(shares×price/equity) at the rebalance bar — exactly how the engine carries weights buy-and-hold
+between rebalances. Path-dependent **portfolio-state features** are computed by `PortfolioState`
+(turnover pushed at each rebalance, period-return + equity peak at each period close) and injected
+via `portfolio_state_override`, so a formula referencing `current_portfolio_drawdown`,
+`trailing_portfolio_turnover_6`, etc. sees engine-consistent values.
 
-## Invariants it must respect
+**Parity boundary (what's guaranteed):** selection + target weights are *bit-exact* with Darwin's
+own evaluator (gated by `tests/test_evaluator_parity.py`); portfolio-state features match the
+engine's definitions (gated by `tests/test_portfolio_state.py`). The **equity curve** uses this
+repo's transparent cost model (commission+slippage bps on turnover) — not the native engine's full
+cost machinery (price-scaled slippage, volume impact, daily Sharpe grid). Market segmentation is
+disabled (global cross-sectional rank); `market_*` features need a benchmark series (v1 passes
+none → those features are NaN, handled).
+
+## How a run works
+
+1. For each spec in `paper_trading/strategies/*.json`, fetch daily bars for its universe over
+   `[deployed_on − warmup, today]` — `prices.get_ohlcv` (DSL) or `prices.get_price_history`
+   (momentum). DSL warmup is sized from the formula's longest feature window.
+2. Re-evaluate on each rebalance date → target holdings: the DSL tree via the vendored evaluator
+   (`signals.evaluate_formula`) or the momentum rule (`signals.evaluate`).
+3. Apply fills at the next bar's open with commission + slippage (`portfolio.simulate`).
+4. Mark to market daily; build the equity curve and recompute CAGR / Sharpe / max-DD.
+5. Merge the open entries into `public/data/{portfolio,strategies,trades}.json`.
+6. (In CI) commit the JSON if it changed → Vercel redeploys.
+
+## Cost model
+
+Per `cost_model` in each strategy spec (`commission_bps`, `slippage_bps`). Buys fill at
+`open × (1 + slippage)`, sells at `open × (1 − slippage)`; commission is charged on traded
+notional. These are the **same** assumptions the Darwin Methodology page documents (plan §6.5).
+
+## Rebalance cadence
+
+Per strategy, via `rebalance_cadence_days` in its spec. `portfolio.simulate` snaps each
+scheduled calendar date to the next trading day. (The private secured pipeline drives cadence
+the same way via a daily cron — see [secured-updater.md](secured-updater.md).)
+
+## Merge, not overwrite
+
+`portfolio.json`, `strategies.json`, and `trades.json` are **shared** between the open writer
+(this repo) and the secured writer (the private repo). `update.py` only rewrites entries whose
+`id` belongs to a local open spec and preserves all others, so the two writers never clobber
+each other's data. The file-level `as_of` advances to the latest open bar date.
+
+## Determinism
+
+Historical daily bars are fixed once published, so a given price history always yields the same
+curve, stats, and positions — the only non-determinism is the moving "today" edge of the data.
+Verified offline with `PAPER_TRADING_SYNTHETIC=1` (two runs produce byte-identical JSON).
+
+## Invariants it respects
 
 - **[Paper only](../concepts/paper-trading-only.md):** no broker, no real money, deterministic and re-runnable.
-- **[Separate from Darwin](../concepts/separation-from-darwin.md):** signal evaluation is a pure-Python re-implementation (plan's option A) or a vendored, scrubbed copy — never an import into the live Darwin tree.
-- **Writes the [data contract](../concepts/data-contract.md) exactly:** any shape change updates `lib/data.ts` in the same commit.
-- **No committed secret:** keyless price source, or a GitHub Actions secret.
+- **[Separate from Darwin](../concepts/separation-from-darwin.md):** the DSL evaluator is a *vendored, scrubbed copy* (`darwin_eval/`), not an import into the live Darwin tree; the only Darwin import is the test-only, skipped-in-CI parity gate.
+- **Writes the [data contract](../concepts/data-contract.md) exactly:** matches the types in `lib/data.ts`; any shape change updates the reader in the same commit.
+- **No committed secret:** keyless price source (a GitHub Actions secret would be used if a keyed source were ever needed).
 
-## Signal evaluation: A vs B
+## Tests
 
-The plan offers two ways to evaluate signals: (A) a lightweight pure-Python re-implementation for the small deployed set, or (B) vendoring Darwin's compiler/backtester for true parity. **Default to (A)**; defer (B) unless parity drift bites. Document which one is in use when you build this.
-
-## To fill this in
-
-Replace this stub when `paper_trading/` exists. Document the actual module responsibilities, the cost model, the rebalance cadence, and the determinism guarantee.
+- `paper_trading/tests/test_evaluator_parity.py` — bit-exact vs Darwin's `select_tickers_on_date` (skipped without a local Darwin checkout; set `DARWIN_REPO`).
+- `paper_trading/tests/test_portfolio_state.py` — `PortfolioState` semantics vs the `native_eval.c` definitions.
+- `paper_trading/tests/test_simulate_dsl.py` — DSL sim integration, determinism, and state injection.
+- Run: `python -m pytest paper_trading/tests/ -q`.
 
 ## Source files
 
-- `paper_trading/update.py`, `paper_trading/prices.py`, `paper_trading/signals.py`, `paper_trading/portfolio.py` (when built).
+- `paper_trading/update.py`, `paper_trading/prices.py`, `paper_trading/signals.py`, `paper_trading/portfolio.py`, `paper_trading/portfolio_state.py`
+- `paper_trading/darwin_eval/` — vendored scrubbed DSL evaluator.
+- `paper_trading/strategies/open_momentum_v1.json` — the first open spec (momentum).
+- `paper_trading/requirements.txt`, `paper_trading/requirements-dev.txt`

@@ -6,7 +6,7 @@ This repo is **independent** of the Darwin repo, and it contains **no secrets**.
 
 `personal-site` is its own repository with its own deployment. It is not a subfolder of Darwin and does not share Darwin's Python environment.
 
-- **No import path into Darwin internals.** Nothing here imports `src/config/secrets.py`, `src/...` modules, or otherwise path-reaches into the Darwin tree. If Tier 2 needs to evaluate a strategy signal, it does so via a small re-implementation or a *vendored, scrubbed* copy — never by reaching across into the live Darwin repo. (See the plan's §5 options A/B; A is the default.)
+- **No import path into Darwin internals.** Nothing here imports `src/config/secrets.py`, `src/...` modules, or otherwise path-reaches into the Darwin tree. To evaluate a real king's DSL formula, Tier 2 uses a *vendored, scrubbed copy* of Darwin's pure-Python evaluator — `paper_trading/darwin_eval/` (the plan's option B). It is a copy, not an import: the `src.config`/`src.config.paths` couplings were replaced with vendored constants, and no secret lives there. Fidelity to the original is enforced by `paper_trading/tests/test_evaluator_parity.py`, which (when a local Darwin checkout is present via `DARWIN_REPO`) asserts bit-identical selections/weights against Darwin's own `select_tickers_on_date`. That test is the *only* place that imports Darwin, and it is test-only and skipped in CI.
 - **The only coupling is one-way JSON.** Darwin's publish step (Tier 3) writes portable king JSON into this repo's `paper_trading/strategies/`. That is the entire interface.
 
 ## No secrets in the repo
@@ -36,5 +36,7 @@ If the website repo could import Darwin, a leak in the website would expose Darw
 ## Source files
 
 - `.gitignore` — must ignore `.env*` and any credential files.
+- `paper_trading/darwin_eval/` — the vendored, scrubbed DSL evaluator (no `src.` imports).
+- `paper_trading/tests/test_evaluator_parity.py` — the test-only parity gate (the sole, guarded Darwin import).
 - `paper_trading/strategies/*.json` — scrubbed king exports (when published).
 - The Darwin repo's `scripts/publish_deployed_kings.py` — does the scrubbing (when built).

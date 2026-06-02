@@ -4,10 +4,10 @@ The route tree and what each page owns. Theme tokens are in [design-system.md](d
 
 ## Top-level navigation
 
-Grouped to ~6 items; the **Studio** hub combines music + art.
+**Studio** and **Projects** are temporarily hidden from the nav (their routes still exist and build; re-add them in `lib/site.ts` and the home-page tiles when ready). The **Studio** hub combines music + art.
 
 ```
-Home  ·  About  ·  Darwin  ·  Live  ·  Writing  ·  Studio  ·  Projects
+Home  ·  About  ·  Darwin  ·  Live  ·  Writing  ·  Contact
 ```
 
 ## Routes
@@ -15,13 +15,14 @@ Home  ·  About  ·  Darwin  ·  Live  ·  Writing  ·  Studio  ·  Projects
 | Route | Page owns | Notes |
 |---|---|---|
 | `/` | Home | Hero (one-line identity), one featured Darwin result, links into each section. |
-| `/about` | Bio + résumé | Web view + a downloadable `public/resume.pdf`. |
+| `/about` | Bio | Product-style bio: hero, capabilities, an at-a-glance spec sheet (incl. an auto-updating age derived from `site.birthDate`), placeholder profile photo (`public/profile.png`). Résumé deferred. |
+| `/contact` | Contact | Email contact (`site.email`) with a `mailto:` CTA. Surfaced as its own nav item. |
 | `/darwin` | Darwin explainer + **Methodology** | What Darwin is (a high-performance GP search — kept deliberately high-level), the **Tiingo** data source, the investable **universe & filters**, the **backtesting model** (daily bars, next-open fills, regimes, metrics), the **cost model** (commission/slippage/impact bps), and **out-of-sample testing & validity measures** (train/OOS firewall, rolling stress, factor decomposition, capacity). The most prominent action links to `/darwin/live`. The flagship section; results themselves live on the dashboard. |
 | `/darwin/live` | Live dashboard | Open + secured strategies, in two labelled sections (open broken out first). Standing paper-only disclaimer. Reads `public/data/*.json`. Also surfaced as its own nav item ("Live"). |
 | `/writing` | Essay index | Lists essays from `content/essays/*.mdx`. |
 | `/writing/[slug]` | Essay reader | Renders one essay. |
-| `/studio` | Music + Art hub | Music: embeds or self-hosted players. Art: image galleries with lightbox. |
-| `/projects` | Portfolio index | Lists `content/projects/*.mdx` (software + non-software). |
+| `/studio` | Music + Art hub | Music: embeds or self-hosted players. Art: image galleries with lightbox. **Hidden from nav for now.** |
+| `/projects` | Portfolio index | Lists `content/projects/*.mdx` (software + non-software). **Hidden from nav for now.** |
 | `/projects/[slug]` | Project writeup | Renders one writeup. |
 
 ## Section ownership → subsystem docs

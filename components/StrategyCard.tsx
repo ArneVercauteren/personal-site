@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { isOpen, type Strategy, type StrategyMeta } from "@/lib/data";
 import { pct, money } from "@/lib/format";
-import { Sparkline } from "@/components/Sparkline";
+import { EquityCurveChart } from "@/components/EquityCurveChart";
+import { DrawdownChart } from "@/components/DrawdownChart";
+import { ExposureDonut } from "@/components/ExposureDonut";
 import { StatsTable } from "@/components/StatsTable";
 
 function Badge({ visibility }: { visibility: Strategy["visibility"] }) {
@@ -45,38 +47,6 @@ function PositionsTable({
   );
 }
 
-function ExposureBars({
-  exposure,
-}: {
-  exposure: { group: string; weight: number }[];
-}) {
-  const sorted = [...exposure].sort((a, b) => b.weight - a.weight);
-  const max = Math.max(...sorted.map((e) => e.weight)) || 1;
-  return (
-    <div>
-      <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-        Sector exposure
-      </h4>
-      <ul className="flex flex-col gap-1.5">
-        {sorted.map((e) => (
-          <li key={e.group} className="text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-ink">{e.group}</span>
-              <span className="num text-ink-muted">{pct(e.weight)}</span>
-            </div>
-            <div className="mt-1 h-1 rounded bg-elevated">
-              <div
-                className="h-1 rounded bg-accent/60"
-                style={{ width: `${(e.weight / max) * 100}%` }}
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 export function StrategyCard({
   strategy,
   meta,
@@ -96,14 +66,19 @@ export function StrategyCard({
         <Badge visibility={strategy.visibility} />
       </div>
 
-      <Sparkline points={strategy.equity_curve} />
+      <EquityCurveChart
+        points={strategy.equity_curve}
+        currency={meta?.base_currency ?? "USD"}
+      />
 
       <StatsTable stats={strategy.stats} />
+
+      <DrawdownChart points={strategy.equity_curve} />
 
       {isOpen(strategy) ? (
         <PositionsTable positions={strategy.positions} />
       ) : (
-        <ExposureBars exposure={strategy.exposure} />
+        <ExposureDonut exposure={strategy.exposure} />
       )}
 
       {meta ? (

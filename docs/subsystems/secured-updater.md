@@ -27,6 +27,14 @@ The evaluation engine is **reused from the public repo's `paper_trading/`** (sub
 Python, keyless yfinance, no feature store. The private repo adds only data (formulas, weights,
 metadata, sector map) and the two workflows.
 
+**The sanitizer is also in the shared engine, not the private repo.** Turning ticker `positions`
+into aggregate `exposure` is not secret (only the formulas/weights are), and the data contract
+requires it to stay version-locked to `lib/data.ts`. So it lives in `paper_trading/secured.py`
+— `aggregate_exposure()`, `build_secured_entry()`, and an `assert_sanitized()` leak guard — unit
+tested in the open (`paper_trading/tests/test_secured.py`). `daily.yml` just calls
+`build_secured_entry(sim, spec, sector_map)` and pushes the result. The per-strategy cadence
+check (`is_rebalance_due` / `advance_next_rebalance`) lives there too.
+
 ## Per-strategy cadence (no global rebalance schedule)
 
 Each strategy carries `rebalance_cadence_days` + `next_rebalance_date` in its metadata (stamped
@@ -55,5 +63,5 @@ side.
 
 ## Source files
 
-- Private repo `personal-site-trading`: `strategies/`, `weights/`, `.github/workflows/{rebalance,daily}.yml` (when built).
-- This repo: `paper_trading/` (the shared engine), `public/data/*.json` (the received sanitized snapshot).
+- Private repo `personal-site-trading`: `strategies/`, `weights/`, `ticker_sectors.json`, `.github/workflows/{rebalance,daily}.yml` (when built).
+- This repo: `paper_trading/` (the shared engine), `paper_trading/secured.py` (sanitizer + cadence helpers, built), `paper_trading/tests/test_secured.py` (the leak-boundary tests, built), `public/data/*.json` (the received sanitized snapshot).

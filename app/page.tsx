@@ -18,26 +18,26 @@ const featured = [
   },
 ];
 
-// Secondary — essays, then bio.
+// Secondary — essays, reading recommendations, then bio.
 const secondary = [
   {
     href: "/writing",
     label: "Writing",
     blurb: "Occasional essays and notes.",
-    wide: true,
+    wide: false,
+  },
+  {
+    href: "/reading",
+    label: "Reading",
+    blurb: "Books I recommend — and why.",
+    wide: false,
   },
   {
     href: "/about",
     label: "About",
-    blurb: "A short bio and a résumé.",
+    blurb: "A short bio.",
     wide: false,
   },
-];
-
-// Tertiary — the rest.
-const tertiary = [
-  { href: "/studio", label: "Studio", blurb: "Music and art." },
-  { href: "/projects", label: "Projects", blurb: "Other things I've worked on." },
 ];
 
 export default function HomePage() {
@@ -91,22 +91,6 @@ export default function HomePage() {
               {s.label}
             </span>
             <span className="text-sm text-ink-muted">{s.blurb}</span>
-          </Link>
-        ))}
-      </section>
-
-      {/* Tertiary: quietest. */}
-      <section className="mt-4 grid gap-4 sm:grid-cols-2">
-        {tertiary.map((s) => (
-          <Link
-            key={s.href}
-            href={s.href}
-            className="panel panel-hover group flex items-baseline justify-between gap-3 p-4"
-          >
-            <span className="text-sm font-medium text-ink-muted group-hover:text-ink">
-              {s.label}
-            </span>
-            <span className="text-xs text-ink-muted">{s.blurb}</span>
           </Link>
         ))}
       </section>

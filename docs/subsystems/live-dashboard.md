@@ -1,6 +1,6 @@
 # Subsystem — Live paper-trading dashboard (Tier 1)
 
-> **Status: built (v1).** The dashboard renders real data from the contract: per-strategy cards with an equity sparkline, stats, and positions (open) / sector bars (secured). The full Recharts charts (equity/drawdown/exposure donut) and a trade-log view are the planned next increment.
+> **Status: built (v2).** The dashboard renders real data from the contract: per-strategy cards with a Recharts equity curve, stats, a drawdown chart, and positions (open) / exposure donut (secured). A trade-log view is the planned next increment.
 
 ## What this owns
 
@@ -9,14 +9,18 @@ The reader side of the live data: the dashboard page and the chart/stat componen
 ## Shape (built)
 
 - `app/darwin/live/page.tsx` — loads `portfolio.json` + `strategies.json` via `lib/data.ts`, shows the `as_of` date and the disclaimer, then renders strategies in two labelled sections — **Open strategies** (formula + positions shown) and **Secured strategies** (performance + exposure only) — splitting on `isOpen`. One `StrategyCard` per strategy.
-- `components/StrategyCard.tsx` — per-strategy card: name, open/secured badge, sparkline, stats, and positions table (open) or sector-exposure bars (secured) + metadata (capital, cadence, costs).
-- `components/Sparkline.tsx` — dependency-free SVG equity curve (gain/loss colored).
+- `components/StrategyCard.tsx` — per-strategy card: name, open/secured badge, equity curve, stats, drawdown chart, and positions table (open) or exposure donut (secured) + metadata (capital, cadence, costs).
+- `components/EquityCurveChart.tsx` — Recharts area/line equity curve (gain/loss colored, faint grid, hover tooltip). Client component.
+- `components/DrawdownChart.tsx` — Recharts underwater plot derived from the equity curve (`value / running-peak − 1`). Client component.
+- `components/ExposureDonut.tsx` — Recharts donut + legend for secured sector/asset-class exposure. Client component.
+- `components/charts/chartColors.ts` — shared palette mirroring the Tailwind tokens (charts are client components and can't read Tailwind at runtime).
 - `components/StatsTable.tsx` — CAGR / Sharpe / max drawdown, mono/tabular.
 - `components/Disclaimer.tsx` — the standing paper-only disclaimer.
 
+Recharts loads only on `/darwin/live` (code-split), so the rest of the site keeps its small bundle.
+
 ## Planned (next increment)
 
-- `components/EquityCurveChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx` — Recharts (client components) replacing/augmenting the sparkline + bars.
 - A trade-log view fed by `trades.json`.
 
 ## Two strategy classes
@@ -41,4 +45,4 @@ See the recipe: [tasks/add-dashboard-chart.md](../tasks/add-dashboard-chart.md).
 
 ## Source files
 
-- `app/darwin/live/page.tsx`, `components/StrategyCard.tsx`, `components/Sparkline.tsx`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.
+- `app/darwin/live/page.tsx`, `components/StrategyCard.tsx`, `components/EquityCurveChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx`, `components/charts/chartColors.ts`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.

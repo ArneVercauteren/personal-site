@@ -1,0 +1,24 @@
+{
+  "id": "open_momentum_v1",
+  "name": "Momentum (Open)",
+  "visibility": "open",
+  "blurb": "A fully open momentum strategy — formula and basket published for anyone to audit.",
+  "formula_ref": "/projects/darwin",
+  "deployed_on": "2026-01-02",
+  "portfolio_size": 100000,
+  "base_currency": "USD",
+  "rebalance_cadence_days": 30,
+  "cost_model": { "commission_bps": 1.0, "slippage_bps": 5.0 },
+  "universe": [
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META",
+    "JPM", "XOM", "UNH", "JNJ", "PG", "HD"
+  ],
+  "signal": {
+    "type": "cross_sectional_momentum",
+    "lookback_days": 90,
+    "skip_days": 5,
+    "top_n": 5,
+    "min_momentum": 0.0,
+    "weighting": "equal"
+  }
+}

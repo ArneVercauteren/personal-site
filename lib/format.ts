@@ -20,6 +20,22 @@ export function money(value: number, currency = "USD"): string {
   }).format(value);
 }
 
+/**
+ * Whole years from an ISO birth date (YYYY-MM-DD) to `now`.
+ * Defaults to the current date — for statically rendered pages this is the
+ * build-time date, so the age refreshes whenever the site is rebuilt.
+ */
+export function age(birthIso: string, now: Date = new Date()): number {
+  const b = new Date(birthIso + "T00:00:00Z");
+  let years = now.getUTCFullYear() - b.getUTCFullYear();
+  const beforeBirthday =
+    now.getUTCMonth() < b.getUTCMonth() ||
+    (now.getUTCMonth() === b.getUTCMonth() &&
+      now.getUTCDate() < b.getUTCDate());
+  if (beforeBirthday) years -= 1;
+  return years;
+}
+
 /** ISO date (YYYY-MM-DD) -> "Jun 1, 2026". */
 export function shortDate(iso: string): string {
   const d = new Date(iso + "T00:00:00Z");

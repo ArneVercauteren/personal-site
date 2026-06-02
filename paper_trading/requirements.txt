@@ -1,0 +1,5 @@
+# Tier-2b open-strategy updater dependencies (public repo).
+# Keyless price source — no API keys, no broker SDKs.
+yfinance>=0.2.40
+pandas>=2.0
+numpy>=1.24

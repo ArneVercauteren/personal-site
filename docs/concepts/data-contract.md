@@ -19,6 +19,11 @@ The boundary between Tier 2 (the Python updater that *writes* JSON) and Tier 1 (
 | `paper_trading/update.py` | 2b (writer) | open-strategy JSON, in the public repo |
 | private repo `daily.yml` | 2a (writer) | secured sanitized JSON, pushed to the public repo |
 
+How an open strategy computes its weights — a lightweight momentum `signal` or a real Darwin
+`formula` (DSL tree) run through the vendored evaluator — is an implementation detail of the
+writer. It does **not** change this contract: both paths emit the same `portfolio.json` /
+`strategies.json` / `trades.json` shape, so `lib/data.ts` is unaffected.
+
 ## `visibility` gates the shape
 
 Every strategy entry carries `visibility: "open" | "secured"`, and that field decides which
@@ -97,8 +102,9 @@ two stay consistent.
 
 1. Edit the type in `lib/data.ts`.
 2. Edit the **open** writer in `paper_trading/` to emit the new shape.
-3. Edit the **secured** writer in the private repo (`daily.yml`'s sanitizer) to match — and
-   re-confirm it still emits **no** `positions`/formula for secured entries.
+3. Edit the **secured** sanitizer in `paper_trading/secured.py` (`build_secured_entry`) to match
+   — and re-confirm `assert_sanitized` still rejects any `positions`/formula on secured entries.
+   The private repo's `daily.yml` calls this, so the shape stays locked to `lib/data.ts` here.
 4. Update any sample/fixture JSON in `public/data/`.
 5. Update the tests that pin the shape (see [playbook/test-maintenance.md](../playbook/test-maintenance.md)).
 6. Update this page if the contract's meaning changed.

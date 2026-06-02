@@ -131,7 +131,8 @@ export default function DarwinPage() {
           The selectable universe is then narrowed by two kinds of filter:
           filters that remove obviously malformed or partially missing data, and
           filters that remove niche, risky, or structurally unconventional
-          tickers. It's worth knowing that the second category largely subsumes the first — for the
+          tickers. It&apos;s worth knowing that the second category largely
+          subsumes the first — for the
           conventional names these strategies trade, Tiingo&apos;s data is very
           reliable.
         </p>
