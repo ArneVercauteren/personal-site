@@ -31,6 +31,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+import time
 import urllib.request
 from pathlib import Path
 
@@ -60,6 +61,13 @@ DEFAULT_MIN_PRICE = 10.0
 DEFAULT_MIN_ADV = 5_000_000.0
 DEFAULT_CAP = 1200
 DEFAULT_LOOKBACK_DAYS = 120  # ~63 trading days of history for the median
+
+# Be a polite client to the (free, keyless) price API: batch per request, pause
+# between batches, and back off on failure instead of hammering / silently
+# dropping. Tunable via update_universe env vars.
+DEFAULT_FETCH_CHUNK = 120     # tickers per yfinance batch request
+DEFAULT_FETCH_PAUSE = 1.5     # seconds between batches
+DEFAULT_FETCH_RETRIES = 3     # attempts per batch before skipping it
 
 # --- symbol filters (vendored from Darwin src/data/ticker_filtering.py) -------
 _NON_COMMON_SUFFIXES: set[str] = {
@@ -193,30 +201,52 @@ def rank_by_liquidity(
 
 
 def _fetch_liquidity(
-    symbols: list[str], lookback_days: int, chunk: int = 150
+    symbols: list[str],
+    lookback_days: int,
+    *,
+    chunk: int = DEFAULT_FETCH_CHUNK,
+    pause: float = DEFAULT_FETCH_PAUSE,
+    max_retries: int = DEFAULT_FETCH_RETRIES,
 ) -> tuple[dict[str, float], dict[str, float]]:
-    """Trailing median dollar volume + last close per symbol, fetched in chunks.
+    """Trailing median dollar volume + last close per symbol, fetched politely.
 
-    Per-chunk failures are skipped so one bad symbol can't sink the whole build.
+    Symbols are fetched in batches of `chunk` (one yfinance request each), with a
+    `pause` between batches and exponential back-off + retry on failure, so the
+    free keyless API isn't hammered and a transient rate-limit doesn't silently
+    drop names. A batch that still fails after `max_retries` is skipped.
     """
     start = (pd.Timestamp.today() - pd.Timedelta(days=lookback_days)).strftime("%Y-%m-%d")
     end = pd.Timestamp.today().strftime("%Y-%m-%d")
     dollar_volume: dict[str, float] = {}
     last_price: dict[str, float] = {}
-    for i in range(0, len(symbols), chunk):
+
+    batches = list(range(0, len(symbols), chunk))
+    for bi, i in enumerate(batches):
         group = symbols[i : i + chunk]
-        try:
-            df = prices.get_ohlcv(group, start, end)
-        except Exception as exc:  # noqa: BLE001 — robustness over a few thousand symbols
-            print(f"  chunk {i // chunk}: skipped ({exc})")
-            continue
-        df = df.assign(dv=df["adj_close"] * df["volume"])
-        med = df.groupby("ticker")["dv"].median()
-        last = df.sort_values("date").groupby("ticker")["close"].last()
-        for t in group:
-            if t in med.index and np.isfinite(med[t]):
-                dollar_volume[t] = float(med[t])
-                last_price[t] = float(last.get(t, 0.0))
+        df = None
+        for attempt in range(max_retries):
+            try:
+                df = prices.get_ohlcv(group, start, end)
+                break
+            except Exception as exc:  # noqa: BLE001 — robustness over thousands of symbols
+                if attempt < max_retries - 1:
+                    backoff = pause * (2 ** attempt)
+                    print(f"  batch {bi + 1}/{len(batches)}: attempt {attempt + 1} failed "
+                          f"({exc}); retrying in {backoff:.1f}s")
+                    time.sleep(backoff)
+                else:
+                    print(f"  batch {bi + 1}/{len(batches)}: skipped after {max_retries} attempts ({exc})")
+        if df is not None:
+            df = df.assign(dv=df["adj_close"] * df["volume"])
+            med = df.groupby("ticker")["dv"].median()
+            last = df.sort_values("date").groupby("ticker")["close"].last()
+            for t in group:
+                if t in med.index and np.isfinite(med[t]):
+                    dollar_volume[t] = float(med[t])
+                    last_price[t] = float(last.get(t, 0.0))
+        # Polite gap before the next batch (skip after the final one).
+        if bi < len(batches) - 1:
+            time.sleep(pause)
     return dollar_volume, last_price
 
 
@@ -227,13 +257,17 @@ def build_universe(
     cap: int = DEFAULT_CAP,
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
     exclude_etf: bool = False,
+    fetch_chunk: int = DEFAULT_FETCH_CHUNK,
+    fetch_pause: float = DEFAULT_FETCH_PAUSE,
     out_path: Path | None = None,
 ) -> dict:
     """Build + write the shared universe (the monthly job's entry point)."""
     rows = fetch_symbol_directory()
     commons = filter_common_symbols(rows, exclude_etf=exclude_etf)
     print(f"listings: {len(rows)} rows → {len(commons)} common symbols")
-    dollar_volume, last_price = _fetch_liquidity(commons, lookback_days)
+    dollar_volume, last_price = _fetch_liquidity(
+        commons, lookback_days, chunk=fetch_chunk, pause=fetch_pause
+    )
     tickers = rank_by_liquidity(
         dollar_volume, last_price, min_price=min_price, min_adv=min_adv, cap=cap
     )

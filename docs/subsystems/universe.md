@@ -71,7 +71,17 @@ is the point: Darwin's frozen universe is the thing that goes stale for a forwar
 
 It is **updater data**, not part of the site's read contract (`lib/data.ts`) — the public site
 never renders it. Env overrides for the build: `UNIVERSE_CAP`, `UNIVERSE_MIN_PRICE`,
-`UNIVERSE_MIN_ADV`, `UNIVERSE_EXCLUDE_ETF`.
+`UNIVERSE_MIN_ADV`, `UNIVERSE_EXCLUDE_ETF`, `UNIVERSE_FETCH_CHUNK`, `UNIVERSE_FETCH_PAUSE`.
+
+## Polite fetching
+
+The liquidity step is a good citizen toward the free, keyless price API: it fetches in **batches**
+(one request per `UNIVERSE_FETCH_CHUNK` symbols, default 120 — yfinance batches a multi-ticker
+download into a single request), waits `UNIVERSE_FETCH_PAUSE` seconds (default 1.5) **between**
+batches, and **retries with exponential back-off** on failure (default 3 attempts) before skipping
+a batch. So a transient rate-limit slows the build instead of silently dropping names, and the API
+is never hammered with thousands of back-to-back requests. The monthly workflow has a 120-minute
+timeout to absorb the pauses.
 
 ## Source files
 

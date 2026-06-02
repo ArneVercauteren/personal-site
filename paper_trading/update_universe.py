@@ -8,7 +8,8 @@ it runs **monthly** in its own workflow, not on the daily mark. Writes
 `universe.resolve_universe`. See `docs/subsystems/universe.md`.
 
 Env overrides (all optional):
-  UNIVERSE_CAP, UNIVERSE_MIN_PRICE, UNIVERSE_MIN_ADV, UNIVERSE_EXCLUDE_ETF
+  UNIVERSE_CAP, UNIVERSE_MIN_PRICE, UNIVERSE_MIN_ADV, UNIVERSE_EXCLUDE_ETF,
+  UNIVERSE_FETCH_CHUNK, UNIVERSE_FETCH_PAUSE  (politeness toward the price API)
 """
 
 from __future__ import annotations
@@ -38,6 +39,8 @@ def main() -> None:
         min_adv=_env_float("UNIVERSE_MIN_ADV", universe.DEFAULT_MIN_ADV),
         cap=_env_int("UNIVERSE_CAP", universe.DEFAULT_CAP),
         exclude_etf=os.environ.get("UNIVERSE_EXCLUDE_ETF", "") not in ("", "0", "false"),
+        fetch_chunk=_env_int("UNIVERSE_FETCH_CHUNK", universe.DEFAULT_FETCH_CHUNK),
+        fetch_pause=_env_float("UNIVERSE_FETCH_PAUSE", universe.DEFAULT_FETCH_PAUSE),
     )
     print(f"done; as_of={payload['as_of']} count={payload['count']}")
 
