@@ -42,18 +42,29 @@ def use_synthetic() -> bool:
     return os.environ.get("PAPER_TRADING_SYNTHETIC", "") not in ("", "0", "false")
 
 
-def get_ohlcv(tickers: list[str], start: str, end: str) -> pd.DataFrame:
+def get_ohlcv(
+    tickers: list[str],
+    start: str,
+    end: str,
+    *,
+    session=None,
+    threads: bool = True,
+) -> pd.DataFrame:
     """Long-format daily OHLCV for `tickers` over [start, end].
 
     Columns: date, ticker, open, high, low, close, adj_close, volume. `close` is
     the raw (unadjusted) close used for the min-price eligibility rule; `adj_close`
     is split/dividend-adjusted and drives feature computation. This matches the
     schema the vendored Darwin evaluator expects.
+
+    `session` (a rate-limited/cached requests session) and `threads` are passed to
+    yfinance — the bulk universe build uses them to stay under Yahoo's rate limit
+    (see `universe.py`); normal strategy fetches leave the defaults.
     """
     if use_synthetic():
         df = _synthetic_ohlcv(tickers, start, end)
     else:
-        df = _yfinance_ohlcv(tickers, start, end)
+        df = _yfinance_ohlcv(tickers, start, end, session=session, threads=threads)
     df = df.dropna(subset=["adj_close"]).sort_values(["ticker", "date"]).reset_index(drop=True)
     return df[_OHLCV_COLUMNS]
 
@@ -108,21 +119,34 @@ def get_price_history(
     return opens[cols], closes[cols]
 
 
-def _yfinance_ohlcv(tickers: list[str], start: str, end: str) -> pd.DataFrame:
+def _yfinance_ohlcv(
+    tickers: list[str], start: str, end: str, *, session=None, threads: bool = True
+) -> pd.DataFrame:
     import yfinance as yf
 
     # `end` is exclusive in yfinance; bump by a day so today's bar is included.
     end_excl = (pd.Timestamp(end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-    raw = yf.download(
-        tickers,
-        start=start,
-        end=end_excl,
-        auto_adjust=False,  # keep raw Close + Adj Close, like Darwin's yf path
-        progress=False,
-        group_by="column",
-    )
+    kwargs = dict(threads=threads)
+    if session is not None:
+        kwargs["session"] = session
+    try:
+        raw = yf.download(
+            tickers, start=start, end=end_excl,
+            auto_adjust=False, progress=False, group_by="column", **kwargs,
+        )
+    except TypeError:
+        # Older/newer yfinance may not accept `session`/`threads` on download.
+        raw = yf.download(
+            tickers, start=start, end=end_excl,
+            auto_adjust=False, progress=False, group_by="column",
+        )
+    return _frame_from_yf(raw, tickers)
+
+
+def _frame_from_yf(raw: pd.DataFrame, tickers: list[str]) -> pd.DataFrame:
+    """Reshape a yfinance download into the long OHLCV frame."""
     if raw.empty:
-        raise RuntimeError(f"yfinance returned no data for {tickers} over {start}..{end}")
+        raise RuntimeError(f"yfinance returned no data for {tickers}")
 
     fields = {
         "open": "Open",

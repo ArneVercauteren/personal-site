@@ -3,3 +3,8 @@
 yfinance>=0.2.40
 pandas>=2.0
 numpy>=1.24
+# Rate-limits yfinance so the monthly universe build stays under Yahoo's cap
+# (the recommended fix for YFRateLimitError). Optional: the build falls back to
+# sequential fetch + pauses if it isn't installed.
+requests-ratelimiter>=0.7
+

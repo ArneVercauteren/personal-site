@@ -73,15 +73,33 @@ It is **updater data**, not part of the site's read contract (`lib/data.ts`) —
 never renders it. Env overrides for the build: `UNIVERSE_CAP`, `UNIVERSE_MIN_PRICE`,
 `UNIVERSE_MIN_ADV`, `UNIVERSE_EXCLUDE_ETF`, `UNIVERSE_FETCH_CHUNK`, `UNIVERSE_FETCH_PAUSE`.
 
-## Polite fetching
+## Polite fetching + rate-limit handling
 
-The liquidity step is a good citizen toward the free, keyless price API: it fetches in **batches**
-(one request per `UNIVERSE_FETCH_CHUNK` symbols, default 120 — yfinance batches a multi-ticker
-download into a single request), waits `UNIVERSE_FETCH_PAUSE` seconds (default 1.5) **between**
-batches, and **retries with exponential back-off** on failure (default 3 attempts) before skipping
-a batch. So a transient rate-limit slows the build instead of silently dropping names, and the API
-is never hammered with thousands of back-to-back requests. The monthly workflow has a 120-minute
-timeout to absorb the pauses.
+The liquidity step is built to stay under Yahoo's rate limit (the `YFRateLimitError` you'll
+otherwise see), since yfinance fetches per-ticker and bursts easily:
+
+- **Rate-limited session.** Requests go through a `requests_ratelimiter` session capped at
+  `DEFAULT_REQUESTS_PER_SEC` (4/s) — the yfinance-recommended fix. If the package isn't installed
+  the build falls back to sequential fetch + pauses (gentler but slower).
+- **Sequential, batched, paced.** `threads=False`, `UNIVERSE_FETCH_CHUNK` symbols per batch
+  (default 120), `UNIVERSE_FETCH_PAUSE`s between batches (default 1.5).
+- **Retry the missing subset.** yfinance doesn't raise on a per-ticker rate-limit — it returns that
+  name empty — so the build detects which requested symbols are missing and re-fetches **only
+  those** with back-off (default 3 rounds). Rate-limited names recover; genuinely dead ones don't.
+- **Retention guard.** If a run yields fewer than `MIN_RETENTION` (60%) of the previous universe's
+  tickers, it's treated as a rate-limited failure: the build **raises** rather than overwrite the
+  committed `universe.json` with a husk. Re-run (or lower the rate) and it recovers.
+
+## Skip-list — remembering dead symbols
+
+The listings file contains thousands of delisted / preferred / bad symbols (e.g. `AAAD`, `FBYDP`)
+that never return data. To avoid re-fetching them every month, symbols that return no usable data
+are recorded in **`public/data/universe_skip.json`** as `{symbol: last_failed_date}` and excluded
+from the next build's fetch. Entries **expire after `SKIP_TTL_DAYS` (180)** so a symbol that
+relists gets re-checked. This is the only cross-run "memory" the builder keeps — the universe
+itself is still a full rebuild each month (liquidity must be recomputed from fresh prices). The
+monthly workflow commits `universe_skip.json` alongside `universe.json`. The 120-minute job timeout
+absorbs the pauses.
 
 ## Source files
 
@@ -90,4 +108,5 @@ timeout to absorb the pauses.
 - `.github/workflows/universe-refresh.yml` — monthly cron (built).
 - `paper_trading/tests/test_universe.py` — offline tests for the pure functions (built).
 - `public/data/universe.json` — the committed shared universe (written by the monthly job).
+- `public/data/universe_skip.json` — persistent skip-list of dead symbols (TTL-pruned).
 - Consumed by `paper_trading/update.py` (open) and the private repo's `update_secured.py` (secured).

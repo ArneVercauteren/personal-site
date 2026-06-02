@@ -67,7 +67,18 @@ DEFAULT_LOOKBACK_DAYS = 120  # ~63 trading days of history for the median
 # dropping. Tunable via update_universe env vars.
 DEFAULT_FETCH_CHUNK = 120     # tickers per yfinance batch request
 DEFAULT_FETCH_PAUSE = 1.5     # seconds between batches
-DEFAULT_FETCH_RETRIES = 3     # attempts per batch before skipping it
+DEFAULT_FETCH_RETRIES = 3     # attempts to recover missing/rate-limited names per batch
+DEFAULT_REQUESTS_PER_SEC = 4  # global cap via a rate-limited session (if available)
+
+# Persistent skip-list of symbols that returned no data (delisted / preferred /
+# bad symbols), so we don't re-fetch known-dead names every month. Entries carry
+# the date they last failed and are re-checked after SKIP_TTL_DAYS in case a
+# symbol relists.
+DEFAULT_SKIP_PATH = REPO_ROOT / "public" / "data" / "universe_skip.json"
+SKIP_TTL_DAYS = 180
+
+# Safety: never overwrite a good universe with a husk from a rate-limited run.
+MIN_RETENTION = 0.6
 
 # --- symbol filters (vendored from Darwin src/data/ticker_filtering.py) -------
 _NON_COMMON_SUFFIXES: set[str] = {
@@ -200,54 +211,127 @@ def rank_by_liquidity(
     return eligible[:cap]
 
 
+def _make_session():
+    """A rate-limited requests session so yfinance stays under Yahoo's cap.
+
+    Uses `requests_ratelimiter` if installed (the yfinance-recommended way to
+    avoid `YFRateLimitError`). Returns None if it isn't — the fetch then falls
+    back to sequential requests + inter-batch pauses, which is gentler but slower.
+    """
+    try:
+        from requests_ratelimiter import LimiterSession
+
+        return LimiterSession(per_second=DEFAULT_REQUESTS_PER_SEC)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (no rate-limited session — pip install requests-ratelimiter; {exc})")
+        return None
+
+
+# --- persistent skip-list -----------------------------------------------------
+def load_skip(path: Path | None = None) -> dict[str, str]:
+    """Load the `{symbol: last_failed_date}` skip-list (empty if none yet)."""
+    p = path or DEFAULT_SKIP_PATH
+    if not p.exists():
+        return {}
+    try:
+        return dict(json.loads(p.read_text(encoding="utf-8")).get("symbols", {}))
+    except (ValueError, OSError):
+        return {}
+
+
+def save_skip(skip: dict[str, str], path: Path | None = None) -> None:
+    p = path or DEFAULT_SKIP_PATH
+    payload = {"as_of": dt.date.today().isoformat(), "count": len(skip), "symbols": dict(sorted(skip.items()))}
+    p.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def active_skips(skip: dict[str, str], today: dt.date | None = None) -> set[str]:
+    """Symbols whose last failure is still within SKIP_TTL_DAYS (so still skipped)."""
+    today = today or dt.date.today()
+    out: set[str] = set()
+    for sym, when in skip.items():
+        try:
+            age = (today - dt.date.fromisoformat(when)).days
+        except (TypeError, ValueError):
+            age = 0
+        if age < SKIP_TTL_DAYS:
+            out.add(sym)
+    return out
+
+
+def _prune_skip(skip: dict[str, str], today: dt.date | None = None) -> dict[str, str]:
+    """Drop expired entries so relisted symbols get re-checked next run."""
+    keep = active_skips(skip, today)
+    return {s: w for s, w in skip.items() if s in keep}
+
+
+def _fetch_one_batch(group, start, end, *, session, pause, max_retries, label):
+    """Fetch a batch, retrying the *missing* (often rate-limited) subset.
+
+    yfinance doesn't raise on per-ticker rate-limits — it just returns those
+    names empty — so we detect which requested symbols are missing and re-fetch
+    only those with back-off. Returns `{ticker: (median_dollar_volume, last_close)}`.
+    """
+    out: dict[str, tuple[float, float]] = {}
+    pending = list(group)
+    for attempt in range(max_retries):
+        df = None
+        try:
+            df = prices.get_ohlcv(pending, start, end, session=session, threads=False)
+        except Exception as exc:  # noqa: BLE001 — hard failure (network); retry below
+            print(f"  batch {label}: request failed ({exc})")
+        if df is not None and not df.empty:
+            df = df.assign(dv=df["adj_close"] * df["volume"])
+            med = df.groupby("ticker")["dv"].median()
+            last = df.sort_values("date").groupby("ticker")["close"].last()
+            for t in list(pending):
+                if t in med.index and np.isfinite(med[t]):
+                    out[t] = (float(med[t]), float(last.get(t, 0.0)))
+            pending = [t for t in pending if t not in out]
+        if not pending or attempt == max_retries - 1:
+            break
+        backoff = pause * (2 ** attempt)
+        print(f"  batch {label}: {len(pending)} missing/limited; retry in {backoff:.1f}s")
+        time.sleep(backoff)
+    return out
+
+
 def _fetch_liquidity(
     symbols: list[str],
     lookback_days: int,
     *,
+    session=None,
     chunk: int = DEFAULT_FETCH_CHUNK,
     pause: float = DEFAULT_FETCH_PAUSE,
     max_retries: int = DEFAULT_FETCH_RETRIES,
-) -> tuple[dict[str, float], dict[str, float]]:
+) -> tuple[dict[str, float], dict[str, float], set[str]]:
     """Trailing median dollar volume + last close per symbol, fetched politely.
 
-    Symbols are fetched in batches of `chunk` (one yfinance request each), with a
-    `pause` between batches and exponential back-off + retry on failure, so the
-    free keyless API isn't hammered and a transient rate-limit doesn't silently
-    drop names. A batch that still fails after `max_retries` is skipped.
+    Batched and rate-limited (via `session`), sequential within a batch, with a
+    `pause` between batches and a back-off retry of any missing/rate-limited
+    names. Returns `(dollar_volume, last_price, failed)` where `failed` are the
+    symbols that never returned usable data (recorded to the skip-list).
     """
     start = (pd.Timestamp.today() - pd.Timedelta(days=lookback_days)).strftime("%Y-%m-%d")
     end = pd.Timestamp.today().strftime("%Y-%m-%d")
     dollar_volume: dict[str, float] = {}
     last_price: dict[str, float] = {}
+    failed: set[str] = set()
 
     batches = list(range(0, len(symbols), chunk))
     for bi, i in enumerate(batches):
         group = symbols[i : i + chunk]
-        df = None
-        for attempt in range(max_retries):
-            try:
-                df = prices.get_ohlcv(group, start, end)
-                break
-            except Exception as exc:  # noqa: BLE001 — robustness over thousands of symbols
-                if attempt < max_retries - 1:
-                    backoff = pause * (2 ** attempt)
-                    print(f"  batch {bi + 1}/{len(batches)}: attempt {attempt + 1} failed "
-                          f"({exc}); retrying in {backoff:.1f}s")
-                    time.sleep(backoff)
-                else:
-                    print(f"  batch {bi + 1}/{len(batches)}: skipped after {max_retries} attempts ({exc})")
-        if df is not None:
-            df = df.assign(dv=df["adj_close"] * df["volume"])
-            med = df.groupby("ticker")["dv"].median()
-            last = df.sort_values("date").groupby("ticker")["close"].last()
-            for t in group:
-                if t in med.index and np.isfinite(med[t]):
-                    dollar_volume[t] = float(med[t])
-                    last_price[t] = float(last.get(t, 0.0))
-        # Polite gap before the next batch (skip after the final one).
+        got = _fetch_one_batch(
+            group, start, end, session=session, pause=pause,
+            max_retries=max_retries, label=f"{bi + 1}/{len(batches)}",
+        )
+        for t, (m, p) in got.items():
+            dollar_volume[t] = m
+            last_price[t] = p
+        failed.update(t for t in group if t not in got)
         if bi < len(batches) - 1:
             time.sleep(pause)
-    return dollar_volume, last_price
+    return dollar_volume, last_price, failed
 
 
 def build_universe(
@@ -260,19 +344,53 @@ def build_universe(
     fetch_chunk: int = DEFAULT_FETCH_CHUNK,
     fetch_pause: float = DEFAULT_FETCH_PAUSE,
     out_path: Path | None = None,
+    skip_path: Path | None = None,
 ) -> dict:
-    """Build + write the shared universe (the monthly job's entry point)."""
+    """Build + write the shared universe (the monthly job's entry point).
+
+    Reuses a persistent skip-list so known-dead symbols aren't re-fetched every
+    month, fetches through a rate-limited session, and refuses to overwrite a good
+    universe with a rate-limited husk (the retention guard).
+    """
+    path = out_path or DEFAULT_UNIVERSE_PATH
+    skip_path = skip_path or DEFAULT_SKIP_PATH
+    today = dt.date.today()
+
+    skip = load_skip(skip_path)
+    skipped = active_skips(skip, today)
+
     rows = fetch_symbol_directory()
     commons = filter_common_symbols(rows, exclude_etf=exclude_etf)
-    print(f"listings: {len(rows)} rows → {len(commons)} common symbols")
-    dollar_volume, last_price = _fetch_liquidity(
-        commons, lookback_days, chunk=fetch_chunk, pause=fetch_pause
+    candidates = [s for s in commons if s not in skipped]
+    print(f"listings: {len(rows)} rows → {len(commons)} common; "
+          f"{len(skipped)} known-dead skipped → {len(candidates)} to fetch")
+
+    session = _make_session()
+    dollar_volume, last_price, failed = _fetch_liquidity(
+        candidates, lookback_days, session=session, chunk=fetch_chunk, pause=fetch_pause
     )
     tickers = rank_by_liquidity(
         dollar_volume, last_price, min_price=min_price, min_adv=min_adv, cap=cap
     )
+
+    # Retention guard: a sharp drop vs the last good universe means the run was
+    # likely rate-limited — fail loudly instead of clobbering the committed file.
+    prior = _prior_count(path)
+    if prior and len(tickers) < MIN_RETENTION * prior:
+        raise RuntimeError(
+            f"new universe has {len(tickers)} tickers vs prior {prior} "
+            f"(< {MIN_RETENTION:.0%}); likely a rate-limited run — keeping the existing "
+            f"universe.json. Re-run, or lower UNIVERSE_FETCH rate, then retry."
+        )
+
+    # Remember this run's failures so next month skips them (within TTL).
+    for sym in failed:
+        skip[sym] = today.isoformat()
+    skip = _prune_skip(skip, today)
+    save_skip(skip, skip_path)
+
     payload = {
-        "as_of": dt.date.today().isoformat(),
+        "as_of": today.isoformat(),
         "source": "nasdaqtrader",
         "filters": {
             "min_price": min_price,
@@ -281,12 +399,23 @@ def build_universe(
             "exclude_etf": exclude_etf,
         },
         "count": len(tickers),
+        "skipped": len(skip),
         "tickers": tickers,
     }
-    path = out_path or DEFAULT_UNIVERSE_PATH
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    print(f"wrote {path.relative_to(REPO_ROOT)} — {len(tickers)} tickers")
+    print(f"wrote {path.relative_to(REPO_ROOT)} — {len(tickers)} tickers "
+          f"({len(failed)} new dead symbols recorded; {len(skip)} skipped total)")
     return payload
+
+
+def _prior_count(path: Path) -> int:
+    """Ticker count in the existing universe.json, or 0 if none/unreadable."""
+    if not path.exists():
+        return 0
+    try:
+        return int(json.loads(path.read_text(encoding="utf-8")).get("count", 0))
+    except (ValueError, OSError):
+        return 0
 
 
 # --- reader (used by the daily updaters) --------------------------------------

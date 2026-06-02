@@ -81,3 +81,42 @@ def test_resolve_universe_falls_back_to_shared(tmp_path):
 def test_resolve_universe_missing_shared_raises(tmp_path):
     with pytest.raises(FileNotFoundError, match="shared universe not found"):
         universe.resolve_universe({}, path=tmp_path / "nope.json")
+
+
+# --- skip-list (known-dead symbols, with TTL) -----------------------------
+
+def test_active_skips_respects_ttl():
+    import datetime as dt
+    today = dt.date(2026, 6, 3)
+    skip = {
+        "DEAD": (today - dt.timedelta(days=10)).isoformat(),    # recent → still skipped
+        "OLD": (today - dt.timedelta(days=200)).isoformat(),    # > 180d → expired
+    }
+    active = universe.active_skips(skip, today)
+    assert active == {"DEAD"}
+
+
+def test_skip_roundtrip_and_prune(tmp_path):
+    import datetime as dt
+    today = dt.date(2026, 6, 3)
+    skip = {
+        "DEAD": (today - dt.timedelta(days=10)).isoformat(),
+        "OLD": (today - dt.timedelta(days=300)).isoformat(),
+    }
+    p = tmp_path / "universe_skip.json"
+    universe.save_skip(skip, p)
+    loaded = universe.load_skip(p)
+    assert loaded == skip
+    pruned = universe._prune_skip(loaded, today)
+    assert "OLD" not in pruned and "DEAD" in pruned
+
+
+def test_skipped_symbols_excluded_from_candidates():
+    # filter_common_symbols output minus active skips is what gets fetched.
+    rows = universe.parse_symbol_directory(NASDAQ_TXT, OTHER_TXT)
+    commons = universe.filter_common_symbols(rows)
+    import datetime as dt
+    skip = {"AAPL": dt.date.today().isoformat()}
+    skipped = universe.active_skips(skip)
+    candidates = [s for s in commons if s not in skipped]
+    assert "AAPL" not in candidates and "MSFT" in candidates

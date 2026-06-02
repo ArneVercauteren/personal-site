@@ -46,7 +46,7 @@ jobs:
         run: |
           git config user.name "universe-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add public/data/universe.json
+          git add public/data/universe.json public/data/universe_skip.json
           if git diff --staged --quiet; then
             echo "No universe changes; nothing to commit."
           else
