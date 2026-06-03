@@ -1,6 +1,6 @@
 # Subsystem — Live paper-trading dashboard (Tier 1)
 
-> **Status: built (v2).** The dashboard renders real data from the contract: per-strategy cards with a Recharts equity curve, stats, a drawdown chart, and positions (open) / exposure donut (secured). A trade-log view is the planned next increment.
+> **Status: built (v3).** The dashboard renders real data from the contract: per-strategy cards with a Recharts equity curve (split into a muted out-of-sample **backfill** segment and a solid **live** segment at the `live_since` marker), split live/backtest stats, a drawdown chart, and positions (open) / exposure donut (secured). Each card links to a **per-strategy detail page** (`/astralanx/live/[id]`) with a continuous training → OOS → live shaded-band chart, regime stat cards, and the validity battery. A trade-log view is the planned next increment.
 
 ## What this owns
 
@@ -8,16 +8,18 @@ The reader side of the live data: the dashboard page and the chart/stat componen
 
 ## Shape (built)
 
-- `app/darwin/live/page.tsx` — loads `portfolio.json` + `strategies.json` via `lib/data.ts`, shows the `as_of` date and the disclaimer, then renders strategies in two labelled sections — **Open strategies** (formula + positions shown) and **Secured strategies** (performance + exposure only) — splitting on `isOpen`. One `StrategyCard` per strategy.
-- `components/StrategyCard.tsx` — per-strategy card: name, open/secured badge, equity curve, stats, drawdown chart, and positions table (open) or exposure donut (secured) + metadata (capital, cadence, costs).
-- `components/EquityCurveChart.tsx` — Recharts area/line equity curve (gain/loss colored, faint grid, hover tooltip). Client component.
-- `components/DrawdownChart.tsx` — Recharts underwater plot derived from the equity curve (`value / running-peak − 1`). Client component.
+- `app/astralanx/live/page.tsx` — loads `portfolio.json` + `strategies.json` via `lib/data.ts`, shows the `as_of` date and the disclaimer, then renders strategies in two labelled sections — **Open strategies** (formula + positions shown) and **Secured strategies** (performance + exposure only) — splitting on `isOpen`. One `StrategyCard` per strategy.
+- `app/astralanx/live/[id]/page.tsx` — **per-strategy detail page** (statically generated from the published ids). Header + key facts, the continuous `RegimeEquityChart`, the live (forward) stats, then a **Backtest** section with three detailed-stat panels — **Out-of-sample**, **Training (in-sample)**, and **Combined (training + OOS)** — driven by `meta.performance` (the three single-seed runs), a king-level **Capacity & holdings** block (`active_share`, `capacity`), and the composition (basket for open, exposure donut for secured). The `DetailedStatsPanel` helper renders whichever of the ~18 `DetailedStats` fields a run carries; degrades gracefully when provenance is absent.
+- `components/StrategyCard.tsx` — per-strategy summary card: name, open/secured badge, equity curve, split live/backtest stats, drawdown chart, positions table (open) or exposure donut (secured), metadata, and a "Full breakdown →" link to the detail page.
+- `components/EquityCurveChart.tsx` — Recharts area/line equity curve. With `liveSince` it renders two-tone: a muted/dashed out-of-sample backfill segment and a solid live segment, with a "Live" `ReferenceLine` marker and a small legend. Client component.
+- `components/RegimeEquityChart.tsx` — Recharts equity curve with translucent `ReferenceArea` bands behind it for the training / OOS / live regimes (boundaries snapped to the nearest curve date), the live marker, and a regime legend. Detail-page only. Client component.
+- `components/DrawdownChart.tsx` — Recharts underwater plot derived from the equity curve (`value / running-peak − 1`); takes an optional `liveSince` marker. Client component.
 - `components/ExposureDonut.tsx` — Recharts donut + legend for secured sector/asset-class exposure. Client component.
 - `components/charts/chartColors.ts` — shared palette mirroring the Tailwind tokens (charts are client components and can't read Tailwind at runtime).
-- `components/StatsTable.tsx` — CAGR / Sharpe / max drawdown, mono/tabular.
+- `components/StatsTable.tsx` — CAGR / Sharpe / max drawdown, mono/tabular. Reused for each regime card.
 - `components/Disclaimer.tsx` — the standing paper-only disclaimer.
 
-Recharts loads only on `/darwin/live` (code-split), so the rest of the site keeps its small bundle.
+Recharts loads only on `/astralanx/live` and `/astralanx/live/[id]` (code-split), so the rest of the site keeps its small bundle.
 
 ## Planned (next increment)
 
@@ -45,4 +47,4 @@ See the recipe: [tasks/add-dashboard-chart.md](../tasks/add-dashboard-chart.md).
 
 ## Source files
 
-- `app/darwin/live/page.tsx`, `components/StrategyCard.tsx`, `components/EquityCurveChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx`, `components/charts/chartColors.ts`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.
+- `app/astralanx/live/page.tsx`, `app/astralanx/live/[id]/page.tsx`, `components/StrategyCard.tsx`, `components/EquityCurveChart.tsx`, `components/RegimeEquityChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx`, `components/charts/chartColors.ts`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.

@@ -15,7 +15,7 @@ export const site = {
   nav: [
     { href: "/", label: "Home" },
     { href: "/about", label: "About" },
-    { href: "/astralanx", label: "astralanx" },
+    { href: "/astralanx", label: "Astralanx" },
     { href: "/astralanx/live", label: "Live" },
     { href: "/writing", label: "Writing" },
     { href: "/reading", label: "Reading list" },

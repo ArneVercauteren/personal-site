@@ -114,11 +114,33 @@ set when the strategy is deployed from Darwin and shown on the site:
                      "vol_scaled_cost_enable": true, "vol_cost_k": 0.75,
                      "vol_cost_realized_window": 63, "vol_cost_long_window": 252,
                      "vol_cost_mult_max": 3.0},
-      "blurb": "Balanced risk/return king from epoch 7."
+      "blurb": "Balanced risk/return king from epoch 7.",
+      "performance": {
+        "training": {"start": "2018-01-02", "end": "2022-12-30",
+                     "windows": [{"start": "2018-01-02", "end": "2020-12-31", "label": "Regime 1"}],
+                     "stats": {"cagr": 0.131, "volatility": 0.171, "sharpe": 0.99,
+                               "sortino": 1.42, "calmar": 0.64, "max_dd": -0.205, "alpha": 0.038}},
+        "oos": {"start": "2023-01-03", "end": "2025-12-31",
+                "stats": {"cagr": 0.131, "sharpe": 0.98, "max_dd": -0.156, "benchmark_beta": 0.82}},
+        "combined": {"start": "2018-01-02", "end": "2025-12-31",
+                     "stats": {"cagr": 0.131, "sharpe": 0.99, "max_dd": -0.205}}
+      },
+      "active_share": 0.66,
+      "capacity": {"liquidity_usd": 42000000, "impact_usd": 18000000}
     }
   ]
 }
 ```
+
+`performance` is **optional provenance** from Darwin's discovery run, shown on the per-strategy detail
+page (`/astralanx/live/[id]`). It holds **three single-seed runs** — `training` (in-sample, with
+optional `windows` for its regimes), `oos` (held-out), and `combined` (both, run end to end) — each
+with a `DetailedStats` block (CAGR, volatility, Sharpe/Sortino/Calmar, max DD, rolling stress,
+benchmark beta/correlation, Fama-French alpha, …). `active_share` and `capacity` are king-level. All
+are dates + aggregate stats only — never the formula or weights — so they publish for **secured**
+strategies too. Entries without them simply omit the breakdown. See
+[subsystems/live-dashboard.md](../subsystems/live-dashboard.md) and
+[subsystems/darwin-publish.md](../subsystems/darwin-publish.md).
 
 This metadata is **not sensitive** — it describes *how the sim is run* (capital, cadence, cost
 assumptions), not the formula or the basket — so it is published for secured strategies too.

@@ -14,7 +14,7 @@ const capabilities = [
   },
   {
     title: "High-performance systems",
-    body: "Performance-critical engines in Python and C, designed for determinism, reproducibility, and scale.",
+    body: "Performance-critical engines in Python and C",
   },
   {
     title: "Conceptual and abstract reasoning",
@@ -67,7 +67,7 @@ export default function AboutPage() {
               {age(site.birthDate)} years old
             </p>
             <p className="mt-3 max-w-prose leading-relaxed text-ink-muted">
-              Developer and quantitative researcher with a focus on systematic strategy development and high-performance software.
+              Developer with a focus on systematic strategy development and high-performance software.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2">

@@ -99,6 +99,70 @@ export interface CostModel {
   vol_cost_mult_max?: number;
 }
 
+/**
+ * A full per-run stat block from one deterministic (single-seed) Darwin
+ * backtest. Extends the headline `Stats` (cagr/sharpe/max_dd) with the richer
+ * diagnostics Darwin records. Every extra field is optional — the detail page
+ * renders whatever the export provides. Numbers only; nothing secret, so this
+ * publishes for secured strategies too.
+ */
+export interface DetailedStats extends Stats {
+  /** Total cumulative return over the window (fraction). */
+  total_return?: number;
+  /** Annualized volatility (fraction). */
+  volatility?: number;
+  /** Sortino ratio (downside-only risk adjustment). */
+  sortino?: number;
+  /** Calmar ratio (CAGR / |max drawdown|). */
+  calmar?: number;
+  /** Longest peak-to-recovery drawdown, in calendar days. */
+  max_dd_duration_days?: number;
+  /** Fraction of rebalance periods with a positive return. */
+  win_rate?: number;
+  /** Best / worst calendar-year return over the window (fraction). */
+  best_year?: number;
+  worst_year?: number;
+  /** Worst rolling 3-year / 5-year CAGR over the window (negative ok). */
+  worst_rolling_3y_cagr?: number;
+  worst_rolling_5y_cagr?: number;
+  /** Minimum rolling annualized Sharpe. */
+  rolling_sharpe_min?: number;
+  /** Beta / correlation vs the S&P 500 benchmark. */
+  benchmark_beta?: number;
+  benchmark_corr?: number;
+  /** Annualized Fama-French alpha (fraction, e.g. 0.04 = 4%/yr). */
+  alpha?: number;
+  /** Information ratio vs the benchmark. */
+  information_ratio?: number;
+}
+
+/**
+ * One of the three single-seed runs the Darwin exporter records. `start`/`end`
+ * is the window envelope; `windows` optionally lists sub-windows (e.g. the
+ * training regimes) for display when the run spans more than one stretch.
+ */
+export interface PerformanceRun {
+  /** ISO date, inclusive. */
+  start: string;
+  /** ISO date, inclusive. */
+  end: string;
+  /** Optional sub-windows (e.g. training's constituent regimes), display only. */
+  windows?: { start: string; end: string; label?: string }[];
+  stats: DetailedStats;
+}
+
+/**
+ * The three runs Darwin computes for a deployed king: the in-sample training
+ * window, the held-out out-of-sample window, and the two combined. Each is a
+ * separate single-seed backtest, so the combined figures (Sharpe, max DD across
+ * the boundary) are authoritative rather than stitched from the two halves.
+ */
+export interface StrategyPerformance {
+  training: PerformanceRun;
+  oos: PerformanceRun;
+  combined: PerformanceRun;
+}
+
 export interface StrategyMeta {
   id: string;
   name: string;
@@ -109,6 +173,18 @@ export interface StrategyMeta {
   deployed_on: string;
   cost_model: CostModel;
   blurb: string;
+  /**
+   * Optional provenance from Darwin (Tier 3), shown on the per-strategy detail
+   * page. `performance` carries the three single-seed runs (training, OOS,
+   * combined) each with detailed stats; `active_share` and `capacity` are
+   * king-level liquidity/holdings measures. All optional and backward
+   * compatible — entries without them simply omit the breakdown.
+   */
+  performance?: StrategyPerformance;
+  /** Active share vs an equal-weight eligible universe (fraction). */
+  active_share?: number;
+  /** Capacity estimates (USD): liquidity-screen and stricter impact-consistent. */
+  capacity?: { liquidity_usd?: number; impact_usd?: number };
 }
 
 export interface StrategiesFile {

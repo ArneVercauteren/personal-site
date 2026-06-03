@@ -152,14 +152,22 @@ export function StrategyCard({
         </dl>
       ) : null}
 
-      {isOpen(strategy) && strategy.formula_ref ? (
+      <div className="flex items-center justify-between border-t border-hair pt-4">
         <Link
-          href={strategy.formula_ref}
-          className="text-sm text-accent hover:underline"
+          href={`/astralanx/live/${strategy.id}`}
+          className="text-sm font-semibold text-accent hover:underline"
         >
-          View the formula →
+          Full breakdown →
         </Link>
-      ) : null}
+        {isOpen(strategy) && strategy.formula_ref ? (
+          <Link
+            href={strategy.formula_ref}
+            className="text-sm text-ink-muted hover:text-ink"
+          >
+            View the formula →
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }

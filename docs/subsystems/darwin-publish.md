@@ -47,8 +47,22 @@ A deployed strategy is one `*.json` file matching the strategy-spec the updater 
   "name": "Balanced King",
   "visibility": "secured",                       // "open" → public repo; "secured" → private repo
   "blurb": "Balanced risk/return king from epoch 7.",
-  "deployed_on": "2026-06-02",                    // export date; sim starts here
+  "deployed_on": "2026-06-02",                    // LIVE-since marker (forward paper-trading begins)
+  "backfill_start": "2018-01-02",                 // optional: curve start for a one-time backfill
+                                                  //   (earlier than deployed_on; the sim runs from here)
   "next_rebalance_date": "2026-07-14",            // deployed_on + cadence (secured only needs this)
+  "performance": {                                // optional: three single-seed runs (see below)
+    "training": {"start": "2018-01-02", "end": "2022-12-30",
+                 "windows": [{"start": "2018-01-02", "end": "2020-12-31", "label": "Regime 1"}],
+                 "stats": {"cagr": 0.131, "total_return": 0.857, "volatility": 0.171, "sharpe": 0.99,
+                           "sortino": 1.42, "calmar": 0.64, "max_dd": -0.205, "alpha": 0.038, "...": 0}},
+    "oos": {"start": "2023-01-03", "end": "2025-12-31",
+            "stats": {"cagr": 0.131, "sharpe": 0.98, "max_dd": -0.156, "benchmark_beta": 0.82, "...": 0}},
+    "combined": {"start": "2018-01-02", "end": "2025-12-31",
+                 "stats": {"cagr": 0.131, "sharpe": 0.99, "max_dd": -0.205, "...": 0}}
+  },
+  "active_share": 0.66,                            // king-level liquidity/holdings measures
+  "capacity": {"liquidity_usd": 42000000, "impact_usd": 18000000},
   "portfolio_size": 100000,
   "base_currency": "USD",
   "rebalance_cadence_days": 42,
@@ -71,6 +85,39 @@ the secured pipeline strips the formula/positions from the *public snapshot* (`a
 never letting them reach the public site. The only export-time differences are `visibility` and the
 open-only public `formula_ref`. The secured file is kept secret simply by living **only in the
 private repo**; the open file's formula is published for auditability.
+
+**`backfill_start`, `performance`, `active_share`, and `capacity` are optional and publish for both
+visibilities** — they are dates and aggregate performance numbers, never the formula or weights, so
+they clear the security boundary. They drive the per-strategy detail page (continuous training → OOS →
+live curve with shaded bands, plus detailed stat panels). `backfill_start` is typically the earliest
+training-regime start, so the site's re-simulated curve spans the whole lifecycle.
+
+### `performance` — three single-seed runs
+
+To give the site authoritative figures, the exporter runs **three deterministic (single-seed)
+backtests** of the frozen king tree, all at the deployed `cost_model`, and records each run's full
+diagnostics:
+
+1. **`training`** — over the in-sample window(s) the formula was fit on. Set `windows` to the
+   constituent regimes when training spans more than one stretch; `start`/`end` is the envelope.
+2. **`oos`** — over the held-out out-of-sample window.
+3. **`combined`** — over training **and** OOS together. Run end to end (a fresh backtest over the
+   union span), **not** stitched from the two halves — cross-boundary figures like max drawdown and
+   Sharpe aren't additive.
+
+Each run's `stats` is a `DetailedStats` block. Map Darwin's existing backtest diagnostics into it:
+
+| `DetailedStats` field | Darwin source (per-run backtest diagnostic) |
+|---|---|
+| `cagr`, `total_return`, `volatility`, `max_dd`, `max_dd_duration_days` | core return/risk summary |
+| `sharpe`, `sortino`, `calmar` | risk-adjusted ratios |
+| `win_rate`, `best_year`, `worst_year` | period/calendar-year breakdown |
+| `worst_rolling_3y_cagr`, `worst_rolling_5y_cagr`, `rolling_sharpe_min` | rolling-window stress |
+| `benchmark_beta`, `benchmark_corr`, `alpha`, `information_ratio` | benchmark relationship + Fama-French alpha |
+
+`active_share` and `capacity` (`liquidity_usd` / `impact_usd`) are king-level (current basket /
+liquidity), emitted once. Omit any field you don't have — the detail page renders only what's present.
+See [data-contract.md](../concepts/data-contract.md) and [live-dashboard.md](live-dashboard.md).
 
 The `formula` tree is exactly what `paper_trading`'s vendored evaluator already consumes, so the
 exporter should reuse Darwin's existing serializer **`src/dsl/serialize.py::to_dict(strategy)`**

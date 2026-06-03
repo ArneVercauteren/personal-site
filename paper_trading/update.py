@@ -127,7 +127,7 @@ def run() -> str:
             entry["formula_ref"] = spec["formula_ref"]
         portfolio_entries.append(entry)
 
-        meta_entries.append({
+        meta_entry = {
             "id": spec["id"],
             "name": spec["name"],
             "visibility": "open",
@@ -137,7 +137,14 @@ def run() -> str:
             "deployed_on": spec["deployed_on"],
             "cost_model": spec["cost_model"],
             "blurb": spec["blurb"],
-        })
+        }
+        # Optional Darwin provenance for the detail page: the three single-seed
+        # runs (training / OOS / combined) plus king-level liquidity measures.
+        # Passed straight through; the site only displays it.
+        for key in ("performance", "active_share", "capacity"):
+            if spec.get(key) is not None:
+                meta_entry[key] = spec[key]
+        meta_entries.append(meta_entry)
 
         open_trades.extend(dict(strategy_id=spec["id"], **t) for t in result.trades)
         print(f"  {spec['id']}: {result.stats} ({len(result.equity_curve)} pts)")
