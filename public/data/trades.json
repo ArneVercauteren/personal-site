@@ -1,8 +1,54 @@
 {
-  "as_of": "2026-06-01",
+  "as_of": "2026-06-02",
   "trades": [
-    { "strategy_id": "open_momentum_v1", "d": "2026-05-01", "ticker": "NVDA", "side": "buy", "weight": 0.05 },
-    { "strategy_id": "open_momentum_v1", "d": "2026-05-01", "ticker": "TSLA", "side": "sell", "weight": 0.04 },
-    { "strategy_id": "open_momentum_v1", "d": "2026-04-01", "ticker": "JPM", "side": "buy", "weight": 0.045 }
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-06-02",
+      "ticker": "AAPL",
+      "side": "buy",
+      "weight": 0.2
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-06-02",
+      "ticker": "AMZN",
+      "side": "sell",
+      "weight": 0.1869
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-06-02",
+      "ticker": "GOOGL",
+      "side": "buy",
+      "weight": 0.0095
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-06-02",
+      "ticker": "JNJ",
+      "side": "sell",
+      "weight": 0.1993
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-06-02",
+      "ticker": "NVDA",
+      "side": "sell",
+      "weight": 0.0288
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-06-02",
+      "ticker": "UNH",
+      "side": "buy",
+      "weight": 0.2
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-06-02",
+      "ticker": "XOM",
+      "side": "buy",
+      "weight": 0.0033
+    }
   ]
 }
