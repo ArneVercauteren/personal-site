@@ -45,8 +45,11 @@ fields are allowed. This is a **security boundary** — see
       "id": "open_momentum_v1",
       "name": "Momentum (Open)",
       "visibility": "open",
-      "equity_curve": [{"d": "2026-01-02", "v": 100000.0}],
+      "equity_curve": [{"d": "2024-01-02", "v": 100000.0}],
       "stats": {"cagr": 0.081, "sharpe": 0.65, "max_dd": -0.12},
+      "live_since": "2026-01-02",
+      "stats_backtest": {"cagr": 0.090, "sharpe": 0.70, "max_dd": -0.15},
+      "stats_live": {"cagr": 0.034, "sharpe": 0.55, "max_dd": -0.04},
       "positions": [{"ticker": "AAPL", "weight": 0.04}],
       "formula_ref": "/writing/open-momentum"
     },
@@ -68,6 +71,25 @@ Notes on the shape:
 - `as_of` is the snapshot date; the site shows it so a reader knows how fresh the data is.
 - Money values are plain numbers in `base_currency`; the site formats them via `lib/format.ts`.
 - `exposure[].group` is a sector / asset-class label, never a ticker.
+
+### Backfill & the live marker
+
+The equity curve may start **before** a strategy went live — a one-time historical backfill so the
+site has evidence on day one rather than after months of waiting. Three **optional** fields describe
+this (open and secured alike); all are backward-compatible, so older entries without them still render
+as a single curve with one stat set:
+
+- `live_since` — ISO date where real forward paper-trading begins. The site draws a marker here and
+  renders the pre-live curve muted/dashed. Everything before it is an **out-of-sample backtest**, not
+  live evidence; the copy says so.
+- `stats_backtest` — stats over the pre-live segment `[curve start, live_since)`.
+- `stats_live` — stats over the post-live segment `[live_since, last bar]`. Reports zeros while the
+  segment is shorter than a handful of bars; the UI shows "accruing" until then.
+
+`stats` stays the full-curve summary. On the Tier-2 **writer** side, the curve start is set per-king by
+a `backfill_start` field in the strategy spec (an updater input, *not* part of this published
+contract); `deployed_on` in `strategies.json` is the live-since date. See
+[subsystems/paper-trading-updater.md](../subsystems/paper-trading-updater.md).
 
 ## `strategies.json` — per-strategy metadata
 

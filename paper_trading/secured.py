@@ -77,6 +77,13 @@ def _get(sim, key):
     return getattr(sim, key)
 
 
+def _get_opt(sim, key):
+    """Read an optional field, returning None when absent."""
+    if isinstance(sim, dict):
+        return sim.get(key)
+    return getattr(sim, key, None)
+
+
 def aggregate_exposure(
     positions: list[dict],
     sector_map: dict[str, str] | None = None,
@@ -155,6 +162,14 @@ def build_secured_entry(
         "stats": _get(sim, "stats"),
         "exposure": aggregate_exposure(_get(sim, "positions"), sector_map, **kwargs),
     }
+    # Optional split-stats + live marker (one-time backfill). Aggregate-safe:
+    # these are performance numbers, never positions, so they pass the boundary.
+    if spec.get("deployed_on"):
+        entry["live_since"] = spec["deployed_on"]
+    for opt in ("stats_backtest", "stats_live"):
+        val = _get_opt(sim, opt)
+        if val is not None:
+            entry[opt] = val
     assert_sanitized(entry, sector_map=sector_map)
     return entry
 

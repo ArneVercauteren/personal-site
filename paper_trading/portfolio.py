@@ -33,10 +33,16 @@ TRADING_DAYS = 252
 @dataclass
 class SimResult:
     equity_curve: list[dict]          # [{"d": "YYYY-MM-DD", "v": float}, ...]
-    stats: dict                       # {"cagr", "sharpe", "max_dd"}
+    stats: dict                       # {"cagr", "sharpe", "max_dd"} over the full curve
     positions: list[dict]             # [{"ticker", "weight"}, ...] (latest)
     trades: list[dict]                # most-recent rebalance's trades
     as_of: str                        # latest bar date, ISO
+    # Split stats around `live_since` (= deployed_on). The curve can start
+    # earlier than the live date (a one-time backfill), so the pre-live segment
+    # is an out-of-sample backtest and the post-live segment is real forward
+    # paper-trading. Either may be all-zeros when its segment has < 2 points.
+    stats_backtest: dict = None       # [curve start, live_since)
+    stats_live: dict = None           # [live_since, last bar]
 
 
 def _rebalance_dates(index: pd.DatetimeIndex, deployed_on: pd.Timestamp, cadence_days: int):
@@ -129,20 +135,21 @@ def _simulate_signal(
     raw_closes: pd.DataFrame | None = None,
 ) -> SimResult:
     capital = float(strategy["portfolio_size"])
-    deployed_on = pd.Timestamp(strategy["deployed_on"])
+    sim_start = pd.Timestamp(strategy.get("backfill_start") or strategy["deployed_on"])
+    live_since = pd.Timestamp(strategy["deployed_on"])
     cadence = int(strategy["rebalance_cadence_days"])
     cfg = costs.CostModel.from_spec(strategy["cost_model"])
     signal = strategy["signal"]
     tickers = list(closes.columns)
     market_rets = _market_returns(closes)
 
-    sim_index = closes.loc[deployed_on:].index
+    sim_index = closes.loc[sim_start:].index
     if len(sim_index) == 0:
         raise ValueError(
-            f"{strategy['id']}: no price bars on/after deployed_on {deployed_on.date()}"
+            f"{strategy['id']}: no price bars on/after curve start {sim_start.date()}"
         )
 
-    rebal_dates = set(_rebalance_dates(sim_index, deployed_on, cadence))
+    rebal_dates = set(_rebalance_dates(sim_index, sim_start, cadence))
 
     cash = capital
     shares = {t: 0.0 for t in tickers}
@@ -190,6 +197,7 @@ def _simulate_signal(
 
     equity = pd.Series(equity_values, index=sim_index)
     stats = _stats(equity)
+    stats_backtest, stats_live = _split_stats(equity, live_since)
     positions = _latest_positions(shares, closes.iloc[-1], equity_values[-1], tickers)
 
     return SimResult(
@@ -198,6 +206,8 @@ def _simulate_signal(
         positions=positions,
         trades=last_trades,
         as_of=sim_index[-1].strftime("%Y-%m-%d"),
+        stats_backtest=stats_backtest,
+        stats_live=stats_live,
     )
 
 
@@ -218,20 +228,21 @@ def _simulate_dsl(
     open under our cost model. See docs/subsystems/paper-trading-updater.md.
     """
     capital = float(strategy["portfolio_size"])
-    deployed_on = pd.Timestamp(strategy["deployed_on"])
+    sim_start = pd.Timestamp(strategy.get("backfill_start") or strategy["deployed_on"])
+    live_since = pd.Timestamp(strategy["deployed_on"])
     cadence = int(strategy["rebalance_cadence_days"])
     cfg = costs.CostModel.from_spec(strategy["cost_model"])
     formula = strategy["formula"]
     universe = list(closes.columns)
     market_rets = _market_returns(closes)
 
-    sim_index = closes.loc[deployed_on:].index
+    sim_index = closes.loc[sim_start:].index
     if len(sim_index) == 0:
         raise ValueError(
-            f"{strategy['id']}: no price bars on/after deployed_on {deployed_on.date()}"
+            f"{strategy['id']}: no price bars on/after curve start {sim_start.date()}"
         )
 
-    rebal_set = set(_rebalance_dates(sim_index, deployed_on, cadence))
+    rebal_set = set(_rebalance_dates(sim_index, sim_start, cadence))
     needed_state = signals.formula_state_features(formula)
 
     state = ps.PortfolioState(capital)
@@ -305,6 +316,7 @@ def _simulate_dsl(
 
     equity = pd.Series(equity_values, index=sim_index)
     stats = _stats(equity)
+    stats_backtest, stats_live = _split_stats(equity, live_since)
     positions = _latest_positions(shares, closes.iloc[-1], equity_values[-1], universe)
 
     return SimResult(
@@ -313,6 +325,8 @@ def _simulate_dsl(
         positions=positions,
         trades=last_trades,
         as_of=sim_index[-1].strftime("%Y-%m-%d"),
+        stats_backtest=stats_backtest,
+        stats_live=stats_live,
     )
 
 
@@ -374,6 +388,17 @@ def _stats(equity: pd.Series) -> dict:
         "sharpe": round(float(sharpe), 2),
         "max_dd": round(max_dd, 4),
     }
+
+
+def _split_stats(equity: pd.Series, live_since: pd.Timestamp) -> tuple[dict, dict]:
+    """Stats for the pre-live (backtest) and post-live segments of the curve.
+
+    The boundary point `live_since` is included in both segments as their anchor.
+    A segment with fewer than 2 points yields all-zeros (see `_stats`).
+    """
+    backtest = _stats(equity.loc[:live_since])
+    live = _stats(equity.loc[live_since:])
+    return backtest, live
 
 
 def _latest_positions(shares, close_px, equity, tickers) -> list[dict]:

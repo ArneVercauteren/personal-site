@@ -4,6 +4,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -19,9 +20,11 @@ import { CHART } from "@/components/charts/chartColors";
 export function DrawdownChart({
   points,
   height = 120,
+  liveSince,
 }: {
   points: EquityPoint[];
   height?: number;
+  liveSince?: string;
 }) {
   if (points.length < 2) return null;
 
@@ -32,6 +35,11 @@ export function DrawdownChart({
   });
 
   const minDd = Math.min(...series.map((s) => s.dd));
+
+  // Mark where live paper-trading begins, matching the equity chart.
+  const boundary = liveSince ? series.findIndex((s) => s.d >= liveSince) : -1;
+  const markerD =
+    boundary > 0 && boundary < series.length ? series[boundary].d : null;
 
   return (
     <div>
@@ -70,6 +78,13 @@ export function DrawdownChart({
               labelFormatter={(d) => shortDate(String(d))}
               formatter={(v) => [pct(Number(v)), "Drawdown"]}
             />
+            {markerD ? (
+              <ReferenceLine
+                x={markerD}
+                stroke={CHART.accent}
+                strokeDasharray="3 3"
+              />
+            ) : null}
             <Area
               type="monotone"
               dataKey="dd"

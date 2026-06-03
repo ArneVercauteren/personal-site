@@ -83,11 +83,16 @@ def run() -> str:
         # Explicit spec universe, else the shared self-refreshing universe.
         tickers = universe.resolve_universe(spec)
 
+        # The equity curve starts at `backfill_start` (a one-time historical
+        # backfill) when given, else at the live date. `deployed_on` is the
+        # live-since marker; everything before it is an out-of-sample backtest.
+        curve_start = spec.get("backfill_start") or spec["deployed_on"]
+
         if "formula" in spec:
             # Real DSL king: warm up enough history for the longest feature window.
             needed = collect_all_needed_features(spec["formula"], include_exit_root=True)
             warmup = max(WARMUP_DAYS, int(required_history_days(needed) * 1.6) + 30)
-            start = (pd.Timestamp(spec["deployed_on"]) - pd.Timedelta(days=warmup)).strftime("%Y-%m-%d")
+            start = (pd.Timestamp(curve_start) - pd.Timedelta(days=warmup)).strftime("%Y-%m-%d")
             # The evaluator needs the long OHLCV frame.
             long = prices.get_ohlcv(tickers, start, end)
             opens, closes = prices.long_to_wide(long)
@@ -97,7 +102,7 @@ def run() -> str:
                 dollar_volume=dollar_volume, raw_closes=raw_closes,
             )
         else:
-            start = (pd.Timestamp(spec["deployed_on"]) - pd.Timedelta(days=WARMUP_DAYS)).strftime("%Y-%m-%d")
+            start = (pd.Timestamp(curve_start) - pd.Timedelta(days=WARMUP_DAYS)).strftime("%Y-%m-%d")
             long = prices.get_ohlcv(tickers, start, end)
             opens, closes = prices.long_to_wide(long)
             raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
@@ -113,6 +118,9 @@ def run() -> str:
             "visibility": "open",
             "equity_curve": result.equity_curve,
             "stats": result.stats,
+            "stats_backtest": result.stats_backtest,
+            "stats_live": result.stats_live,
+            "live_since": spec["deployed_on"],
             "positions": result.positions,
         }
         if spec.get("formula_ref"):

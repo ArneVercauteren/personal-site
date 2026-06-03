@@ -4,6 +4,7 @@
   "visibility": "open",
   "blurb": "A fully open momentum strategy — formula and basket published for anyone to audit.",
   "formula_ref": "/projects/darwin",
+  "backfill_start": "2024-01-02",
   "deployed_on": "2026-01-02",
   "portfolio_size": 100000,
   "base_currency": "USD",

@@ -4,14 +4,14 @@ import { site } from "@/lib/site";
 // Featured — the core of the site.
 const featured = [
   {
-    href: "/darwin",
+    href: "/astralanx",
     eyebrow: "Project",
-    label: "Darwin",
+    label: "Astralanx",
     blurb:
       "A system for evolving stock-picking strategies — how it works and what it has found.",
   },
   {
-    href: "/darwin/live",
+    href: "/astralanx/live",
     eyebrow: "Live · simulated",
     label: "Live",
     blurb: "A simulated portfolio running a few of those strategies.",
@@ -27,7 +27,7 @@ const secondary = [
   },
   {
     href: "/reading",
-    label: "Reading",
+    label: "Reading list",
     blurb: "Books I recommend.",
   },
   {
@@ -58,21 +58,21 @@ export default function HomePage() {
         <p className="mt-6 max-w-prose text-lg leading-relaxed text-ink-muted">
           This site documents my software projects, essays, and other
           non-software work. Chief among them is{" "}
-          <span className="text-ink">Darwin</span>, a system for synthesizing
+          <span className="text-ink">Astralanx</span>, a system for synthesizing
           stock-picking strategies — and the simulated paper portfolio it runs
           live.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <Link
-            href="/darwin"
+            href="/astralanx"
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-[#0a0c10] shadow-sm transition-transform hover:-translate-y-0.5"
           >
-            Explore Darwin
+            Explore Astralanx
             <span aria-hidden>→</span>
           </Link>
           <Link
-            href="/darwin/live"
+            href="/astralanx/live"
             className="inline-flex items-center gap-2 rounded-lg border border-hair px-5 py-2.5 text-sm font-semibold text-ink-muted transition-colors hover:border-accent/60 hover:text-ink"
           >
             View the live portfolio
@@ -80,7 +80,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured: Darwin + Live carry the most weight. */}
+      {/* Featured: astralanx + Live carry the most weight. */}
       <section className="mt-12 grid gap-4 sm:grid-cols-2">
         {featured.map((s, i) => (
           <Link

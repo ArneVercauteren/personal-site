@@ -1,11 +1,11 @@
 ---
-title: "Darwin"
+title: "astralanx"
 summary: "A genetic-programming engine that evolves quantitative stock-picking strategies, then trades the best ones live on paper."
 date: "2026-05-01"
 tags: ["software", "quant", "genetic-programming"]
 ---
 
-**Darwin** applies genetic programming to stock-picking: it generates candidate
+**astralanx** applies genetic programming to stock-picking: it generates candidate
 strategies, backtests them, keeps and recombines the best, and repeats this over
 many generations.
 
@@ -20,7 +20,7 @@ evaluator and runs across the US equity universe.
 ## How the search works
 
 1. **Generate** a population of random strategy trees.
-2. **Backtest** each one (see [the methodology](/darwin)).
+2. **Backtest** each one (see [the methodology](/astralanx)).
 3. **Score** on risk-adjusted return, regime stability, parsimony, and
    originality versus the rest of the population.
 4. **Select, mutate, and breed** the best; migrate between parallel islands.
@@ -29,7 +29,7 @@ evaluator and runs across the US equity universe.
 
 ## From engine to live site
 
-A chosen king is deployed to the [live dashboard](/darwin/live): its formula
+A chosen king is deployed to the [live dashboard](/astralanx/live): its formula
 produces target weights that rebalance every one to two months, and a simulated
 portfolio paper-trades those weights daily. The strategies whose formulas stay
 private show their performance and aggregate sector exposure only; one or two

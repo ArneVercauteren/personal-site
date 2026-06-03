@@ -13,7 +13,7 @@ export default function ContactPage() {
       <PageHeader
         eyebrow="Contact"
         title="Get in touch"
-        intro="For inquiries about Darwin or other work, email is the best way to reach me."
+        intro="For inquiries about Astralanx or other work, email is the best way to reach me."
       />
 
       <section className="panel border-accent/25 bg-accent/[0.06] p-8">

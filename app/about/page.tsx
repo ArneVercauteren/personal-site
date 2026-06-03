@@ -26,7 +26,7 @@ const specs: { label: string; value: ReactNode }[] = [
   { label: "Focus", value: "Quantitative research & software" },
   { label: "Based in", value: "Belgium" },
   { label: "Status", value: "Open to opportunities" },
-  { label: "Flagship", value: <Link href="/darwin" className="text-accent hover:underline">Darwin</Link> },
+  { label: "Flagship", value: <Link href="/astralanx" className="text-accent hover:underline">Astralanx</Link> },
 ];
 
 export default function AboutPage() {
@@ -92,10 +92,10 @@ export default function AboutPage() {
                 <span aria-hidden>→</span>
               </Link>
               <Link
-                href="/darwin"
+                href="/astralanx"
                 className="inline-flex items-center gap-2 rounded-lg border border-hair px-5 py-2.5 text-sm font-medium text-ink-muted transition-colors hover:border-accent/60 hover:text-ink"
               >
-                Explore Darwin
+                Explore Astralanx
               </Link>
             </div>
           </div>
@@ -143,7 +143,7 @@ export default function AboutPage() {
       <section className="mt-10 panel border-accent/25 bg-accent/[0.06] p-8">
         <h2 className="text-xl font-semibold text-ink">Get in touch</h2>
         <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-muted">
-          For inquiries about Darwin or other work, email is the best way to
+          For inquiries about Astralanx or other work, email is the best way to
           reach me.
         </p>
         <div className="mt-5 flex flex-wrap gap-3">

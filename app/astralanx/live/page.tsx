@@ -21,7 +21,7 @@ export default function LivePage() {
       <PageHeader
         eyebrow="Live · simulated"
         title="Paper-trading dashboard"
-        intro="A few Darwin strategies run as a simulated portfolio. Open-formula strategies show the full basket, end to end; the rest show performance and aggregate sector exposure only."
+        intro="A few Astralanx strategies run as a simulated portfolio. Open-formula strategies show the full basket, end to end; the rest show performance and aggregate sector exposure only. Where a curve predates the “Live” marker, that earlier stretch is an out-of-sample backtest of the same frozen formula — live paper-trading begins at the marker."
       />
 
       <div className="mb-6">

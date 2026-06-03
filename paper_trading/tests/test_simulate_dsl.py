@@ -57,6 +57,41 @@ def test_simulate_is_deterministic(universe, long_prices):
     assert r1.trades == r2.trades
 
 
+def test_backfill_start_extends_curve_and_splits_stats(universe, long_prices):
+    """`backfill_start` starts the curve before the live date and splits stats."""
+    opens, closes = prices.long_to_wide(long_prices)
+    spec = _spec(universe, _roc_topn())
+    spec["deployed_on"] = "2024-06-01"   # live marker
+    spec["backfill_start"] = "2022-06-01"  # one-time historical backfill
+    res = portfolio.simulate(spec, opens, closes, prices_long=long_prices)
+
+    # The curve starts at the backfill date, well before the live date.
+    assert res.equity_curve[0]["d"] >= "2022-06-01"
+    assert res.equity_curve[0]["d"] < "2024-06-01"
+
+    # Both pre-live (backtest) and post-live (live) segments are well-formed.
+    for seg in (res.stats_backtest, res.stats_live):
+        assert set(seg) == {"cagr", "sharpe", "max_dd"}
+
+    # The live window covers exactly the same trading days as a deployed-only run
+    # from that date (backfill only adds earlier history, never changes the live
+    # date grid).
+    live_only = {k: v for k, v in spec.items() if k != "backfill_start"}
+    res_live = portfolio.simulate(live_only, opens, closes, prices_long=long_prices)
+    live_dates = [p["d"] for p in res.equity_curve if p["d"] >= "2024-06-01"]
+    assert live_dates[0] == res_live.equity_curve[0]["d"]
+    assert live_dates[-1] == res_live.equity_curve[-1]["d"]
+
+
+def test_no_backfill_leaves_backtest_segment_empty(universe, long_prices):
+    """Without `backfill_start` the curve is all-live; backtest stats are zeros."""
+    opens, closes = prices.long_to_wide(long_prices)
+    res = portfolio.simulate(_spec(universe, _roc_topn()), opens, closes, prices_long=long_prices)
+    assert res.stats_backtest == {"cagr": 0.0, "sharpe": 0.0, "max_dd": 0.0}
+    # The live segment then equals the full-curve stats.
+    assert res.stats_live == res.stats
+
+
 def test_dsl_requires_prices_long(universe, long_prices):
     opens, closes = prices.long_to_wide(long_prices)
     with pytest.raises(ValueError, match="prices_long"):

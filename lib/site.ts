@@ -1,9 +1,9 @@
 // Central site config. Edit name/tagline once the domain + identity are settled.
 export const site = {
-  name: "Arne Vercauteren",
+  name: "astralanx",
   tagline: "Software and quantitative research",
   description:
-    "A personal site for my work — Darwin, a system for evolving trading strategies, and the simulated portfolio it runs — alongside some essays, music, and art.",
+    "A personal site for my work — astralanx, a system for evolving trading strategies, and the simulated portfolio it runs — alongside some essays, music, and art.",
   // Public contact email.
   email: "arne.ffmeta@gmail.com",
   // Birth date (ISO, YYYY-MM-DD). Age is derived from this and the build-time
@@ -15,10 +15,10 @@ export const site = {
   nav: [
     { href: "/", label: "Home" },
     { href: "/about", label: "About" },
-    { href: "/darwin", label: "Darwin" },
-    { href: "/darwin/live", label: "Live" },
+    { href: "/astralanx", label: "astralanx" },
+    { href: "/astralanx/live", label: "Live" },
     { href: "/writing", label: "Writing" },
-    { href: "/reading", label: "Reading" },
+    { href: "/reading", label: "Reading list" },
     { href: "/contact", label: "Contact" },
   ],
 } as const;

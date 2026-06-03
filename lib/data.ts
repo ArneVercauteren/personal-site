@@ -41,7 +41,19 @@ interface StrategyBase {
   name: string;
   visibility: Visibility;
   equity_curve: EquityPoint[];
+  /** Stats over the full displayed curve (backfill + live). */
   stats: Stats;
+  /**
+   * Optional one-time backfill support. The equity curve may start before the
+   * strategy went live; `live_since` (ISO date) marks where real forward
+   * paper-trading begins. Everything before it is an out-of-sample backtest.
+   * `stats_backtest` covers the pre-live segment, `stats_live` the post-live
+   * one. All three are optional so pre-backfill data still renders. A segment
+   * with < 2 points reports zeros (treated as "accruing" in the UI).
+   */
+  live_since?: string;
+  stats_backtest?: Stats;
+  stats_live?: Stats;
 }
 
 export interface OpenStrategy extends StrategyBase {

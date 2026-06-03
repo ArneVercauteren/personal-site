@@ -176,6 +176,33 @@ def test_build_secured_entry_shape_and_no_leak():
     assert groups["Cash"] == pytest.approx(0.25)
 
 
+def test_build_secured_entry_passes_through_split_stats():
+    """Backfill split-stats + live marker are aggregate-safe and flow through."""
+    sim = {
+        "equity_curve": _FakeSim.equity_curve,
+        "stats": _FakeSim.stats,
+        "stats_backtest": {"cagr": 0.05, "sharpe": 0.40, "max_dd": -0.20},
+        "stats_live": {"cagr": 0.12, "sharpe": 0.90, "max_dd": -0.03},
+        "positions": _FakeSim.positions,
+    }
+    spec = {"id": "k", "name": "K", "deployed_on": "2026-01-02"}
+    entry = build_secured_entry(sim, spec, SECTOR_MAP)
+    assert entry["live_since"] == "2026-01-02"
+    assert entry["stats_live"]["cagr"] == 0.12
+    assert entry["stats_backtest"]["max_dd"] == -0.20
+    # Still no ticker-level leak alongside the new fields.
+    assert "positions" not in entry
+
+
+def test_build_secured_entry_omits_split_stats_when_absent():
+    """No live marker / split stats unless the writer provides them."""
+    spec = {"id": "balanced_king_v3", "name": "Balanced King"}
+    entry = build_secured_entry(_FakeSim(), spec, SECTOR_MAP)
+    assert "live_since" not in entry
+    assert "stats_live" not in entry
+    assert "stats_backtest" not in entry
+
+
 def test_build_secured_entry_accepts_dict_sim():
     sim = {
         "equity_curve": _FakeSim.equity_curve,

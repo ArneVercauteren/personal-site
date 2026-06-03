@@ -6,8 +6,8 @@ import { site } from "@/lib/site";
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
-  // "/darwin" should not light up when on "/darwin/live" (Live is its own item).
-  if (href === "/darwin") return pathname === "/darwin";
+  // "/astralanx" should not light up when on "/astralanx/live" (Live is its own item).
+  if (href === "/astralanx") return pathname === "/astralanx";
   return pathname === href || pathname.startsWith(href + "/");
 }
 

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 
 export const metadata: Metadata = {
-  title: "Darwin",
+  title: "Astralanx",
   description:
-    "How Darwin works: the Tiingo price data, the investable universe and filters, the backtesting model, the cost model, and the out-of-sample testing that keeps the numbers honest.",
+    "How Astralanx works: the Tiingo price data, the investable universe and filters, the backtesting model, the cost model, and out-of-sample testing",
 };
 
 function Section({
@@ -71,13 +71,13 @@ function C({ children }: { children: ReactNode }) {
   );
 }
 
-export default function DarwinPage() {
+export default function AstralanxPage() {
   return (
     <div>
       <PageHeader
         eyebrow="Project"
-        title="Darwin"
-        intro="Darwin is a system I built to discover quantitative stock-picking strategies and then run the best of them as a simulated portfolio. This page is the methodology: where the data comes from, how a candidate strategy is backtested and costed, the filters that define a realistic investable universe, and how out-of-sample testing keeps the results honest."
+        title="Astralanx"
+        intro="Astralanx is a system built to discover long-term quantitative stock-picking strategies and then run the best of them as a simulated portfolio. This page describes the methodology: where the data is imported from, how a candidate strategy is backtested, how realistic costs are simulated, the filters used to define a realistic investable universe, and how out-of-sample testing is applied."
       />
 
       <StatStrip />
@@ -85,21 +85,21 @@ export default function DarwinPage() {
       {/* The most prominent action: go see the strategies. */}
       <div className="mt-10 flex flex-wrap items-center gap-4">
         <Link
-          href="/darwin/live"
+          href="/astralanx/live"
           className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-semibold text-[#0a0c10] shadow-sm transition-transform hover:-translate-y-0.5"
         >
           View the strategies
           <span aria-hidden>→</span>
         </Link>
         <span className="text-sm text-ink-muted">
-          Live performance for every deployed strategy, with the open-formula
-          ones broken out on their own.
+          Live performance for every deployed strategy, with additional open-formula
+          strategies broken out on their own.
         </span>
       </div>
 
       <Section eyebrow="The engine" title="A genetic-programming search">
         <p>
-          Darwin is a highly performant genetic-programming engine.
+          Astralanx is a highly performant genetic-programming engine.
           It generates large populations of candidate strategies, evaluates each
           one against historical market data, and evolves them across
           many generations.
@@ -156,7 +156,7 @@ export default function DarwinPage() {
         title="What is allowed into the backtest"
       >
         <p>
-          The selectable universe is then narrowed by two kinds of filter:
+          The selectable universe is then narrowed by two kinds of filters:
           filters that remove obviously malformed or partially missing data, and
           filters that remove niche, risky, or structurally unconventional
           tickers. It&apos;s worth knowing that the second category largely
@@ -361,7 +361,7 @@ export default function DarwinPage() {
 
       <div className="mt-8">
         <Link
-          href="/darwin/live"
+          href="/astralanx/live"
           className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-semibold text-[#0a0c10] shadow-sm transition-transform hover:-translate-y-0.5"
         >
           View the strategies

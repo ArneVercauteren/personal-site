@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { isOpen, type Strategy, type StrategyMeta } from "@/lib/data";
-import { pct, money } from "@/lib/format";
+import { pct, money, shortDate } from "@/lib/format";
 import { EquityCurveChart } from "@/components/EquityCurveChart";
 import { DrawdownChart } from "@/components/DrawdownChart";
 import { ExposureDonut } from "@/components/ExposureDonut";
@@ -47,6 +47,21 @@ function PositionsTable({
   );
 }
 
+// Minimum live trading days before the live stats are worth showing; below
+// this the segment is too short for a meaningful CAGR/Sharpe.
+const MIN_LIVE_POINTS = 10;
+
+function StatBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+        {label}
+      </h4>
+      {children}
+    </div>
+  );
+}
+
 export function StrategyCard({
   strategy,
   meta,
@@ -54,6 +69,16 @@ export function StrategyCard({
   strategy: Strategy;
   meta?: StrategyMeta;
 }) {
+  const liveSince = strategy.live_since ?? meta?.deployed_on;
+  const liveCount = liveSince
+    ? strategy.equity_curve.filter((p) => p.d >= liveSince).length
+    : 0;
+  const livePending = liveCount < MIN_LIVE_POINTS;
+  // Show the split only when the writer provided both segments and a boundary.
+  const showSplit = Boolean(
+    liveSince && strategy.stats_backtest && strategy.stats_live,
+  );
+
   return (
     <div className="panel flex flex-col gap-4 p-6">
       <div className="flex items-start justify-between gap-4">
@@ -69,11 +94,36 @@ export function StrategyCard({
       <EquityCurveChart
         points={strategy.equity_curve}
         currency={meta?.base_currency ?? "USD"}
+        liveSince={liveSince}
       />
 
-      <StatsTable stats={strategy.stats} />
+      {showSplit ? (
+        <div className="flex flex-col gap-4">
+          <StatBlock
+            label={
+              liveSince && !livePending
+                ? `Live · since ${shortDate(liveSince)}`
+                : "Live"
+            }
+          >
+            {livePending ? (
+              <p className="text-sm text-ink-muted">
+                Accruing{liveSince ? ` since ${shortDate(liveSince)}` : ""} —
+                live stats appear once enough trading days pass.
+              </p>
+            ) : (
+              <StatsTable stats={strategy.stats_live!} />
+            )}
+          </StatBlock>
+          <StatBlock label="Backtest · out-of-sample">
+            <StatsTable stats={strategy.stats_backtest!} />
+          </StatBlock>
+        </div>
+      ) : (
+        <StatsTable stats={strategy.stats} />
+      )}
 
-      <DrawdownChart points={strategy.equity_curve} />
+      <DrawdownChart points={strategy.equity_curve} liveSince={liveSince} />
 
       {isOpen(strategy) ? (
         <PositionsTable positions={strategy.positions} />
