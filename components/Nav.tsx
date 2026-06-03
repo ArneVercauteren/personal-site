@@ -26,26 +26,24 @@ export function Nav() {
         </Link>
 
         <ul className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
-          {site.nav
-            .filter((item) => item.href !== "/")
-            .map((item) => {
-              const active = isActive(pathname, item.href);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={
-                      active
-                        ? "text-accent"
-                        : "text-ink-muted transition-colors hover:text-ink"
-                    }
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
+          {site.nav.map((item) => {
+            const active = isActive(pathname, item.href);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={
+                    active
+                      ? "text-accent"
+                      : "text-ink-muted transition-colors hover:text-ink"
+                  }
+                >
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </nav>
     </header>

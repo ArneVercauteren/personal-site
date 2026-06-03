@@ -37,6 +37,32 @@ function Bullets({ children }: { children: ReactNode }) {
   );
 }
 
+// Headline scale figures, gathered from the Darwin source tree. Honest,
+// de-duplicated counts: src/ Python (67,507 lines), the native_eval.c +
+// generator_native.c + ffill_fast.c kernels (12,522 lines), and the
+// post-filter tradable universe (~3,500 names after the ≥$10 / ≥$5M median
+// dollar-volume screens; the raw listing file is far larger).
+const stats: { value: string; label: string }[] = [
+  { value: "65K+", label: "lines of Python" },
+  { value: "~12K", label: "lines of native C" },
+  { value: "~3,500", label: "names in the tradable universe" },
+];
+
+function StatStrip() {
+  return (
+    <dl className="mt-10 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-hair bg-hair sm:grid-cols-3">
+      {stats.map((s) => (
+        <div key={s.label} className="bg-panel px-5 py-5">
+          <dt className="font-mono text-2xl font-semibold tabular-nums text-accent">
+            {s.value}
+          </dt>
+          <dd className="mt-1 text-sm text-ink-muted">{s.label}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function C({ children }: { children: ReactNode }) {
   return (
     <code className="rounded bg-elevated px-1.5 py-0.5 font-mono text-[0.85em] text-ink">
@@ -54,8 +80,10 @@ export default function DarwinPage() {
         intro="Darwin is a system I built to discover quantitative stock-picking strategies and then run the best of them as a simulated portfolio. This page is the methodology: where the data comes from, how a candidate strategy is backtested and costed, the filters that define a realistic investable universe, and how out-of-sample testing keeps the results honest."
       />
 
+      <StatStrip />
+
       {/* The most prominent action: go see the strategies. */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="mt-10 flex flex-wrap items-center gap-4">
         <Link
           href="/darwin/live"
           className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-semibold text-[#0a0c10] shadow-sm transition-transform hover:-translate-y-0.5"
