@@ -57,10 +57,9 @@ export default function HomePage() {
 
         <p className="mt-6 max-w-prose text-lg leading-relaxed text-ink-muted">
           This site documents my software projects, essays, and other
-          non-software work. Chief among them is{" "}
-          <span className="text-ink">Astralanx</span>, a system for synthesizing
-          stock-picking strategies — and the simulated paper portfolio it runs
-          live.
+          non-software work. My main project is{" "}
+          <span className="text-ink">Astralanx</span>, a system for synthesizing long-term
+          stock-picking strategies.
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">

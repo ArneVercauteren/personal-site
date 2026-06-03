@@ -23,7 +23,7 @@ const capabilities = [
 ];
 
 const specs: { label: string; value: ReactNode }[] = [
-  { label: "Focus", value: "Quantitative research & software" },
+  { label: "Focus", value: "Quantitative work & software" },
   { label: "Based in", value: "Belgium" },
   { label: "Status", value: "Open to opportunities" },
   { label: "Flagship", value: <Link href="/astralanx" className="text-accent hover:underline">Astralanx</Link> },

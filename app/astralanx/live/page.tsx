@@ -40,7 +40,7 @@ export default function LivePage() {
             Open strategies
           </h2>
           <p className="mt-1 text-sm text-ink-muted">
-            Formula and full position list published — everything is shown.
+            Formula and full position list published, all stats are shown.
           </p>
         </div>
         {open.length > 0 ? (
@@ -60,8 +60,7 @@ export default function LivePage() {
             Secured strategies
           </h2>
           <p className="mt-1 text-sm text-ink-muted">
-            Performance and aggregate sector exposure only — the formula and
-            individual weights stay private.
+            Performance and aggregate sector exposure only.
           </p>
         </div>
         {secured.length > 0 ? (
