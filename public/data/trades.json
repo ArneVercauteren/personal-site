@@ -2,53 +2,354 @@
   "as_of": "2026-06-03",
   "trades": [
     {
-      "strategy_id": "open_momentum_v1",
-      "d": "2026-05-21",
-      "ticker": "AMZN",
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "AG",
       "side": "sell",
-      "weight": 0.001
+      "weight": 0.0012
     },
     {
-      "strategy_id": "open_momentum_v1",
-      "d": "2026-05-21",
-      "ticker": "GOOGL",
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "AGNC",
+      "side": "sell",
+      "weight": 0.0071
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "ALM",
       "side": "buy",
-      "weight": 0.2
+      "weight": 0.0042
     },
     {
-      "strategy_id": "open_momentum_v1",
-      "d": "2026-05-21",
-      "ticker": "JNJ",
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "AMPX",
       "side": "sell",
-      "weight": 0.1946
+      "weight": 0.0244
     },
     {
-      "strategy_id": "open_momentum_v1",
-      "d": "2026-05-21",
-      "ticker": "JPM",
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "APLD",
       "side": "sell",
-      "weight": 0.1846
+      "weight": 0.0034
     },
     {
-      "strategy_id": "open_momentum_v1",
-      "d": "2026-05-21",
-      "ticker": "NVDA",
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "ASX",
       "side": "sell",
-      "weight": 0.014
+      "weight": 0.0012
     },
     {
-      "strategy_id": "open_momentum_v1",
-      "d": "2026-05-21",
-      "ticker": "UNH",
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "AXTI",
+      "side": "sell",
+      "weight": 0.0065
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "BKD",
+      "side": "sell",
+      "weight": 0.0136
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "BW",
+      "side": "sell",
+      "weight": 0.0025
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "CDE",
+      "side": "sell",
+      "weight": 0.0005
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "CIFR",
+      "side": "sell",
+      "weight": 0.0195
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "CORZ",
+      "side": "sell",
+      "weight": 0.002
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "CRVS",
+      "side": "sell",
+      "weight": 0.0033
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "CX",
+      "side": "sell",
+      "weight": 0.0035
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "EQX",
+      "side": "sell",
+      "weight": 0.0017
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "ERAS",
       "side": "buy",
-      "weight": 0.2
+      "weight": 0.0216
     },
     {
-      "strategy_id": "open_momentum_v1",
-      "d": "2026-05-21",
-      "ticker": "XOM",
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "ERIC",
+      "side": "buy",
+      "weight": 0.0008
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "HBM",
       "side": "sell",
-      "weight": 0.0106
+      "weight": 0.0015
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "HL",
+      "side": "sell",
+      "weight": 0.0014
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "IAG",
+      "side": "sell",
+      "weight": 0.0178
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "JOBY",
+      "side": "sell",
+      "weight": 0.0004
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "LPTH",
+      "side": "buy",
+      "weight": 0.0021
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "LWLG",
+      "side": "buy",
+      "weight": 0.0409
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "NOK",
+      "side": "buy",
+      "weight": 0.0409
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "NVDY",
+      "side": "sell",
+      "weight": 0.0006
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "NVTS",
+      "side": "buy",
+      "weight": 0.0002
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "NXE",
+      "side": "buy",
+      "weight": 0.0068
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "ONDS",
+      "side": "sell",
+      "weight": 0.0063
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "ORLA",
+      "side": "sell",
+      "weight": 0.0002
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "OSS",
+      "side": "buy",
+      "weight": 0.0285
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "PBI",
+      "side": "sell",
+      "weight": 0.0138
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "PL",
+      "side": "sell",
+      "weight": 0.0013
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "POET",
+      "side": "buy",
+      "weight": 0.0409
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "PTEN",
+      "side": "sell",
+      "weight": 0.0011
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "QBTS",
+      "side": "sell",
+      "weight": 0.002
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "QUBT",
+      "side": "sell",
+      "weight": 0.0041
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "RCAT",
+      "side": "sell",
+      "weight": 0.0042
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "RGTI",
+      "side": "sell",
+      "weight": 0.0009
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "SAN",
+      "side": "buy",
+      "weight": 0.0031
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "SBSW",
+      "side": "sell",
+      "weight": 0.0006
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "SVM",
+      "side": "sell",
+      "weight": 0.0004
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "TRVI",
+      "side": "sell",
+      "weight": 0.0141
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "TSSI",
+      "side": "sell",
+      "weight": 0.0003
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "TTI",
+      "side": "buy",
+      "weight": 0.0048
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "UEC",
+      "side": "sell",
+      "weight": 0.01
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "UMAC",
+      "side": "sell",
+      "weight": 0.0053
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "UMC",
+      "side": "sell",
+      "weight": 0.0055
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "UUUU",
+      "side": "sell",
+      "weight": 0.0014
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "VISN",
+      "side": "sell",
+      "weight": 0.0031
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-05-19",
+      "ticker": "WULF",
+      "side": "sell",
+      "weight": 0.0102
     }
   ]
 }

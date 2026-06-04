@@ -2,28 +2,6 @@
   "as_of": "2026-06-03",
   "strategies": [
     {
-      "id": "balanced_king_v3",
-      "name": "Balanced King",
-      "visibility": "secured",
-      "portfolio_size": 100000,
-      "base_currency": "USD",
-      "rebalance_cadence_days": 42,
-      "deployed_on": "2026-01-02",
-      "cost_model": {
-        "commission_bps": 1.0,
-        "slippage_bps": 5.0,
-        "spread_ref_price": 50.0,
-        "volume_impact_coef": 0.5,
-        "impact_portfolio_size": 1000000,
-        "vol_scaled_cost_enable": true,
-        "vol_cost_k": 0.75,
-        "vol_cost_realized_window": 63,
-        "vol_cost_long_window": 252,
-        "vol_cost_mult_max": 3.0
-      },
-      "blurb": "Balanced risk/return king from epoch 7. Performance and sector exposure shown; basket held private."
-    },
-    {
       "id": "gen0194",
       "name": "gen0194",
       "visibility": "open",
@@ -43,7 +21,7 @@
         "vol_cost_long_window": 252,
         "vol_cost_mult_max": 3.0
       },
-      "blurb": "gen0194 \u2014 this was the first usable strategy found by the engine.",
+      "blurb": "gen0194 \u2014 deployed from Darwin.",
       "performance": {
         "training": {
           "start": "2000-01-01",
@@ -160624,117 +160602,6 @@
       "capacity": {
         "liquidity_usd": 92061875.12168588,
         "impact_usd": 1227491.6682891452
-      }
-    },
-    {
-      "id": "open_momentum_v1",
-      "name": "Momentum (Open)",
-      "visibility": "open",
-      "portfolio_size": 100000,
-      "base_currency": "USD",
-      "rebalance_cadence_days": 30,
-      "deployed_on": "2026-01-02",
-      "cost_model": {
-        "commission_bps": 1.0,
-        "slippage_bps": 5.0,
-        "spread_ref_price": 50.0,
-        "volume_impact_coef": 0.5,
-        "impact_portfolio_size": 1000000,
-        "vol_scaled_cost_enable": true,
-        "vol_cost_k": 0.75,
-        "vol_cost_realized_window": 63,
-        "vol_cost_long_window": 252,
-        "vol_cost_mult_max": 3.0
-      },
-      "blurb": "A fully open momentum strategy \u2014 formula and basket published for anyone to audit.",
-      "performance": {
-        "training": {
-          "start": "2018-01-02",
-          "end": "2022-12-30",
-          "windows": [
-            {
-              "start": "2018-01-02",
-              "end": "2020-12-31",
-              "label": "Regime 1 \u00b7 2018\u20132020"
-            },
-            {
-              "start": "2021-01-04",
-              "end": "2022-12-30",
-              "label": "Regime 2 \u00b7 2021\u20132022"
-            }
-          ],
-          "stats": {
-            "cagr": 0.131,
-            "total_return": 0.857,
-            "volatility": 0.171,
-            "sharpe": 0.99,
-            "sortino": 1.42,
-            "calmar": 0.64,
-            "max_dd": -0.205,
-            "max_dd_duration_days": 287,
-            "win_rate": 0.58,
-            "best_year": 0.312,
-            "worst_year": -0.084,
-            "worst_rolling_3y_cagr": 0.072,
-            "rolling_sharpe_min": 0.61,
-            "benchmark_beta": 0.86,
-            "benchmark_corr": 0.74,
-            "alpha": 0.038,
-            "information_ratio": 0.51
-          }
-        },
-        "oos": {
-          "start": "2023-01-03",
-          "end": "2025-12-31",
-          "stats": {
-            "cagr": 0.131,
-            "total_return": 0.447,
-            "volatility": 0.158,
-            "sharpe": 0.98,
-            "sortino": 1.39,
-            "calmar": 0.84,
-            "max_dd": -0.156,
-            "max_dd_duration_days": 164,
-            "win_rate": 0.6,
-            "best_year": 0.241,
-            "worst_year": 0.012,
-            "worst_rolling_3y_cagr": 0.061,
-            "rolling_sharpe_min": 0.54,
-            "benchmark_beta": 0.82,
-            "benchmark_corr": 0.71,
-            "alpha": 0.043,
-            "information_ratio": 0.57
-          }
-        },
-        "combined": {
-          "start": "2018-01-02",
-          "end": "2025-12-31",
-          "stats": {
-            "cagr": 0.131,
-            "total_return": 1.687,
-            "volatility": 0.166,
-            "sharpe": 0.99,
-            "sortino": 1.41,
-            "calmar": 0.64,
-            "max_dd": -0.205,
-            "max_dd_duration_days": 287,
-            "win_rate": 0.59,
-            "best_year": 0.312,
-            "worst_year": -0.084,
-            "worst_rolling_3y_cagr": 0.061,
-            "worst_rolling_5y_cagr": 0.078,
-            "rolling_sharpe_min": 0.54,
-            "benchmark_beta": 0.84,
-            "benchmark_corr": 0.73,
-            "alpha": 0.04,
-            "information_ratio": 0.54
-          }
-        }
-      },
-      "active_share": 0.66,
-      "capacity": {
-        "liquidity_usd": 42000000,
-        "impact_usd": 18000000
       }
     }
   ]

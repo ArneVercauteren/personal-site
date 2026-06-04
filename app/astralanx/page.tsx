@@ -235,12 +235,12 @@ export default function AstralanxPage() {
           <li>
             <strong>Next-open fills.</strong> When the basket changes, fills land
             at the <em>next</em> bar&apos;s open — never at the close that
-            produced the signal. This removes the classic look-ahead bias of
+            produced the signal. This removes the look-ahead bias of
             trading on a price you could not have acted on.
           </li>
           <li>
             <strong>Four regimes over twenty years.</strong> Training always
-            spans four non-overlapping five-year regimes, this tests the strategy across a variety of market conditions and ensures it isn&apos;t just optimised for one particular stretch.
+            spans four non-overlapping five-year regimes, this tests the strategy across a variety of market conditions and ensures it isn&apos;t just optimized for one particular stretch.
           </li>
         </Bullets>
         <p>

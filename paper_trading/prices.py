@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import os
 import time
+from importlib.metadata import PackageNotFoundError, version
 
 import numpy as np
 import pandas as pd
@@ -47,6 +48,20 @@ DEFAULT_FETCH_PAUSE = float(os.environ.get("PAPER_TRADING_FETCH_PAUSE", "1.0"))
 DEFAULT_REQUESTS_PER_SEC = int(os.environ.get("PAPER_TRADING_REQUESTS_PER_SEC", "4"))
 
 
+def _package_version_at_least(package: str, minimum: tuple[int, ...]) -> bool:
+    try:
+        parts = version(package).split("+", 1)[0].split(".")
+    except PackageNotFoundError:
+        return False
+    nums: list[int] = []
+    for part in parts:
+        try:
+            nums.append(int(part))
+        except ValueError:
+            break
+    return tuple(nums) >= minimum
+
+
 def make_limiter_session(per_second: int = DEFAULT_REQUESTS_PER_SEC):
     """A rate-limited requests session so yfinance stays under Yahoo's cap.
 
@@ -56,6 +71,8 @@ def make_limiter_session(per_second: int = DEFAULT_REQUESTS_PER_SEC):
     Synthetic/offline mode never needs a session.
     """
     if use_synthetic():
+        return None
+    if _package_version_at_least("yfinance", (0, 2, 66)):
         return None
     try:
         from requests_ratelimiter import LimiterSession
