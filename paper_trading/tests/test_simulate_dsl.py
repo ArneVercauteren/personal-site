@@ -107,6 +107,31 @@ def test_darwin_equity_curve_is_authoritative_prefix(universe, long_prices):
     assert res.stats_backtest["cagr"] != 0.0
 
 
+def test_darwin_prefix_continuation_survives_sparse_yahoo_ticker(universe, long_prices):
+    """One sparse universe member must not erase the Yahoo continuation dates."""
+    spec = _spec(universe, _roc_topn())
+    available = long_prices["date"].drop_duplicates().sort_values().tolist()
+    prefix_dates = available[:3]
+    cutoff = prefix_dates[2]
+    spec["deployed_on"] = available[10].strftime("%Y-%m-%d")
+    spec["darwin_equity_curve"] = [
+        {"d": prefix_dates[0].strftime("%Y-%m-%d"), "v": 100000.0},
+        {"d": prefix_dates[1].strftime("%Y-%m-%d"), "v": 101000.0},
+        {"d": prefix_dates[2].strftime("%Y-%m-%d"), "v": 102500.0},
+    ]
+
+    sparse = long_prices[
+        ~((long_prices["ticker"] == universe[-1]) & (long_prices["date"] > cutoff))
+    ]
+    opens, closes = prices.long_to_wide(sparse)
+    res = portfolio.simulate(spec, opens, closes, prices_long=sparse)
+
+    tail_dates = [p["d"] for p in res.equity_curve[3:]]
+    assert len(tail_dates) > 10
+    assert tail_dates[0] > spec["darwin_equity_curve"][-1]["d"]
+    assert tail_dates[-1] == closes.index[-1].strftime("%Y-%m-%d")
+
+
 def test_no_backfill_leaves_backtest_segment_empty(universe, long_prices):
     """Without `backfill_start` the curve is all-live; backtest stats are zeros."""
     opens, closes = prices.long_to_wide(long_prices)

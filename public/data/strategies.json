@@ -43,7 +43,7 @@
         "vol_cost_long_window": 252,
         "vol_cost_mult_max": 3.0
       },
-      "blurb": "gen0194 \u2014 deployed from Darwin.",
+      "blurb": "gen0194 \u2014 this was the first usable strategy found by the engine.",
       "performance": {
         "training": {
           "start": "2000-01-01",

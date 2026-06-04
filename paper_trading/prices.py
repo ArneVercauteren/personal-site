@@ -150,17 +150,24 @@ def long_to_wide(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
     Both are on an adjusted basis: `closes` = adj_close; `opens` = the raw open
     scaled by the day's adjustment factor (adj_close / close), so opens and
-    closes stay consistent across splits/dividends. Rows with any missing ticker
-    are dropped so the simulator never marks against a NaN.
+    closes stay consistent across splits/dividends. Individual tickers can have
+    sparse bars (delistings, recent listings, Yahoo gaps); those gaps must not
+    remove the whole market day from the portfolio curve. Close prices are
+    forward-filled per ticker and missing opens fall back to that day's close.
+    The simulator ignores zero-share NaNs and only requires finite prices for
+    tickers it actually trades or marks.
     """
     work = df.copy()
     factor = np.where(work["close"] > 0, work["adj_close"] / work["close"], 1.0)
     work["adj_open"] = work["open"] * factor
     opens = work.pivot_table(index="date", columns="ticker", values="adj_open").sort_index()
     closes = work.pivot_table(index="date", columns="ticker", values="adj_close").sort_index()
-    common = opens.dropna(how="any").index.intersection(closes.dropna(how="any").index)
     tickers = list(closes.columns)
-    return opens.loc[common, tickers], closes.loc[common, tickers]
+    idx = opens.index.union(closes.index).sort_values()
+    closes = closes.reindex(idx).ffill()
+    opens = opens.reindex(idx).combine_first(closes)
+    valid = closes.notna().any(axis=1)
+    return opens.loc[valid, tickers], closes.loc[valid, tickers]
 
 
 def wide_raw_and_dollar_volume(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:

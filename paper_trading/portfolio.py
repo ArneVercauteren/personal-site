@@ -148,6 +148,48 @@ def _review_maps(day, names, raw_closes, closes, dollar_volume):
     return price, dvol
 
 
+def _finite_price(row, ticker: str) -> float | None:
+    try:
+        value = float(row[ticker])
+    except Exception:
+        return None
+    return value if np.isfinite(value) and value > 0.0 else None
+
+
+def _position_value(shares: dict[str, float], prices, tickers: list[str]) -> float:
+    total = 0.0
+    for t in tickers:
+        qty = float(shares.get(t, 0.0))
+        if abs(qty) <= 1e-12:
+            continue
+        px = _finite_price(prices, t)
+        if px is not None:
+            total += qty * px
+    return total
+
+
+def _current_weights(
+    shares: dict[str, float],
+    prices,
+    equity: float,
+    tickers: list[str],
+) -> dict[str, float]:
+    if equity <= 0:
+        return {}
+    out: dict[str, float] = {}
+    for t in tickers:
+        qty = float(shares.get(t, 0.0))
+        if abs(qty) <= 1e-12:
+            continue
+        px = _finite_price(prices, t)
+        if px is None:
+            continue
+        val = qty * px
+        if val > 0:
+            out[t] = val / equity
+    return out
+
+
 def simulate(
     strategy: dict,
     opens: pd.DataFrame,
@@ -216,7 +258,7 @@ def _simulate_signal(
         # Execute the previous rebalance's target at today's open, then charge
         # the Darwin equity haircut computed on the review date.
         if pending_target and i > 0:
-            equity_open = cash + sum(shares[t] * opens.at[day, t] for t in tickers)
+            equity_open = cash + _position_value(shares, opens.loc[day], tickers)
             shares, cash, trades = _apply_targets(
                 pending_target, shares, cash, opens.loc[day], equity_open, tickers,
             )
@@ -229,12 +271,8 @@ def _simulate_signal(
         # Decide a new target on rebalance days (filled next open).
         if day in rebal_dates:
             target = signals.evaluate(signal, closes, day)
-            equity_now = cash + sum(shares[t] * closes.at[day, t] for t in tickers)
-            prior_w = {
-                t: (shares[t] * closes.at[day, t]) / equity_now
-                for t in tickers
-                if equity_now > 0 and shares[t] * closes.at[day, t] > 0
-            }
+            equity_now = cash + _position_value(shares, closes.loc[day], tickers)
+            prior_w = _current_weights(shares, closes.loc[day], equity_now, tickers)
             names = set(prior_w) | set(target)
             price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
             vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
@@ -243,7 +281,7 @@ def _simulate_signal(
             )["total_fraction"]
             pending_target = target
 
-        equity_close = cash + sum(shares[t] * closes.at[day, t] for t in tickers)
+        equity_close = cash + _position_value(shares, closes.loc[day], tickers)
         equity_values.append(equity_close)
         curve.append({"d": day.strftime("%Y-%m-%d"), "v": round(equity_close, 2)})
 
@@ -313,7 +351,7 @@ def _simulate_dsl(
         # Execute the previous rebalance's target at today's open, then charge
         # the Darwin equity haircut computed on the review date.
         if pending_target is not None and i > 0:
-            equity_open = cash + sum(shares[t] * opens.at[day, t] for t in universe)
+            equity_open = cash + _position_value(shares, opens.loc[day], universe)
             shares, cash, trades = _apply_targets(
                 pending_target, shares, cash, opens.loc[day], equity_open, universe,
             )
@@ -325,7 +363,7 @@ def _simulate_dsl(
 
         # Rebalance decision on review days (filled at next open).
         if day in rebal_set:
-            equity_now = cash + sum(shares[t] * closes.at[day, t] for t in universe)
+            equity_now = cash + _position_value(shares, closes.loc[day], universe)
 
             # Close out the prior holding period's return + peak BEFORE reading
             # state, mirroring native_eval.c (peak updates at period end).
@@ -333,11 +371,7 @@ def _simulate_dsl(
                 state.push_period_return(equity_now / equity_at_prev_rebal - 1.0)
                 state.update_peak(equity_now)
 
-            prior_w = {
-                t: (shares[t] * closes.at[day, t]) / equity_now
-                for t in universe
-                if equity_now > 0 and shares[t] * closes.at[day, t] > 0
-            }
+            prior_w = _current_weights(shares, closes.loc[day], equity_now, universe)
             prior_holdings = list(prior_w)
             override = state.scalars_for(needed_state, equity=equity_now, weights=prior_w)
 
@@ -363,7 +397,7 @@ def _simulate_dsl(
             pending_target = target
             equity_at_prev_rebal = equity_now
 
-        equity_close = cash + sum(shares[t] * closes.at[day, t] for t in universe)
+        equity_close = cash + _position_value(shares, closes.loc[day], universe)
         equity_values.append(equity_close)
         curve.append({"d": day.strftime("%Y-%m-%d"), "v": round(equity_close, 2)})
 
@@ -395,7 +429,9 @@ def _apply_targets(targets, shares, cash, open_px, equity, tickers):
     trades: list[dict] = []
 
     for t in tickers:
-        px = float(open_px[t])
+        px = _finite_price(open_px, t)
+        if px is None:
+            continue
         cur_val = shares[t] * px
         cur_w = cur_val / equity if equity > 0 else 0.0
         tgt_w = targets.get(t, 0.0)
@@ -457,7 +493,10 @@ def _split_stats(equity: pd.Series, live_since: pd.Timestamp) -> tuple[dict, dic
 def _latest_positions(shares, close_px, equity, tickers) -> list[dict]:
     out = []
     for t in tickers:
-        val = shares[t] * float(close_px[t])
+        px = _finite_price(close_px, t)
+        if px is None:
+            continue
+        val = shares[t] * px
         w = val / equity if equity > 0 else 0.0
         if w > 1e-4:
             out.append({"ticker": t, "weight": round(w, 4)})
