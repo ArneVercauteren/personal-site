@@ -1,9 +1,7 @@
 import Link from "next/link";
-import { isOpen, type Strategy, type StrategyMeta } from "@/lib/data";
-import { pct, money, shortDate } from "@/lib/format";
+import { type Strategy, type StrategyMeta } from "@/lib/data";
+import { money, shortDate } from "@/lib/format";
 import { EquityCurveChart } from "@/components/EquityCurveChart";
-import { DrawdownChart } from "@/components/DrawdownChart";
-import { ExposureDonut } from "@/components/ExposureDonut";
 import { StatsTable } from "@/components/StatsTable";
 
 function Badge({ visibility }: { visibility: Strategy["visibility"] }) {
@@ -21,47 +19,13 @@ function Badge({ visibility }: { visibility: Strategy["visibility"] }) {
   );
 }
 
-function PositionsTable({
-  positions,
-}: {
-  positions: { ticker: string; weight: number }[];
-}) {
-  const sorted = [...positions].sort((a, b) => b.weight - a.weight);
-  return (
-    <div>
-      <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-        Positions
-      </h4>
-      <ul className="flex flex-col gap-1">
-        {sorted.map((p) => (
-          <li
-            key={p.ticker}
-            className="flex items-center justify-between text-sm"
-          >
-            <span className="num text-ink">{p.ticker}</span>
-            <span className="num text-ink-muted">{pct(p.weight)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 // Minimum live trading days before the live stats are worth showing; below
 // this the segment is too short for a meaningful CAGR/Sharpe.
 const MIN_LIVE_POINTS = 10;
 
-function StatBlock({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-        {label}
-      </h4>
-      {children}
-    </div>
-  );
-}
-
+// A compact dashboard card: the equity curve plus headline stats and a few
+// facts — just enough to scan. The full breakdown (drawdown, basket, formula,
+// backtest runs) and the deep analytics live on the linked detail pages.
 export function StrategyCard({
   strategy,
   meta,
@@ -73,14 +37,23 @@ export function StrategyCard({
   const liveCount = liveSince
     ? strategy.equity_curve.filter((p) => p.d >= liveSince).length
     : 0;
-  const livePending = liveCount < MIN_LIVE_POINTS;
-  // Show the split only when the writer provided both segments and a boundary.
-  const showSplit = Boolean(
-    liveSince && strategy.stats_backtest && strategy.stats_live,
-  );
+  const liveReady = liveCount >= MIN_LIVE_POINTS;
+  // Headline = live stats once there's enough live history, else the backtest
+  // segment, else the full-curve stats.
+  const headline = liveReady
+    ? strategy.stats_live
+    : strategy.stats_backtest ?? strategy.stats;
+  const headlineLabel = liveReady
+    ? `Live · since ${shortDate(liveSince!)}`
+    : strategy.stats_backtest
+      ? "Backtest · out-of-sample"
+      : "Performance";
 
   return (
-    <div className="panel flex flex-col gap-4 p-6">
+    <Link
+      href={`/astralanx/live/${strategy.id}`}
+      className="panel panel-hover flex flex-col gap-4 p-6"
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-ink">{strategy.name}</h3>
@@ -97,39 +70,12 @@ export function StrategyCard({
         liveSince={liveSince}
       />
 
-      {showSplit ? (
-        <div className="flex flex-col gap-4">
-          <StatBlock
-            label={
-              liveSince && !livePending
-                ? `Live · since ${shortDate(liveSince)}`
-                : "Live"
-            }
-          >
-            {livePending ? (
-              <p className="text-sm text-ink-muted">
-                Accruing{liveSince ? ` since ${shortDate(liveSince)}` : ""} —
-                live stats appear once enough trading days pass.
-              </p>
-            ) : (
-              <StatsTable stats={strategy.stats_live!} />
-            )}
-          </StatBlock>
-          <StatBlock label="Backtest · out-of-sample">
-            <StatsTable stats={strategy.stats_backtest!} />
-          </StatBlock>
-        </div>
-      ) : (
-        <StatsTable stats={strategy.stats} />
-      )}
-
-      <DrawdownChart points={strategy.equity_curve} liveSince={liveSince} />
-
-      {isOpen(strategy) ? (
-        <PositionsTable positions={strategy.positions} />
-      ) : (
-        <ExposureDonut exposure={strategy.exposure} />
-      )}
+      <div>
+        <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+          {headlineLabel}
+        </h4>
+        <StatsTable stats={headline ?? strategy.stats} />
+      </div>
 
       {meta ? (
         <dl className="grid grid-cols-3 gap-3 border-t border-hair pt-4 text-xs">
@@ -152,29 +98,9 @@ export function StrategyCard({
         </dl>
       ) : null}
 
-      <div className="flex items-center justify-between border-t border-hair pt-4">
-        <Link
-          href={`/astralanx/live/${strategy.id}`}
-          className="text-sm font-semibold text-accent hover:underline"
-        >
-          Full breakdown →
-        </Link>
-        {isOpen(strategy) && strategy.formula ? (
-          <Link
-            href={`/astralanx/live/${strategy.id}#formula`}
-            className="text-sm text-ink-muted hover:text-ink"
-          >
-            View the formula →
-          </Link>
-        ) : isOpen(strategy) && strategy.formula_ref ? (
-          <Link
-            href={strategy.formula_ref}
-            className="text-sm text-ink-muted hover:text-ink"
-          >
-            View the formula →
-          </Link>
-        ) : null}
-      </div>
-    </div>
+      <span className="mt-auto border-t border-hair pt-4 text-sm font-semibold text-accent">
+        Full breakdown →
+      </span>
+    </Link>
   );
 }

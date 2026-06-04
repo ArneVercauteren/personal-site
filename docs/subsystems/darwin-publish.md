@@ -90,7 +90,7 @@ private repo**; the open file's formula is published for auditability.
 **`backfill_start`, `performance`, `darwin_equity_curve`, `active_share`, and `capacity` are optional
 and publish for both visibilities** — they are dates and aggregate performance numbers, never the
 formula or weights, so they clear the security boundary. They drive the per-strategy detail page
-(continuous training → OOS → live curve with shaded bands, plus detailed stat panels).
+(continuous OOS/backtest → live curve with shaded bands, plus detailed stat panels).
 `darwin_equity_curve` is the authoritative combined training+OOS curve from Darwin; when it is
 present, the updater uses that prefix directly and only fetches Yahoo data from the prefix's final
 date onward.

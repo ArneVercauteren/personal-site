@@ -30,10 +30,11 @@ const REGIME_STYLE: Record<RegimeKind, { color: string; name: string }> = {
   live: { color: CHART.gain, name: "Live (paper)" },
 };
 
-// Continuous equity curve with the strategy's lifecycle shaded behind it:
-// training (in-sample) → out-of-sample → live. The line is one tone; the
-// regimes are translucent bands so the whole history reads as one curve while
-// each phase is still distinct. Boundaries snap to the nearest curve date.
+// Continuous equity curve with lifecycle bands behind it. On the strategy
+// detail page, everything before the live marker is shaded as out-of-sample
+// backtest history and everything after it as live paper history. The line is
+// one tone; the regimes are translucent bands so the whole history reads as one
+// curve. Boundaries snap to the nearest curve date.
 export function RegimeEquityChart({
   points,
   regimes,

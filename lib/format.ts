@@ -79,9 +79,18 @@ export function age(birthIso: string, now: Date = new Date()): number {
   return years;
 }
 
+/**
+ * Normalize a date string the Darwin exporter may emit with a time suffix
+ * ("2008-11-20 00:00:00") down to the bare ISO day ("2008-11-20"), which every
+ * other helper here expects. Pass-through for already-bare dates.
+ */
+export function dateOnly(value: string): string {
+  return value.slice(0, 10);
+}
+
 /** ISO date (YYYY-MM-DD) -> "Jun 1, 2026". */
 export function shortDate(iso: string): string {
-  const d = new Date(iso + "T00:00:00Z");
+  const d = new Date(dateOnly(iso) + "T00:00:00Z");
   return d.toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",

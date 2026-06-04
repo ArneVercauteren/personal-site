@@ -7,9 +7,9 @@ import { DrawdownChart } from "@/components/DrawdownChart";
 import { shortDate } from "@/lib/format";
 
 // Interactive wrapper around the lifecycle equity + drawdown charts: preset
-// buttons jump to a phase (training / out-of-sample / live), and two date
-// inputs set an arbitrary window. Both charts re-render against the visible
-// slice, so the y-axis and drawdown rescale to whatever range is shown.
+// buttons jump to a phase (out-of-sample / live), and two date inputs set an
+// arbitrary window. Both charts re-render against the visible slice, so the
+// y-axis and drawdown rescale to whatever range is shown.
 // Client component (state); the charts it wraps are already client components.
 
 interface Preset {

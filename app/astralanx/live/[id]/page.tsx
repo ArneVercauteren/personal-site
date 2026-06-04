@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
@@ -8,6 +7,7 @@ import { ExposureDonut } from "@/components/ExposureDonut";
 import { EquityExplorer } from "@/components/EquityExplorer";
 import { type Regime } from "@/components/RegimeEquityChart";
 import { FormulaView } from "@/components/FormulaView";
+import { Section } from "@/components/Section";
 import {
   loadPortfolio,
   loadStrategyMeta,
@@ -32,28 +32,6 @@ export async function generateMetadata({
   const s = loadPortfolio().strategies.find((x) => x.id === id);
   if (!s) return {};
   return { title: `${s.name} · strategy detail` };
-}
-
-function Section({
-  eyebrow,
-  title,
-  id,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  id?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section id={id} className="mt-10 scroll-mt-24 border-t border-hair pt-8">
-      <p className="mb-1 font-mono text-xs uppercase tracking-widest text-accent">
-        {eyebrow}
-      </p>
-      <h2 className="text-xl font-semibold tracking-tight text-ink">{title}</h2>
-      <div className="mt-4">{children}</div>
-    </section>
-  );
 }
 
 // --- detailed stat rendering ----------------------------------------------
@@ -183,27 +161,36 @@ export default async function StrategyDetailPage({
 
   const meta = loadStrategyMeta().strategies.find((m) => m.id === id);
   const liveSince = strategy.live_since ?? meta?.deployed_on;
+  const firstD = strategy.equity_curve[0]?.d;
   const lastD = strategy.equity_curve.at(-1)?.d;
   const perf = meta?.performance;
 
-  // Lifecycle chart bands: training regime(s) + OOS window + live tail.
+  // Lifecycle chart bands: everything before the live date is displayed as
+  // out-of-sample/backtest evidence. The original Darwin training/OOS split is
+  // still shown in the detailed stat panels below.
   const regimes: Regime[] = [];
-  if (perf) {
-    const tw = perf.training.windows ?? [
-      { start: perf.training.start, end: perf.training.end },
-    ];
-    for (const w of tw) {
-      regimes.push({ start: w.start, end: w.end, kind: "training", label: w.label });
-    }
-    regimes.push({ start: perf.oos.start, end: perf.oos.end, kind: "oos", label: "OOS" });
+  const firstLiveD = liveSince
+    ? strategy.equity_curve.find((p) => p.d >= liveSince)?.d
+    : undefined;
+  const preLiveEnd = liveSince
+    ? [...strategy.equity_curve].reverse().find((p) => p.d < liveSince)?.d
+    : lastD;
+  if (firstD && preLiveEnd && firstD <= preLiveEnd) {
+    regimes.push({ start: firstD, end: preLiveEnd, kind: "oos", label: "OOS" });
   }
-  if (liveSince && lastD) {
-    regimes.push({ start: liveSince, end: lastD, kind: "live", label: "Live" });
+  if (firstLiveD && lastD) {
+    regimes.push({ start: firstLiveD, end: lastD, kind: "live", label: "Live" });
   }
 
   const cap = meta?.capacity;
   const hasLiquidity =
     meta?.active_share != null || cap?.liquidity_usd != null || cap?.impact_usd != null;
+
+  // Show the deep-analytics CTA only when some run actually carries the rich
+  // open_diagnostics block (open strategies exported from Darwin).
+  const hasAnalytics = perf
+    ? [perf.combined, perf.oos, perf.training].some((r) => r?.open_diagnostics)
+    : false;
 
   return (
     <div>
@@ -227,10 +214,31 @@ export default async function StrategyDetailPage({
         <Facts meta={meta ?? defaultMeta(strategy.id, strategy.name)} />
       </div>
 
-      <Section eyebrow="Lifecycle" title="Training → out-of-sample → live">
+      {hasAnalytics ? (
+        <Link
+          href={`/astralanx/live/${strategy.id}/analytics`}
+          className="panel panel-hover mt-6 flex items-center justify-between gap-4 px-5 py-4"
+        >
+          <span>
+            <span className="block text-sm font-semibold text-ink">
+              Deep analytics →
+            </span>
+            <span className="mt-0.5 block text-xs text-ink-muted">
+              Annual returns, rolling Sharpe, drawdown anatomy, factor &amp;
+              sector exposure, capacity, and the full rebalance history.
+            </span>
+          </span>
+          <span aria-hidden className="font-mono text-lg text-accent">
+            →
+          </span>
+        </Link>
+      ) : null}
+
+      <Section eyebrow="Lifecycle" title="Out-of-sample → live">
         <p className="mb-4 max-w-prose text-sm text-ink-muted">
-          Jump to a phase, or set a custom window with the date pickers — both the
-          equity and drawdown charts redraw against the visible range.
+          Everything before the live marker is grouped as out-of-sample backtest
+          history on this chart; the Darwin training/OOS breakdown remains in
+          the stat panels below.
         </p>
         <EquityExplorer
           points={strategy.equity_curve}

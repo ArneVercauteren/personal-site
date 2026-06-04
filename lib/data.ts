@@ -191,6 +191,146 @@ export interface DetailedStats extends Stats {
   information_ratio?: number;
 }
 
+/** A `{ name, value }` pair — a labelled magnitude (sector weight, tilt, …). */
+export interface NamedValue {
+  name: string;
+  value: number;
+}
+
+/**
+ * The worst peak-to-trough drawdown over a run, with its anatomy: the dates of
+ * the prior peak, the trough, and the recovery (null if never recovered), plus
+ * the calendar-day duration. Each numeric/date field is self-documented by an
+ * entry in `metric_explanations`.
+ */
+export interface MaxDrawdownDetail {
+  /** Most negative peak-to-trough drawdown (negative fraction). */
+  value: number;
+  peak_date: string;
+  trough_date: string;
+  /** ISO date, or null / "Not Recovered" when the curve never regained the peak. */
+  recovery_date: string | null;
+  duration_days: number;
+  metric_explanations?: Record<string, string>;
+}
+
+/** Sector-tilt diagnostics vs an equal-weight eligible universe. Numbers only —
+ *  the internal `sector_map_source` path the exporter attaches is never read. */
+export interface SectorNeutrality {
+  status: string;
+  methodology?: string;
+  rebalance_observations: number;
+  average_sector_active_share: number;
+  median_sector_active_share: number;
+  worst_sector_active_share: number;
+  best_sector_active_share: number;
+  average_max_sector_abs_deviation: number;
+  average_mapped_portfolio_weight_ratio: number;
+  average_mapped_universe_name_ratio: number;
+  average_portfolio_sector_count: number;
+  average_universe_sector_count: number;
+  average_effective_sector_count: number;
+  worst_rebalance_date: string;
+  best_rebalance_date: string;
+  top_average_portfolio_sectors: NamedValue[];
+  top_average_universe_sectors: NamedValue[];
+  top_average_sector_overweights: NamedValue[];
+  top_average_sector_underweights: NamedValue[];
+  metric_explanations?: Record<string, string>;
+}
+
+/** One capacity estimate (heuristic liquidity-screen or impact-model). The
+ *  shared rebalance-percentile fields plus method-specific knobs. */
+export interface CapacityMethod {
+  method: string;
+  median_capacity_usd: number;
+  p25_capacity_usd: number;
+  worst_rebalance_capacity_usd: number;
+  rebalance_observations: number;
+  median_capacity_estimated_impact_bps: number;
+  p25_capacity_estimated_impact_bps: number;
+  worst_rebalance_capacity_estimated_impact_bps: number;
+  // Heuristic-only knobs.
+  participation_rate?: number;
+  adv_lookback_days?: number;
+  execution_days_cap?: number;
+  // Impact-model-only knobs and current-size diagnostics.
+  volume_impact_coef?: number;
+  max_allowed_single_name_impact_bps?: number;
+  current_portfolio_size_usd?: number;
+  current_size_vs_median_capacity?: number;
+  current_worst_name_impact_bps_median?: number;
+  current_worst_name_impact_bps_p75?: number;
+  current_worst_name_impact_bps_max?: number;
+  metric_explanations?: Record<string, string>;
+}
+
+export interface CapacityAnalysis {
+  heuristic_capacity: CapacityMethod;
+  impact_model_capacity: CapacityMethod;
+  metric_explanations?: Record<string, string>;
+}
+
+/** Fama-French factor regression of the strategy's returns: factor betas, the
+ *  residual alpha, and fit quality, each with a plain-English explanation. */
+export interface FamaFrenchRegression {
+  alpha_daily: number;
+  alpha_annualized: number;
+  betas: Record<string, number>;
+  r_squared: number;
+  observations: number;
+  factors_used: string[];
+  excess_return_regression: boolean;
+  metric_explanations?: Record<string, string>;
+  factor_explanations?: Record<string, string>;
+}
+
+/** Summary of the rolling 3-year annualized Sharpe over a run. */
+export interface RollingSharpeSummary {
+  min: number;
+  min_date: string;
+  max: number;
+  max_date: string;
+  avg: number;
+  current: number;
+}
+
+/** One point of the rolling-Sharpe series. `date` may carry a time suffix. */
+export interface RollingSharpePoint {
+  date: string;
+  sharpe: number;
+}
+
+/** One historical rebalance basket: the names held and their target weights. */
+export interface PickRecord {
+  label: string;
+  /** Rebalance date; may carry a " 00:00:00" suffix from the exporter. */
+  date: string;
+  count: number;
+  tickers: string[];
+  weights: Record<string, number>;
+}
+
+/**
+ * The rich, optional analytics block the open Darwin exporter attaches to a
+ * run. Everything here is numbers / labels published for auditability — no
+ * secret formula or internal path is ever read (the exporter's
+ * `sector_map_source` and the duplicate `artifacts`/`holdings` payloads are
+ * intentionally untyped and undisplayed). Rendered on the per-strategy
+ * analytics page; see docs/concepts/data-contract.md.
+ */
+export interface OpenDiagnostics {
+  /** Calendar-year returns keyed by year string, e.g. `{ "2008": -0.36 }`. */
+  annual_returns?: Record<string, number>;
+  max_drawdown?: MaxDrawdownDetail;
+  sector_neutrality?: SectorNeutrality;
+  capacity_analysis?: CapacityAnalysis;
+  fama_french_regression?: FamaFrenchRegression;
+  rolling_3y_sharpe?: RollingSharpeSummary;
+  rolling_3y_sharpe_series?: RollingSharpePoint[];
+  picks_records?: PickRecord[];
+}
+
 /**
  * One of the three single-seed runs the Darwin exporter records. `start`/`end`
  * is the window envelope; `windows` optionally lists sub-windows (e.g. the
@@ -204,6 +344,8 @@ export interface PerformanceRun {
   /** Optional sub-windows (e.g. training's constituent regimes), display only. */
   windows?: { start: string; end: string; label?: string }[];
   stats: DetailedStats;
+  /** Optional rich analytics for the deep-dive page (open strategies). */
+  open_diagnostics?: OpenDiagnostics;
 }
 
 /**
