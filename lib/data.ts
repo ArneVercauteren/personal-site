@@ -56,9 +56,64 @@ interface StrategyBase {
   stats_live?: Stats;
 }
 
+/**
+ * One node of a Darwin DSL formula tree — the scrubbed score expression an open
+ * strategy publishes. A discriminated-ish union keyed on `kind`; every variant's
+ * extra fields are optional so the reader stays tolerant of trees it renders but
+ * doesn't evaluate. This is **open-only**: a secured entry must never carry it
+ * (enforced by `paper_trading/secured.py::assert_sanitized`).
+ */
+export interface FormulaNode {
+  kind:
+    | "number"
+    | "indicator"
+    | "transform"
+    | "arithmetic"
+    | "comparison"
+    | "logic"
+    | "conditional";
+  /** Operator / indicator / transform name (absent for `number`). */
+  name?: string;
+  /** Literal value (`number` nodes only). */
+  value?: number;
+  /** Indicator / transform params, e.g. `{ window: 60 }`. */
+  params?: Record<string, number | string>;
+  /** The single operand of a `transform`. */
+  child?: FormulaNode;
+  /** Operands of an `arithmetic` (n-ary) or `logic` node. */
+  children?: FormulaNode[];
+  /** `comparison` operands. */
+  left?: FormulaNode;
+  right?: FormulaNode;
+  third?: FormulaNode;
+  /** Alternate `logic` operand list. */
+  clauses?: FormulaNode[];
+  /** `conditional` branches. */
+  cases?: { condition?: FormulaNode; result?: FormulaNode; else?: FormulaNode }[];
+}
+
+/**
+ * The published formula for an open strategy: the score expression (a
+ * `FormulaNode` root) plus the top-level selection knobs Darwin attaches —
+ * `top_n` (how many names it holds), an optional `exit_root` rule, and the
+ * native `rebalance_interval`. Carries no secrets: open formulas are published
+ * for auditability. See docs/concepts/open-vs-secured-strategies.md.
+ */
+export interface StrategyFormula extends FormulaNode {
+  /** Number of names held each rebalance (top-N selection). */
+  top_n?: number;
+  /** Optional exit rule evaluated against held names. */
+  exit_root?: FormulaNode;
+  /** Native rebalance cadence label, e.g. "2M". */
+  rebalance_interval?: string;
+}
+
 export interface OpenStrategy extends StrategyBase {
   visibility: "open";
   positions: Position[];
+  /** The full DSL score tree, rendered on the detail page (open only). */
+  formula?: StrategyFormula;
+  /** Optional link to a longer public writeup of the formula. */
   formula_ref?: string;
 }
 

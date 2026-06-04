@@ -64,14 +64,16 @@ are NaN, handled).
 
 1. For each spec in `paper_trading/strategies/*.json`, resolve its universe
    (`universe.resolve_universe` — the spec's explicit list, else the shared self-refreshing
-   `public/data/universe.json`; see [universe.md](universe.md)) and fetch daily bars for it over
-   `[deployed_on − warmup, today]` via `prices.get_ohlcv`. DSL warmup is sized from the formula's
-   longest feature window.
+   `public/data/universe.json`; see [universe.md](universe.md)) and choose the Yahoo-backed
+   simulation start. If Darwin exported `darwin_equity_curve`, that authoritative training+OOS
+   prefix is used directly and Yahoo starts at the prefix's final date; otherwise Yahoo starts at
+   `backfill_start` or `deployed_on`. Daily bars are fetched over `[simulation_start − warmup,
+   today]` via `prices.get_ohlcv`. DSL warmup is sized from the formula's longest feature window.
 2. Re-evaluate on each rebalance date → target holdings: the DSL tree via the vendored evaluator
    (`signals.evaluate_formula`) or the momentum rule (`signals.evaluate`).
 3. Apply fills at the next bar's open, then charge the Darwin cost haircut for that rebalance
    (`portfolio.simulate` + `costs.py`).
-4. Mark to market daily; build the equity curve and recompute CAGR / Sharpe / max-DD.
+4. Mark to market daily; stitch onto any Darwin curve prefix; recompute CAGR / Sharpe / max-DD.
 5. Merge the open entries into `public/data/{portfolio,strategies,trades}.json`.
 6. (In CI) commit the JSON if it changed → Vercel redeploys.
 

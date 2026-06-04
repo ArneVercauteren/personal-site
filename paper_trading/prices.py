@@ -22,19 +22,95 @@ from __future__ import annotations
 
 import hashlib
 import os
+import time
 
 import numpy as np
 import pandas as pd
 
 __all__ = [
     "get_ohlcv",
+    "get_ohlcv_chunked",
     "get_price_history",
     "long_to_wide",
     "wide_raw_and_dollar_volume",
+    "make_limiter_session",
     "use_synthetic",
 ]
 
 _OHLCV_COLUMNS = ["date", "ticker", "open", "high", "low", "close", "adj_close", "volume"]
+
+# Polite defaults for bulk daily fetches — stay under Yahoo's rate limit by
+# batching, fetching sequentially within a batch, and pausing between batches.
+# Tunable via env so a slow CI runner can back off without code changes.
+DEFAULT_FETCH_CHUNK = int(os.environ.get("PAPER_TRADING_FETCH_CHUNK", "150"))
+DEFAULT_FETCH_PAUSE = float(os.environ.get("PAPER_TRADING_FETCH_PAUSE", "1.0"))
+DEFAULT_REQUESTS_PER_SEC = int(os.environ.get("PAPER_TRADING_REQUESTS_PER_SEC", "4"))
+
+
+def make_limiter_session(per_second: int = DEFAULT_REQUESTS_PER_SEC):
+    """A rate-limited requests session so yfinance stays under Yahoo's cap.
+
+    Uses `requests_ratelimiter` if installed (the yfinance-recommended way to
+    avoid `YFRateLimitError`). Returns None if it isn't — callers then fall back
+    to sequential batches + inter-batch pauses, which is gentler but slower.
+    Synthetic/offline mode never needs a session.
+    """
+    if use_synthetic():
+        return None
+    try:
+        from requests_ratelimiter import LimiterSession
+
+        return LimiterSession(per_second=per_second)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (no rate-limited session — pip install requests-ratelimiter; {exc})")
+        return None
+
+
+def get_ohlcv_chunked(
+    tickers: list[str],
+    start: str,
+    end: str,
+    *,
+    session=None,
+    chunk: int = DEFAULT_FETCH_CHUNK,
+    pause: float = DEFAULT_FETCH_PAUSE,
+    threads: bool = False,
+) -> pd.DataFrame:
+    """Long-format OHLCV for many tickers, fetched politely in batches.
+
+    For a large universe a single `yf.download` of every symbol bursts requests
+    and trips Yahoo's rate limiter. This splits the symbols into `chunk`-sized
+    batches, fetches each one (sequentially, `threads=False`) through an optional
+    rate-limited `session`, and pauses `pause` seconds between batches. A batch
+    that returns nothing is skipped rather than aborting the whole run. Synthetic
+    mode skips the pauses (and any session) since it never hits the network.
+
+    Same long schema and post-processing as `get_ohlcv`.
+    """
+    if not tickers:
+        raise RuntimeError("get_ohlcv_chunked: no tickers requested")
+    if use_synthetic():
+        pause = 0.0
+        session = None
+
+    frames: list[pd.DataFrame] = []
+    starts = list(range(0, len(tickers), max(chunk, 1)))
+    for bi, i in enumerate(starts):
+        group = tickers[i : i + chunk]
+        try:
+            df = get_ohlcv(group, start, end, session=session, threads=threads)
+        except Exception as exc:  # noqa: BLE001 — one bad batch shouldn't sink the run
+            print(f"  fetch batch {bi + 1}/{len(starts)} failed ({exc}); skipping")
+            df = None
+        if df is not None and not df.empty:
+            frames.append(df)
+        if pause and bi < len(starts) - 1:
+            time.sleep(pause)
+
+    if not frames:
+        raise RuntimeError(f"get_ohlcv_chunked: no data for any of {len(tickers)} tickers")
+    out = pd.concat(frames, ignore_index=True)
+    return out.sort_values(["ticker", "date"]).reset_index(drop=True)
 
 
 def use_synthetic() -> bool:

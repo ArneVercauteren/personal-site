@@ -83,6 +83,30 @@ def test_backfill_start_extends_curve_and_splits_stats(universe, long_prices):
     assert live_dates[-1] == res_live.equity_curve[-1]["d"]
 
 
+def test_darwin_equity_curve_is_authoritative_prefix(universe, long_prices):
+    opens, closes = prices.long_to_wide(long_prices)
+    spec = _spec(universe, _roc_topn())
+    available = closes.loc["2023-06-01":].index
+    prefix_dates = available[:3]
+    assert len(prefix_dates) == 3
+    spec["deployed_on"] = available[10].strftime("%Y-%m-%d")
+    spec["darwin_equity_curve"] = [
+        {"d": prefix_dates[0].strftime("%Y-%m-%d"), "v": 100000.0},
+        {"d": prefix_dates[1].strftime("%Y-%m-%d"), "v": 101000.0},
+        {"d": prefix_dates[2].strftime("%Y-%m-%d"), "v": 102500.0},
+    ]
+
+    assert portfolio.simulation_curve_start(spec) == spec["darwin_equity_curve"][-1]["d"]
+    res = portfolio.simulate(spec, opens, closes, prices_long=long_prices)
+
+    assert res.equity_curve[:3] == spec["darwin_equity_curve"]
+    dates = [p["d"] for p in res.equity_curve]
+    assert dates == sorted(dates)
+    assert len(dates) == len(set(dates))
+    assert all(p["d"] > spec["darwin_equity_curve"][-1]["d"] for p in res.equity_curve[3:])
+    assert res.stats_backtest["cagr"] != 0.0
+
+
 def test_no_backfill_leaves_backtest_segment_empty(universe, long_prices):
     """Without `backfill_start` the curve is all-live; backtest stats are zeros."""
     opens, closes = prices.long_to_wide(long_prices)

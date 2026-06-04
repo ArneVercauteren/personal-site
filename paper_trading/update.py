@@ -30,7 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 STRATEGY_DIR = Path(__file__).resolve().parent / "strategies"
 DATA_DIR = REPO_ROOT / "public" / "data"
 
-# Extra history before deployed_on so the first signal has its full lookback.
+# Extra history before the Yahoo-backed simulation start so the first signal has its full lookback.
 WARMUP_DAYS = 400
 
 
@@ -66,6 +66,61 @@ def merge_by_id(existing: list[dict], owned: list[dict], owned_ids: set[str]) ->
     return preserved + owned
 
 
+def _spec_fetch_window(spec: dict) -> tuple[list[str], str]:
+    """The tickers and earliest start date this spec's simulation needs.
+
+    The Yahoo-backed window begins `warmup` days before the simulation curve
+    start (the Darwin prefix's last date when present, else `backfill_start` /
+    `deployed_on`), with enough lookback for the longest feature window.
+    """
+    tickers = universe.resolve_universe(spec)
+    curve_start = portfolio.simulation_curve_start(spec)
+    if "formula" in spec:
+        needed = collect_all_needed_features(spec["formula"], include_exit_root=True)
+        # `required_history_days` already converts the longest feature window from
+        # trading days to a calendar-day estimate (it multiplies by 1.6 and adds a
+        # margin internally), so it's used directly here. Applying that weekend
+        # margin a second time only pulled ~1.6x more history than any window needs.
+        warmup = max(WARMUP_DAYS, required_history_days(needed) + 30)
+    else:
+        warmup = WARMUP_DAYS
+    start = (pd.Timestamp(curve_start) - pd.Timedelta(days=warmup)).strftime("%Y-%m-%d")
+    return tickers, start
+
+
+def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
+    """Fetch the OHLCV every spec needs, fetching each ticker exactly once.
+
+    Different strategies often share the same self-refreshing universe, so a
+    naive per-strategy fetch would pull the same bars several times. Instead we
+    take, for each ticker, the **earliest** start date any spec requires, group
+    tickers by that start, and fetch each group once through the polite,
+    rate-limited chunked path. The result is sliced per spec by the caller.
+    """
+    earliest: dict[str, str] = {}
+    for spec in specs:
+        tickers, start = _spec_fetch_window(spec)
+        for t in tickers:
+            cur = earliest.get(t)
+            if cur is None or start < cur:
+                earliest[t] = start
+
+    by_start: dict[str, list[str]] = {}
+    for t, start in earliest.items():
+        by_start.setdefault(start, []).append(t)
+
+    session = prices.make_limiter_session()
+    frames: list[pd.DataFrame] = []
+    total = len(earliest)
+    print(f"fetching {total} unique tickers in {len(by_start)} date-group(s) "
+          f"through {end}")
+    for start, tickers in sorted(by_start.items()):
+        frames.append(
+            prices.get_ohlcv_chunked(sorted(tickers), start, end, session=session)
+        )
+    return pd.concat(frames, ignore_index=True)
+
+
 def run() -> str:
     specs = load_strategy_specs()
     if not specs:
@@ -78,34 +133,27 @@ def run() -> str:
     open_trades: list[dict] = []
     latest_date = ""
 
+    end = pd.Timestamp.today().strftime("%Y-%m-%d")
+    # One deduplicated, rate-limited fetch for every ticker any spec needs; each
+    # spec then slices its own tickers + window out of this shared frame.
+    long_all = _fetch_all_prices(specs, end)
+
     for spec in specs:
-        end = pd.Timestamp.today().strftime("%Y-%m-%d")
-        # Explicit spec universe, else the shared self-refreshing universe.
-        tickers = universe.resolve_universe(spec)
+        tickers, start = _spec_fetch_window(spec)
+        wanted = set(tickers)
+        long = long_all[
+            long_all["ticker"].isin(wanted) & (long_all["date"] >= pd.Timestamp(start))
+        ].reset_index(drop=True)
 
-        # The equity curve starts at `backfill_start` (a one-time historical
-        # backfill) when given, else at the live date. `deployed_on` is the
-        # live-since marker; everything before it is an out-of-sample backtest.
-        curve_start = spec.get("backfill_start") or spec["deployed_on"]
-
+        opens, closes = prices.long_to_wide(long)
+        raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
         if "formula" in spec:
-            # Real DSL king: warm up enough history for the longest feature window.
-            needed = collect_all_needed_features(spec["formula"], include_exit_root=True)
-            warmup = max(WARMUP_DAYS, int(required_history_days(needed) * 1.6) + 30)
-            start = (pd.Timestamp(curve_start) - pd.Timedelta(days=warmup)).strftime("%Y-%m-%d")
-            # The evaluator needs the long OHLCV frame.
-            long = prices.get_ohlcv(tickers, start, end)
-            opens, closes = prices.long_to_wide(long)
-            raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
+            # Real DSL king: the evaluator needs the long OHLCV frame.
             result = portfolio.simulate(
                 spec, opens, closes, prices_long=long,
                 dollar_volume=dollar_volume, raw_closes=raw_closes,
             )
         else:
-            start = (pd.Timestamp(curve_start) - pd.Timedelta(days=WARMUP_DAYS)).strftime("%Y-%m-%d")
-            long = prices.get_ohlcv(tickers, start, end)
-            opens, closes = prices.long_to_wide(long)
-            raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
             result = portfolio.simulate(
                 spec, opens, closes,
                 dollar_volume=dollar_volume, raw_closes=raw_closes,
@@ -123,6 +171,11 @@ def run() -> str:
             "live_since": spec["deployed_on"],
             "positions": result.positions,
         }
+        # Publish the DSL score tree for open formula-strategies so the site can
+        # render it (open formulas are public for auditability; the security
+        # boundary lives on the secured side — secured entries never carry it).
+        if "formula" in spec:
+            entry["formula"] = spec["formula"]
         if spec.get("formula_ref"):
             entry["formula_ref"] = spec["formula_ref"]
         portfolio_entries.append(entry)

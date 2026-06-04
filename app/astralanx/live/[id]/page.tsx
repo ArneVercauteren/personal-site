@@ -5,8 +5,9 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { Disclaimer } from "@/components/Disclaimer";
 import { ExposureDonut } from "@/components/ExposureDonut";
-import { DrawdownChart } from "@/components/DrawdownChart";
-import { RegimeEquityChart, type Regime } from "@/components/RegimeEquityChart";
+import { EquityExplorer } from "@/components/EquityExplorer";
+import { type Regime } from "@/components/RegimeEquityChart";
+import { FormulaView } from "@/components/FormulaView";
 import {
   loadPortfolio,
   loadStrategyMeta,
@@ -36,14 +37,16 @@ export async function generateMetadata({
 function Section({
   eyebrow,
   title,
+  id,
   children,
 }: {
   eyebrow: string;
   title: string;
+  id?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="mt-10 border-t border-hair pt-8">
+    <section id={id} className="mt-10 scroll-mt-24 border-t border-hair pt-8">
       <p className="mb-1 font-mono text-xs uppercase tracking-widest text-accent">
         {eyebrow}
       </p>
@@ -225,15 +228,16 @@ export default async function StrategyDetailPage({
       </div>
 
       <Section eyebrow="Lifecycle" title="Training → out-of-sample → live">
-        <RegimeEquityChart
+        <p className="mb-4 max-w-prose text-sm text-ink-muted">
+          Jump to a phase, or set a custom window with the date pickers — both the
+          equity and drawdown charts redraw against the visible range.
+        </p>
+        <EquityExplorer
           points={strategy.equity_curve}
           regimes={regimes}
           currency={meta?.base_currency ?? "USD"}
           liveSince={liveSince}
         />
-        <div className="mt-4">
-          <DrawdownChart points={strategy.equity_curve} liveSince={liveSince} />
-        </div>
       </Section>
 
       {strategy.stats_live ? (
@@ -297,6 +301,15 @@ export default async function StrategyDetailPage({
         </Section>
       ) : null}
 
+      {isOpen(strategy) && strategy.formula ? (
+        <Section eyebrow="Formula" title="How it picks stocks" id="formula">
+          <FormulaView
+            formula={strategy.formula}
+            rebalanceDays={meta?.rebalance_cadence_days}
+          />
+        </Section>
+      ) : null}
+
       <Section
         eyebrow={isOpen(strategy) ? "Composition" : "Exposure"}
         title={isOpen(strategy) ? "Current basket" : "Aggregate sector exposure"}
@@ -313,14 +326,21 @@ export default async function StrategyDetailPage({
                   </li>
                 ))}
             </ul>
-            {strategy.formula_ref ? (
-              <Link
-                href={strategy.formula_ref}
-                className="mt-4 inline-block text-sm text-accent hover:underline"
-              >
-                View the formula →
-              </Link>
-            ) : null}
+            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1">
+              {strategy.formula ? (
+                <Link href="#formula" className="text-sm text-accent hover:underline">
+                  See the full formula ↑
+                </Link>
+              ) : null}
+              {strategy.formula_ref ? (
+                <Link
+                  href={strategy.formula_ref}
+                  className="text-sm text-accent hover:underline"
+                >
+                  Read the writeup →
+                </Link>
+              ) : null}
+            </div>
           </>
         ) : (
           <ExposureDonut exposure={strategy.exposure} />

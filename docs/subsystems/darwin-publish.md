@@ -61,6 +61,7 @@ A deployed strategy is one `*.json` file matching the strategy-spec the updater 
     "combined": {"start": "2018-01-02", "end": "2025-12-31",
                  "stats": {"cagr": 0.131, "sharpe": 0.99, "max_dd": -0.205, "...": 0}}
   },
+  "darwin_equity_curve": [{"d": "2018-01-02", "v": 100000.0}],  // optional: combined train+OOS curve
   "active_share": 0.66,                            // king-level liquidity/holdings measures
   "capacity": {"liquidity_usd": 42000000, "impact_usd": 18000000},
   "portfolio_size": 100000,
@@ -86,11 +87,13 @@ never letting them reach the public site. The only export-time differences are `
 open-only public `formula_ref`. The secured file is kept secret simply by living **only in the
 private repo**; the open file's formula is published for auditability.
 
-**`backfill_start`, `performance`, `active_share`, and `capacity` are optional and publish for both
-visibilities** — they are dates and aggregate performance numbers, never the formula or weights, so
-they clear the security boundary. They drive the per-strategy detail page (continuous training → OOS →
-live curve with shaded bands, plus detailed stat panels). `backfill_start` is typically the earliest
-training-regime start, so the site's re-simulated curve spans the whole lifecycle.
+**`backfill_start`, `performance`, `darwin_equity_curve`, `active_share`, and `capacity` are optional
+and publish for both visibilities** — they are dates and aggregate performance numbers, never the
+formula or weights, so they clear the security boundary. They drive the per-strategy detail page
+(continuous training → OOS → live curve with shaded bands, plus detailed stat panels).
+`darwin_equity_curve` is the authoritative combined training+OOS curve from Darwin; when it is
+present, the updater uses that prefix directly and only fetches Yahoo data from the prefix's final
+date onward.
 
 ### `performance` — three single-seed runs
 
@@ -104,6 +107,10 @@ diagnostics:
 3. **`combined`** — over training **and** OOS together. Run end to end (a fresh backtest over the
    union span), **not** stitched from the two halves — cross-boundary figures like max drawdown and
    Sharpe aren't additive.
+
+The combined run's equity curve is exported as top-level `darwin_equity_curve`, scaled to the
+deployed paper `portfolio_size`. The updater stitches later Yahoo-backed simulation onto that curve
+instead of re-simulating Darwin's historical training+OOS window with Yahoo prices.
 
 Each run's `stats` is a `DetailedStats` block. Map Darwin's existing backtest diagnostics into it:
 

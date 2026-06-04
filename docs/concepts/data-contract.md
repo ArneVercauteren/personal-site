@@ -30,9 +30,13 @@ Every strategy entry carries `visibility: "open" | "secured"`, and that field de
 fields are allowed. This is a **security boundary** — see
 [open-vs-secured-strategies.md](open-vs-secured-strategies.md).
 
-- **open** → may include `positions` (full ticker weights) and a `formula_ref`.
+- **open** → may include `positions` (full ticker weights), the `formula` DSL score tree
+  (published for auditability and rendered on the detail page by `components/FormulaView.tsx`),
+  and a `formula_ref`.
 - **secured** → may include `exposure` (aggregate sector/asset-class only). **Must never
-  include `positions` or any formula.**
+  include `positions` or any formula.** The leak guard
+  `paper_trading/secured.py::assert_sanitized` rejects `positions`/`formula`/`formula_ref` on a
+  secured entry.
 
 ## Example: `portfolio.json` (mixed open + secured)
 
@@ -88,7 +92,9 @@ as a single curve with one stat set:
 
 `stats` stays the full-curve summary. On the Tier-2 **writer** side, the curve start is set per-king by
 a `backfill_start` field in the strategy spec (an updater input, *not* part of this published
-contract); `deployed_on` in `strategies.json` is the live-since date. See
+contract); if Darwin also provides `darwin_equity_curve`, that training+OOS curve is used as the
+authoritative prefix and Yahoo-backed simulation starts only at the prefix's final date.
+`deployed_on` in `strategies.json` is the live-since date. See
 [subsystems/paper-trading-updater.md](../subsystems/paper-trading-updater.md).
 
 ## `strategies.json` — per-strategy metadata

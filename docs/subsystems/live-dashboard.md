@@ -13,6 +13,7 @@ The reader side of the live data: the dashboard page and the chart/stat componen
 - `components/StrategyCard.tsx` — per-strategy summary card: name, open/secured badge, equity curve, split live/backtest stats, drawdown chart, positions table (open) or exposure donut (secured), metadata, and a "Full breakdown →" link to the detail page.
 - `components/EquityCurveChart.tsx` — Recharts area/line equity curve. With `liveSince` it renders two-tone: a muted/dashed out-of-sample backfill segment and a solid live segment, with a "Live" `ReferenceLine` marker and a small legend. Client component.
 - `components/RegimeEquityChart.tsx` — Recharts equity curve with translucent `ReferenceArea` bands behind it for the training / OOS / live regimes (boundaries snapped to the nearest curve date), the live marker, and a regime legend. Detail-page only. Client component.
+- `components/FormulaView.tsx` — renders an **open** strategy's published `formula` DSL tree (from `lib/data.ts`) as a readable, math-like expression: indicator pills with window subscripts, infix operators (`×`, `÷`, `|·|`), the `top_n`/cadence summary, the `exit_root` rule, and an auto-generated indicator glossary. Pure server component (no Recharts, no client JS). Rendered in a `#formula` section on the detail page for open strategies that carry a formula; absent for signal-only open strategies and never shown for secured.
 - `components/DrawdownChart.tsx` — Recharts underwater plot derived from the equity curve (`value / running-peak − 1`); takes an optional `liveSince` marker. Client component.
 - `components/ExposureDonut.tsx` — Recharts donut + legend for secured sector/asset-class exposure. Client component.
 - `components/charts/chartColors.ts` — shared palette mirroring the Tailwind tokens (charts are client components and can't read Tailwind at runtime).
@@ -30,7 +31,7 @@ Recharts loads only on `/astralanx/live` and `/astralanx/live/[id]` (code-split)
 The page renders both [open and secured](../concepts/open-vs-secured-strategies.md) strategies,
 keyed off `visibility`:
 
-- **open** → badge "Open · formula shown", full **positions** table, link to the formula.
+- **open** → badge "Open · formula shown", full **positions** table, and (when the entry carries a `formula`) a rendered **Formula** section on the detail page via `FormulaView` — the actual DSL score tree, exit rule, and indicator glossary. The card's "View the formula →" link jumps to that `#formula` section.
 - **secured** → badge "Live paper · positions held private", **exposure donut** (sector/asset-class) instead of a positions table. Never render `positions` for a secured entry — the field isn't there, and the UI must not invent one.
 
 ## Invariants it must respect
@@ -47,4 +48,4 @@ See the recipe: [tasks/add-dashboard-chart.md](../tasks/add-dashboard-chart.md).
 
 ## Source files
 
-- `app/astralanx/live/page.tsx`, `app/astralanx/live/[id]/page.tsx`, `components/StrategyCard.tsx`, `components/EquityCurveChart.tsx`, `components/RegimeEquityChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx`, `components/charts/chartColors.ts`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.
+- `app/astralanx/live/page.tsx`, `app/astralanx/live/[id]/page.tsx`, `components/StrategyCard.tsx`, `components/EquityCurveChart.tsx`, `components/RegimeEquityChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx`, `components/FormulaView.tsx`, `components/charts/chartColors.ts`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.

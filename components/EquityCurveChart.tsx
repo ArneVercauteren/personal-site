@@ -46,15 +46,18 @@ export function EquityCurveChart({
   } as const;
   const xProps = {
     dataKey: "d",
+    // Include the year — a multi-year curve labelled with month names alone
+    // repeats "Jan", "Feb", … ambiguously across years.
     tickFormatter: (d: string) =>
       new Date(d + "T00:00:00Z").toLocaleDateString("en-US", {
         month: "short",
+        year: "2-digit",
         timeZone: "UTC",
       }),
     tick: { fill: CHART.inkMuted, fontSize: 10 },
     tickLine: false,
     axisLine: { stroke: CHART.grid },
-    minTickGap: 28,
+    minTickGap: 36,
   } as const;
   const yProps = {
     width: 52,

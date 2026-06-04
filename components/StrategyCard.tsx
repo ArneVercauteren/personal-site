@@ -159,7 +159,14 @@ export function StrategyCard({
         >
           Full breakdown →
         </Link>
-        {isOpen(strategy) && strategy.formula_ref ? (
+        {isOpen(strategy) && strategy.formula ? (
+          <Link
+            href={`/astralanx/live/${strategy.id}#formula`}
+            className="text-sm text-ink-muted hover:text-ink"
+          >
+            View the formula →
+          </Link>
+        ) : isOpen(strategy) && strategy.formula_ref ? (
           <Link
             href={strategy.formula_ref}
             className="text-sm text-ink-muted hover:text-ink"

@@ -1,6 +1,8 @@
 """Paper-portfolio simulator — deterministic, re-runnable, no broker.
 
-Walks a strategy forward from `deployed_on` to the last available bar:
+Walks a strategy forward from its simulation start to the last available bar.
+The start is `backfill_start` / `deployed_on`, or the final date of an
+authoritative Darwin `darwin_equity_curve` prefix when provided:
 
   * On each rebalance date, evaluate the signal (`signals.evaluate`) to get
     target weights and execute the implied trades at the **next** bar's open,
@@ -25,7 +27,7 @@ from . import costs
 from . import portfolio_state as ps
 from . import signals
 
-__all__ = ["simulate", "SimResult"]
+__all__ = ["simulate", "SimResult", "simulation_curve_start"]
 
 TRADING_DAYS = 252
 
@@ -43,6 +45,55 @@ class SimResult:
     # paper-trading. Either may be all-zeros when its segment has < 2 points.
     stats_backtest: dict = None       # [curve start, live_since)
     stats_live: dict = None           # [live_since, last bar]
+
+
+def _darwin_equity_curve(strategy: dict) -> list[dict]:
+    raw = strategy.get("darwin_equity_curve") or []
+    if not raw:
+        return []
+    curve: list[dict] = []
+    prev: pd.Timestamp | None = None
+    for point in raw:
+        day = pd.Timestamp(point["d"]).normalize()
+        value = float(point["v"])
+        if value <= 0 or not np.isfinite(value):
+            raise ValueError(f"{strategy['id']}: darwin_equity_curve has invalid value {value!r}")
+        if prev is not None and day <= prev:
+            raise ValueError(f"{strategy['id']}: darwin_equity_curve dates must be strictly increasing")
+        curve.append({"d": day.strftime("%Y-%m-%d"), "v": round(value, 2)})
+        prev = day
+    return curve
+
+
+def simulation_curve_start(strategy: dict) -> str:
+    """First date the Yahoo-backed simulator must cover for this spec.
+
+    Darwin can export the authoritative training+OOS prefix. When present, the
+    site only needs Yahoo data from that prefix's last date onward.
+    """
+    curve = _darwin_equity_curve(strategy)
+    if curve:
+        return curve[-1]["d"]
+    return strategy.get("backfill_start") or strategy["deployed_on"]
+
+
+def _starting_capital(strategy: dict, darwin_curve: list[dict]) -> float:
+    if darwin_curve:
+        return float(darwin_curve[-1]["v"])
+    return float(strategy["portfolio_size"])
+
+
+def _stitch_curve(darwin_curve: list[dict], continuation: list[dict]) -> tuple[list[dict], pd.Series]:
+    if not darwin_curve:
+        dates = [pd.Timestamp(p["d"]) for p in continuation]
+        equity = pd.Series([float(p["v"]) for p in continuation], index=pd.DatetimeIndex(dates))
+        return continuation, equity
+    cutoff = darwin_curve[-1]["d"]
+    tail = [p for p in continuation if p["d"] > cutoff]
+    stitched = darwin_curve + tail
+    dates = [pd.Timestamp(p["d"]) for p in stitched]
+    equity = pd.Series([float(p["v"]) for p in stitched], index=pd.DatetimeIndex(dates))
+    return stitched, equity
 
 
 def _rebalance_dates(index: pd.DatetimeIndex, deployed_on: pd.Timestamp, cadence_days: int):
@@ -134,8 +185,9 @@ def _simulate_signal(
     dollar_volume: pd.DataFrame | None = None,
     raw_closes: pd.DataFrame | None = None,
 ) -> SimResult:
-    capital = float(strategy["portfolio_size"])
-    sim_start = pd.Timestamp(strategy.get("backfill_start") or strategy["deployed_on"])
+    darwin_curve = _darwin_equity_curve(strategy)
+    capital = _starting_capital(strategy, darwin_curve)
+    sim_start = pd.Timestamp(simulation_curve_start(strategy))
     live_since = pd.Timestamp(strategy["deployed_on"])
     cadence = int(strategy["rebalance_cadence_days"])
     cfg = costs.CostModel.from_spec(strategy["cost_model"])
@@ -195,7 +247,7 @@ def _simulate_signal(
         equity_values.append(equity_close)
         curve.append({"d": day.strftime("%Y-%m-%d"), "v": round(equity_close, 2)})
 
-    equity = pd.Series(equity_values, index=sim_index)
+    curve, equity = _stitch_curve(darwin_curve, curve)
     stats = _stats(equity)
     stats_backtest, stats_live = _split_stats(equity, live_since)
     positions = _latest_positions(shares, closes.iloc[-1], equity_values[-1], tickers)
@@ -205,7 +257,7 @@ def _simulate_signal(
         stats=stats,
         positions=positions,
         trades=last_trades,
-        as_of=sim_index[-1].strftime("%Y-%m-%d"),
+        as_of=equity.index[-1].strftime("%Y-%m-%d"),
         stats_backtest=stats_backtest,
         stats_live=stats_live,
     )
@@ -227,8 +279,9 @@ def _simulate_dsl(
     state. The returned `final_weights` are the target; fills happen at the next
     open under our cost model. See docs/subsystems/paper-trading-updater.md.
     """
-    capital = float(strategy["portfolio_size"])
-    sim_start = pd.Timestamp(strategy.get("backfill_start") or strategy["deployed_on"])
+    darwin_curve = _darwin_equity_curve(strategy)
+    capital = _starting_capital(strategy, darwin_curve)
+    sim_start = pd.Timestamp(simulation_curve_start(strategy))
     live_since = pd.Timestamp(strategy["deployed_on"])
     cadence = int(strategy["rebalance_cadence_days"])
     cfg = costs.CostModel.from_spec(strategy["cost_model"])
@@ -314,7 +367,7 @@ def _simulate_dsl(
         equity_values.append(equity_close)
         curve.append({"d": day.strftime("%Y-%m-%d"), "v": round(equity_close, 2)})
 
-    equity = pd.Series(equity_values, index=sim_index)
+    curve, equity = _stitch_curve(darwin_curve, curve)
     stats = _stats(equity)
     stats_backtest, stats_live = _split_stats(equity, live_since)
     positions = _latest_positions(shares, closes.iloc[-1], equity_values[-1], universe)
@@ -324,7 +377,7 @@ def _simulate_dsl(
         stats=stats,
         positions=positions,
         trades=last_trades,
-        as_of=sim_index[-1].strftime("%Y-%m-%d"),
+        as_of=equity.index[-1].strftime("%Y-%m-%d"),
         stats_backtest=stats_backtest,
         stats_live=stats_live,
     )
