@@ -350,6 +350,55 @@
       "ticker": "WULF",
       "side": "sell",
       "weight": 0.0102
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-05-21",
+      "ticker": "AMZN",
+      "side": "sell",
+      "weight": 0.001
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-05-21",
+      "ticker": "GOOGL",
+      "side": "buy",
+      "weight": 0.2
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-05-21",
+      "ticker": "JNJ",
+      "side": "sell",
+      "weight": 0.1946
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-05-21",
+      "ticker": "JPM",
+      "side": "sell",
+      "weight": 0.1846
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-05-21",
+      "ticker": "NVDA",
+      "side": "sell",
+      "weight": 0.014
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-05-21",
+      "ticker": "UNH",
+      "side": "buy",
+      "weight": 0.2
+    },
+    {
+      "strategy_id": "open_momentum_v1",
+      "d": "2026-05-21",
+      "ticker": "XOM",
+      "side": "sell",
+      "weight": 0.0106
     }
   ]
 }

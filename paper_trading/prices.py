@@ -21,9 +21,11 @@ only — CI never sets it, so committed data always comes from real prices.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import time
 from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -46,6 +48,8 @@ _OHLCV_COLUMNS = ["date", "ticker", "open", "high", "low", "close", "adj_close",
 DEFAULT_FETCH_CHUNK = int(os.environ.get("PAPER_TRADING_FETCH_CHUNK", "150"))
 DEFAULT_FETCH_PAUSE = float(os.environ.get("PAPER_TRADING_FETCH_PAUSE", "1.0"))
 DEFAULT_REQUESTS_PER_SEC = int(os.environ.get("PAPER_TRADING_REQUESTS_PER_SEC", "4"))
+DEFAULT_CACHE_DIR = Path(__file__).resolve().parent.parent / ".cache" / "paper_trading" / "ohlcv"
+CACHE_VERSION = 1
 
 
 def _package_version_at_least(package: str, minimum: tuple[int, ...]) -> bool:
@@ -83,6 +87,77 @@ def make_limiter_session(per_second: int = DEFAULT_REQUESTS_PER_SEC):
         return None
 
 
+def _price_cache_enabled() -> bool:
+    if use_synthetic():
+        return False
+    return os.environ.get("PAPER_TRADING_PRICE_CACHE", "1").lower() not in (
+        "0",
+        "false",
+        "no",
+    )
+
+
+def _price_cache_dir(cache_dir: str | Path | None = None) -> Path:
+    raw = cache_dir or os.environ.get("PAPER_TRADING_PRICE_CACHE_DIR")
+    return Path(raw) if raw else DEFAULT_CACHE_DIR
+
+
+def _chunk_cache_key(tickers: list[str], start: str, end: str) -> str:
+    payload = {
+        "v": CACHE_VERSION,
+        "tickers": sorted(tickers),
+        "start": str(pd.Timestamp(start).date()),
+        "end": str(pd.Timestamp(end).date()),
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
+
+
+def _read_chunk_cache(
+    tickers: list[str],
+    start: str,
+    end: str,
+    cache_dir: str | Path | None = None,
+) -> pd.DataFrame | None:
+    if not _price_cache_enabled():
+        return None
+    path = _price_cache_dir(cache_dir) / f"{_chunk_cache_key(tickers, start, end)}.csv.gz"
+    if not path.exists():
+        return None
+    try:
+        df = pd.read_csv(path, parse_dates=["date"])
+    except Exception as exc:  # noqa: BLE001
+        print(f"  price cache read failed ({path.name}: {exc}); refetching")
+        return None
+    present = set(df.get("ticker", []))
+    if not set(tickers).issubset(present):
+        return None
+    return df[_OHLCV_COLUMNS]
+
+
+def _write_chunk_cache(
+    tickers: list[str],
+    start: str,
+    end: str,
+    df: pd.DataFrame,
+    cache_dir: str | Path | None = None,
+) -> None:
+    if not _price_cache_enabled() or df.empty:
+        return
+    present = set(df.get("ticker", []))
+    if not set(tickers).issubset(present):
+        return
+    directory = _price_cache_dir(cache_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{_chunk_cache_key(tickers, start, end)}.csv.gz"
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        df[_OHLCV_COLUMNS].to_csv(tmp, index=False, compression="gzip")
+        tmp.replace(path)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  price cache write failed ({path.name}: {exc})")
+
+
 def get_ohlcv_chunked(
     tickers: list[str],
     start: str,
@@ -92,6 +167,7 @@ def get_ohlcv_chunked(
     chunk: int = DEFAULT_FETCH_CHUNK,
     pause: float = DEFAULT_FETCH_PAUSE,
     threads: bool = False,
+    cache_dir: str | Path | None = None,
 ) -> pd.DataFrame:
     """Long-format OHLCV for many tickers, fetched politely in batches.
 
@@ -114,6 +190,11 @@ def get_ohlcv_chunked(
     starts = list(range(0, len(tickers), max(chunk, 1)))
     for bi, i in enumerate(starts):
         group = tickers[i : i + chunk]
+        df = _read_chunk_cache(group, start, end, cache_dir)
+        if df is not None:
+            print(f"  cache hit batch {bi + 1}/{len(starts)} ({len(group)} tickers)")
+            frames.append(df)
+            continue
         try:
             df = get_ohlcv(group, start, end, session=session, threads=threads)
         except Exception as exc:  # noqa: BLE001 — one bad batch shouldn't sink the run
@@ -121,6 +202,7 @@ def get_ohlcv_chunked(
             df = None
         if df is not None and not df.empty:
             frames.append(df)
+            _write_chunk_cache(group, start, end, df, cache_dir)
         if pause and bi < len(starts) - 1:
             time.sleep(pause)
 

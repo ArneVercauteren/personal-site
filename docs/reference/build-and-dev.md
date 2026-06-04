@@ -19,9 +19,10 @@ npm run lint                # eslint
 ```powershell
 pip install -r paper_trading/requirements.txt   # first time
 python -m paper_trading.update                  # regenerate public/data/*.json locally
+python -m paper_trading.update --strategy gen0194  # update one open strategy
 ```
 
-Run this after changing anything in `paper_trading/`, then inspect the regenerated `public/data/*.json` before committing. In production it runs in GitHub Actions on a cron and commits the JSON; see [subsystems/scheduled-job.md](../subsystems/scheduled-job.md).
+Run this after changing anything in `paper_trading/`, then inspect the regenerated `public/data/*.json` before committing. Yahoo fetch chunks are cached locally in `.cache/paper_trading/ohlcv` so interrupted local runs can resume completed chunks; use `PAPER_TRADING_PRICE_CACHE=0` to bypass that cache. In production it runs in GitHub Actions on a cron and commits the JSON; see [subsystems/scheduled-job.md](../subsystems/scheduled-job.md).
 
 ## AI instruction docs
 

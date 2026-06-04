@@ -18,7 +18,9 @@ clobbering each other in the shared files — see
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -34,8 +36,20 @@ DATA_DIR = REPO_ROOT / "public" / "data"
 WARMUP_DAYS = 400
 
 
-def load_strategy_specs() -> list[dict]:
+def _split_strategy_ids(values: list[str] | None = None) -> set[str] | None:
+    raw: list[str] = []
+    for value in values or []:
+        raw.extend(value.split(","))
+    for env_name in ("PAPER_TRADING_STRATEGY", "PAPER_TRADING_STRATEGIES"):
+        if os.environ.get(env_name):
+            raw.extend(os.environ[env_name].split(","))
+    ids = {v.strip() for v in raw if v.strip()}
+    return ids or None
+
+
+def load_strategy_specs(strategy_ids: set[str] | None = None) -> list[dict]:
     specs = []
+    seen: set[str] = set()
     for path in sorted(STRATEGY_DIR.glob("*.json")):
         spec = json.loads(path.read_text(encoding="utf-8"))
         if spec.get("visibility") != "open":
@@ -43,7 +57,13 @@ def load_strategy_specs() -> list[dict]:
                 f"{path.name}: only 'open' strategies belong in the public repo; "
                 f"got visibility={spec.get('visibility')!r}"
             )
-        specs.append(spec)
+        seen.add(spec["id"])
+        if strategy_ids is None or spec["id"] in strategy_ids:
+            specs.append(spec)
+    if strategy_ids is not None:
+        missing = sorted(strategy_ids - seen)
+        if missing:
+            raise ValueError(f"unknown open strategy id(s): {', '.join(missing)}")
     return specs
 
 
@@ -121,11 +141,13 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
-def run() -> str:
-    specs = load_strategy_specs()
+def run(strategy_ids: set[str] | None = None) -> str:
+    specs = load_strategy_specs(strategy_ids)
     if not specs:
         print("no open strategies declared; nothing to do")
         return ""
+    if strategy_ids is not None:
+        print(f"selected strategies: {', '.join(sorted(strategy_ids))}")
 
     owned_ids = {s["id"] for s in specs}
     portfolio_entries: list[dict] = []
@@ -225,6 +247,25 @@ def run() -> str:
     return latest_date
 
 
-if __name__ == "__main__":
-    as_of = run()
+def main(argv: list[str] | None = None) -> str:
+    parser = argparse.ArgumentParser(
+        description="Regenerate open paper-trading JSON snapshots."
+    )
+    parser.add_argument(
+        "--strategy",
+        action="append",
+        default=[],
+        help=(
+            "Only update the given open strategy id. May be repeated or "
+            "comma-separated. Env: PAPER_TRADING_STRATEGY / PAPER_TRADING_STRATEGIES."
+        ),
+    )
+    args = parser.parse_args(argv)
+    strategy_ids = _split_strategy_ids(args.strategy)
+    as_of = run(strategy_ids)
     print(f"done; as_of={as_of} (synthetic={prices.use_synthetic()})")
+    return as_of
+
+
+if __name__ == "__main__":
+    main()

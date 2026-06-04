@@ -17,11 +17,16 @@ from a private repo — see [secured-updater.md](secured-updater.md) and
 
 - `paper_trading/update.py` — entry point (`python -m paper_trading.update`). Loads strategy
   specs, runs the sim, and **merges** the results into `public/data/*.json` by id (see
-  "Merge, not overwrite" below). Run locally or by GitHub Actions.
+  "Merge, not overwrite" below). Run locally or by GitHub Actions. For local debugging, pass
+  `--strategy <id>` (repeatable / comma-separated) or set `PAPER_TRADING_STRATEGY=<id>` to update
+  only selected open entries.
 - `paper_trading/prices.py` — keyless price adapter. `get_ohlcv(...)` → long-format OHLCV (what
   the DSL evaluator consumes); `get_price_history(...)` → adjusted `(opens, closes)` wide frames
   (the simulator's accounting). `PAPER_TRADING_SYNTHETIC=1` swaps in deterministic synthetic bars
-  for offline dev/tests; CI never sets it, so committed data always comes from real prices.
+  for offline dev/tests; CI never sets it, so committed data always comes from real prices. Yahoo
+  fetch chunks are cached under `.cache/paper_trading/ohlcv` by default so interrupted local runs can
+  resume completed chunks; set `PAPER_TRADING_PRICE_CACHE=0` to bypass it or
+  `PAPER_TRADING_PRICE_CACHE_DIR=<path>` to move it.
 - `paper_trading/signals.py` — two evaluation paths. `evaluate(signal, closes, asof)` is the
   built-in **option A** momentum rule (`cross_sectional_momentum`). `evaluate_formula(...)` runs a
   real Darwin king's **DSL tree** via the vendored evaluator; `formula_state_features(...)` reports
@@ -69,6 +74,8 @@ are NaN, handled).
    prefix is used directly and Yahoo starts at the prefix's final date; otherwise Yahoo starts at
    `backfill_start` or `deployed_on`. Daily bars are fetched over `[simulation_start − warmup,
    today]` via `prices.get_ohlcv`. DSL warmup is sized from the formula's longest feature window.
+   Each successful Yahoo chunk is written to the local OHLCV cache immediately, before simulation
+   starts, so an interrupted fetch phase can reuse completed chunks on the next run.
 2. Re-evaluate on each rebalance date → target holdings: the DSL tree via the vendored evaluator
    (`signals.evaluate_formula`) or the momentum rule (`signals.evaluate`).
 3. Apply fills at the next bar's open, then charge the Darwin cost haircut for that rebalance
