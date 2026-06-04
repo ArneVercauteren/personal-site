@@ -12,7 +12,7 @@ import {
   YAxis,
 } from "recharts";
 import type { EquityPoint } from "@/lib/data";
-import { money, shortDate } from "@/lib/format";
+import { axisDate, compactMoney, money, shortDate, spanDays } from "@/lib/format";
 import { CHART } from "@/components/charts/chartColors";
 
 export type RegimeKind = "training" | "oos" | "live";
@@ -77,6 +77,10 @@ export function RegimeEquityChart({
   const min = Math.min(...values);
   const max = Math.max(...values);
   const pad = (max - min) * 0.08 || max * 0.02;
+  // Compact y labels (e.g. "$147M") once values run into the millions, where a
+  // full "$146,638,651" would overflow the axis; full money below that.
+  const fmtY = (v: number) => (max >= 1_000_000 ? compactMoney(v, currency) : money(v, currency));
+  const span = spanDays(first, last);
   const up = points[points.length - 1].v >= points[0].v;
   const stroke = up ? CHART.gain : CHART.loss;
 
@@ -114,13 +118,7 @@ export function RegimeEquityChart({
             ))}
             <XAxis
               dataKey="d"
-              tickFormatter={(d: string) =>
-                new Date(d + "T00:00:00Z").toLocaleDateString("en-US", {
-                  month: "short",
-                  year: "2-digit",
-                  timeZone: "UTC",
-                })
-              }
+              tickFormatter={(d: string) => axisDate(d, span)}
               tick={{ fill: CHART.inkMuted, fontSize: 10 }}
               tickLine={false}
               axisLine={{ stroke: CHART.grid }}
@@ -129,7 +127,7 @@ export function RegimeEquityChart({
             <YAxis
               width={56}
               domain={[min - pad, max + pad]}
-              tickFormatter={(v: number) => money(v, currency)}
+              tickFormatter={fmtY}
               tick={{ fill: CHART.inkMuted, fontSize: 10 }}
               tickLine={false}
               axisLine={false}

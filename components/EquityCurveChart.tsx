@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import type { EquityPoint } from "@/lib/data";
-import { money, shortDate } from "@/lib/format";
+import { axisDate, compactMoney, money, shortDate, spanDays } from "@/lib/format";
 import { CHART } from "@/components/charts/chartColors";
 
 // Full equity curve: a terminal-style line with a faint grid, a soft area
@@ -36,6 +36,12 @@ export function EquityCurveChart({
   const min = Math.min(...values);
   const max = Math.max(...values);
   const pad = (max - min) * 0.08 || max * 0.02;
+  // Compact y labels (e.g. "$147M") once values run into the millions, where a
+  // full "$146,638,651" would overflow the narrow axis; full money below that.
+  const fmtY = (v: number) => (max >= 1_000_000 ? compactMoney(v, currency) : money(v, currency));
+  // Adaptive x labels: wide spans collapse the date to the year so a multi-year
+  // curve isn't labelled with ambiguous "Apr 01"-style month/day-looking ticks.
+  const span = spanDays(points[0].d, points[points.length - 1].d);
 
   // Shared axis/grid/tooltip config (recharts needs these as direct children,
   // so we spread plain prop objects rather than wrap them in components).
@@ -46,14 +52,7 @@ export function EquityCurveChart({
   } as const;
   const xProps = {
     dataKey: "d",
-    // Include the year — a multi-year curve labelled with month names alone
-    // repeats "Jan", "Feb", … ambiguously across years.
-    tickFormatter: (d: string) =>
-      new Date(d + "T00:00:00Z").toLocaleDateString("en-US", {
-        month: "short",
-        year: "2-digit",
-        timeZone: "UTC",
-      }),
+    tickFormatter: (d: string) => axisDate(d, span),
     tick: { fill: CHART.inkMuted, fontSize: 10 },
     tickLine: false,
     axisLine: { stroke: CHART.grid },
@@ -62,7 +61,7 @@ export function EquityCurveChart({
   const yProps = {
     width: 52,
     domain: [min - pad, max + pad] as [number, number],
-    tickFormatter: (v: number) => money(v, currency),
+    tickFormatter: fmtY,
     tick: { fill: CHART.inkMuted, fontSize: 10 },
     tickLine: false,
     axisLine: false,

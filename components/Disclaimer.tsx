@@ -8,8 +8,7 @@ export function Disclaimer() {
       </span>
       <p className="mt-1">
         This is a <span className="text-ink">simulated paper portfolio</span> —
-        no broker, no real money, no orders. It is <strong>not investment
-        advice</strong>.
+        no real money.
       </p>
     </div>
   );

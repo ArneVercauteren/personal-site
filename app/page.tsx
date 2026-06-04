@@ -8,7 +8,7 @@ const featured = [
     eyebrow: "Project",
     label: "Astralanx",
     blurb:
-      "A system for evolving stock-picking strategies — how it works and what it has found.",
+      "A GP system for synthesizing long-term stock-picking strategies.",
   },
   {
     href: "/astralanx/live",

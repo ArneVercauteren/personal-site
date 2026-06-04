@@ -21,6 +21,49 @@ export function money(value: number, currency = "USD"): string {
 }
 
 /**
+ * Compact money for chart axes, e.g. 146638651 -> "$147M", 940580 -> "$941K".
+ * A full-precision `money()` label (e.g. "$146,638,651") overflows a narrow
+ * y-axis and gets clipped; the compact form keeps the axis legible at any
+ * magnitude. Tooltips still use `money()` for the exact figure.
+ */
+export function compactMoney(value: number, currency = "USD"): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+/**
+ * Adaptive x-axis date label for an equity curve, chosen by how many days the
+ * visible window spans. A multi-year curve labelled "MMM YY" reads ambiguously
+ * ("Apr 01" looks like April 1st, not April 2001), so wide spans collapse to the
+ * year alone and medium spans mark the year with an apostrophe.
+ *   span > ~2y   -> "2001"
+ *   span > ~4mo  -> "Apr '01"
+ *   else         -> "Apr 3"
+ */
+export function axisDate(iso: string, spanDays: number): string {
+  const d = new Date(iso + "T00:00:00Z");
+  if (spanDays > 730) {
+    return String(d.getUTCFullYear());
+  }
+  const month = d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  if (spanDays > 120) {
+    return `${month} '${String(d.getUTCFullYear()).slice(-2)}`;
+  }
+  return `${month} ${d.getUTCDate()}`;
+}
+
+/** Whole days between two ISO dates (YYYY-MM-DD), order-independent. */
+export function spanDays(fromIso: string, toIso: string): number {
+  const a = new Date(fromIso + "T00:00:00Z").getTime();
+  const b = new Date(toIso + "T00:00:00Z").getTime();
+  return Math.abs(b - a) / 86_400_000;
+}
+
+/**
  * Whole years from an ISO birth date (YYYY-MM-DD) to `now`.
  * Defaults to the current date — for statically rendered pages this is the
  * build-time date, so the age refreshes whenever the site is rebuilt.

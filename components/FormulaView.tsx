@@ -513,7 +513,7 @@ export function FormulaView({
         <li>
           <strong className="text-ink">Comparisons and logic</strong> act as 1 / 0 gates
           (shown in <span className="text-ink-muted/70">[ ]</span> brackets) that switch parts
-          of the score on or off. The score's absolute value is meaningless; only the
+          of the score on or off. The score&apos;s absolute value is meaningless; only the
           ordering across names selects the basket.
         </li>
       </ul>
