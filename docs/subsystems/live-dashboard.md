@@ -15,7 +15,8 @@ The reader side of the live data: the dashboard page and the chart/stat componen
 - `components/RegimeEquityChart.tsx` — Recharts equity curve with translucent `ReferenceArea` bands behind it for OOS/backtest history and live paper-trading (boundaries snapped to the nearest curve date), the live marker, and a regime legend. Detail-page only. Client component.
 - `components/FormulaView.tsx` — renders an **open** strategy's published `formula` DSL tree (from `lib/data.ts`) as a readable, math-like expression: indicator pills with window subscripts, infix operators (`×`, `÷`, `|·|`), the `top_n`/cadence summary, the `exit_root` rule, and an auto-generated indicator glossary. Pure server component (no Recharts, no client JS). Rendered in a `#formula` section on the detail page for open strategies that carry a formula; absent for signal-only open strategies and never shown for secured.
 - `components/DrawdownChart.tsx` — Recharts underwater plot derived from the equity curve (`value / running-peak − 1`); takes an optional `liveSince` marker. Client component.
-- `components/ExposureDonut.tsx` — Recharts donut + legend for secured sector/asset-class exposure. Client component.
+- `components/charts/CompositionDonut.tsx` — shared Recharts donut + legend for any set of labelled weighted slices that sum to ~1. The single rendering used by both the secured exposure donut and the open analytics sector-mix pie. Client component.
+- `components/ExposureDonut.tsx` — secured sector/asset-class exposure; a thin wrapper over `CompositionDonut` that maps `{group, weight}` slices and adds the secured heading/footnote. Client component.
 - `components/charts/chartColors.ts` — shared palette mirroring the Tailwind tokens (charts are client components and can't read Tailwind at runtime).
 - `components/StatsTable.tsx` — CAGR / Sharpe / max drawdown, mono/tabular. Reused for each regime card.
 - `components/Disclaimer.tsx` — the standing paper-only disclaimer.
@@ -48,4 +49,4 @@ See the recipe: [tasks/add-dashboard-chart.md](../tasks/add-dashboard-chart.md).
 
 ## Source files
 
-- `app/astralanx/live/page.tsx`, `app/astralanx/live/[id]/page.tsx`, `components/StrategyCard.tsx`, `components/EquityCurveChart.tsx`, `components/RegimeEquityChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx`, `components/FormulaView.tsx`, `components/charts/chartColors.ts`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.
+- `app/astralanx/live/page.tsx`, `app/astralanx/live/[id]/page.tsx`, `components/StrategyCard.tsx`, `components/EquityCurveChart.tsx`, `components/RegimeEquityChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx`, `components/charts/CompositionDonut.tsx`, `components/FormulaView.tsx`, `components/charts/chartColors.ts`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.

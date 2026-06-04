@@ -169,6 +169,11 @@ export default async function StrategyDetailPage({
   // out-of-sample window, and the live tail — each shaded distinctly behind the
   // curve. A strategy with no training/OOS provenance falls back to shading all
   // pre-live history as a single out-of-sample band.
+  // The last curve point strictly before the live date — the boundary the live
+  // regime starts at, and where pre-live (out-of-sample) history ends.
+  const preLiveEnd = liveSince
+    ? [...strategy.equity_curve].reverse().find((p) => p.d < liveSince)?.d
+    : lastD;
   const regimes: Regime[] = [];
   if (perf) {
     const trainingWindows = perf.training.windows ?? [
@@ -177,19 +182,22 @@ export default async function StrategyDetailPage({
     for (const w of trainingWindows) {
       regimes.push({ start: w.start, end: w.end, kind: "training", label: w.label });
     }
+    // The OOS *backtest run* (perf.oos) ends at Darwin's held-out window end,
+    // but the equity curve continues past it with Yahoo-filled simulation right
+    // up to the live date. That in-between stretch is still out-of-sample — the
+    // frozen formula on prices it was never fit on — so for the lifecycle bands
+    // and the OOS viewer we extend the OOS regime to the last pre-live point.
+    // (The Backtest stats panel below still reports perf.oos's own window.)
+    const oosBandEnd =
+      preLiveEnd && preLiveEnd > perf.oos.end ? preLiveEnd : perf.oos.end;
     regimes.push({
       start: perf.oos.start,
-      end: perf.oos.end,
+      end: oosBandEnd,
       kind: "oos",
       label: "OOS",
     });
-  } else {
-    const preLiveEnd = liveSince
-      ? [...strategy.equity_curve].reverse().find((p) => p.d < liveSince)?.d
-      : lastD;
-    if (firstD && preLiveEnd && firstD <= preLiveEnd) {
-      regimes.push({ start: firstD, end: preLiveEnd, kind: "oos", label: "OOS" });
-    }
+  } else if (firstD && preLiveEnd && firstD <= preLiveEnd) {
+    regimes.push({ start: firstD, end: preLiveEnd, kind: "oos", label: "OOS" });
   }
   if (liveSince && lastD) {
     regimes.push({ start: liveSince, end: lastD, kind: "live", label: "Live" });
@@ -269,7 +277,7 @@ export default async function StrategyDetailPage({
             title="Live (paper)"
             period={liveSince ? `since ${shortDate(liveSince)}` : undefined}
             stats={strategy.stats_live}
-            note="Real forward tracking since the live date — the only segment with no benefit of hindsight."
+            note="Real forward tracking since the live date using the Yahoo Finance API, and the same cost model as the backtests."
           />
         </Section>
       ) : null}
