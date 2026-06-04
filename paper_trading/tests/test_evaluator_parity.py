@@ -1,10 +1,10 @@
-"""Bit-exact parity: vendored evaluator vs Darwin's own select_tickers_on_date.
+"""Bit-exact parity: vendored evaluator vs Astralanx's own select_tickers_on_date.
 
-Skipped when the Darwin repo isn't importable (CI in the public repo), so it is
+Skipped when the Astralanx repo isn't importable (CI in the public repo), so it is
 a local correctness gate. Strategies here use NO portfolio-state features, which
 isolates evaluator-copy fidelity (state injection is tested separately).
 
-Set DARWIN_REPO to point at the Darwin checkout to enable.
+Set DARWIN_REPO to point at the Astralanx checkout to enable.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ TARGET_DATE = "2024-06-03"
 def darwin_select():
     fn = darwin_select_fn()
     if fn is None:
-        pytest.skip("Darwin repo not available (set DARWIN_REPO to enable parity tests)")
+        pytest.skip("Astralanx repo not available (set DARWIN_REPO to enable parity tests)")
     return fn
 
 

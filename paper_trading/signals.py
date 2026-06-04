@@ -2,7 +2,7 @@
 
 Given a strategy's published `signal` block and price history up to a rebalance
 date, return target ticker weights. This is a lightweight re-implementation of
-the deployed formula's semantics, not an import of the Darwin engine — see
+the deployed formula's semantics, not an import of the Astralanx engine — see
 `docs/concepts/separation-from-darwin.md` and the plan's §7 "option A".
 
 Only `visibility: "open"` strategies are evaluated here; their formulas are
@@ -29,7 +29,7 @@ class SignalError(ValueError):
 
 
 # ---------------------------------------------------------------------------
-# DSL path — delegate to the vendored Darwin evaluator (real king formulas).
+# DSL path — delegate to the vendored Astralanx evaluator (real king formulas).
 # ---------------------------------------------------------------------------
 
 
@@ -56,7 +56,7 @@ def evaluate_formula(
     market_series: pd.Series | None = None,
     min_adv: float | None = None,
 ) -> dict:
-    """Evaluate a real Darwin DSL formula on `asof` via the vendored evaluator.
+    """Evaluate a real Astralanx DSL formula on `asof` via the vendored evaluator.
 
     Returns the evaluator's full result dict (`final_weights`, `selected`,
     `scores`, ...). `prior_weights`/`prior_holdings` are the drifted actual

@@ -1,13 +1,13 @@
-"""Darwin-faithful transaction-cost model.
+"""Astralanx-faithful transaction-cost model.
 
-The paper simulator charges the **same** costs Darwin's backtest engine charges,
+The paper simulator charges the **same** costs Astralanx's backtest engine charges,
 so a strategy's live paper curve is consistent with the backtest it was selected
-on. Darwin applies cost as a multiplicative **equity haircut at each rebalance**
-(see `src/native/native_eval.c` and `src/backtest/cost_models.py` in the Darwin
+on. Astralanx applies cost as a multiplicative **equity haircut at each rebalance**
+(see `src/native/native_eval.c` and `src/backtest/cost_models.py` in the Astralanx
 repo), not as per-share fill slippage. This module reproduces that exactly.
 
 At a rebalance, with prior (drifted) weights `prev_w` and target weights
-`target_w`, Darwin computes:
+`target_w`, Astralanx computes:
 
     turnover  = Σ_j |target_w[j] − prev_w[j]|                       # gross; full rotation = 2.0
 
@@ -27,7 +27,7 @@ At a rebalance, with prior (drifted) weights `prev_w` and target weights
 where `harmonic_mean_price` is the harmonic mean of the **target-held** names'
 prices on the review date, `adv_j` is that name's review-date dollar volume
 (price × volume), and `vol_cost_mult` is a crisis-aware multiplier from realized
-vs long-run market volatility. The Darwin defaults below come from
+vs long-run market volatility. The Astralanx defaults below come from
 `src/config/engine.py` (`FinancialRealism` + `BacktestDiag`).
 """
 
@@ -39,14 +39,14 @@ import numpy as np
 
 __all__ = ["CostModel", "volatility_cost_multiplier", "rebalance_cost_fraction"]
 
-# Darwin defaults — keep in sync with Darwin's src/config/engine.py.
+# Astralanx defaults — keep in sync with Astralanx's src/config/engine.py.
 DEFAULT_SPREAD_REF_PRICE = 50.0
 DEFAULT_VOLUME_IMPACT_COEF = 0.5
 DEFAULT_VOL_COST_K = 0.75
 DEFAULT_VOL_COST_REALIZED_WINDOW = 63
 DEFAULT_VOL_COST_LONG_WINDOW = 252
 DEFAULT_VOL_COST_MULT_MAX = 3.0
-# The book size the sqrt volume-impact term sizes trades against. Darwin's
+# The book size the sqrt volume-impact term sizes trades against. Astralanx's
 # backtests use FinancialRealism.portfolio_size ($1M), independent of the
 # strategy's displayed/traded capital, so the live paper cost matches the
 # backtest. Authoritative per-spec via cost_model.impact_portfolio_size.
@@ -58,10 +58,10 @@ MIN_PRICE_SCALE = 0.1        # native_eval.c: price-scale floor (no upper cap)
 
 @dataclass(frozen=True)
 class CostModel:
-    """Cost parameters that mirror Darwin's `FinancialRealism` + `BacktestDiag`.
+    """Cost parameters that mirror Astralanx's `FinancialRealism` + `BacktestDiag`.
 
     Only `commission_bps` and `slippage_bps` are required; the rest default to
-    Darwin's engine defaults so older specs keep working unchanged.
+    Astralanx's engine defaults so older specs keep working unchanged.
     """
 
     commission_bps: float
@@ -95,7 +95,7 @@ def volatility_cost_multiplier(market_returns: np.ndarray, cfg: CostModel) -> fl
     """Crisis-aware cost multiplier ``clip(1 + k·sqrt(realized/long), 1, max)``.
 
     `market_returns` is a 1-D array of the equal-weighted market's daily returns
-    up to and including the review date. Mirrors Darwin's
+    up to and including the review date. Mirrors Astralanx's
     `_compute_volatility_cost_multiplier`: realized vol over the last
     `vol_cost_realized_window` points vs long-run vol over the last
     `vol_cost_long_window` (sample std, ddof=1). Returns 1.0 when disabled or on
@@ -136,7 +136,7 @@ def rebalance_cost_fraction(
     cfg: CostModel,
     vol_cost_mult: float = 1.0,
 ) -> dict:
-    """Total equity-haircut fraction for one rebalance, Darwin-faithful.
+    """Total equity-haircut fraction for one rebalance, Astralanx-faithful.
 
     Returns a breakdown dict with `turnover`, `effective_slippage_bps`,
     `commission_slippage_fraction`, `volume_impact_fraction`, and `total_fraction`
@@ -144,7 +144,7 @@ def rebalance_cost_fraction(
 
     `review_price` / `review_dollar_volume` are keyed by ticker at the review
     date. When `review_dollar_volume` is None the volume-impact term is skipped
-    entirely (mirrors Darwin running with no volume array), rather than charging
+    entirely (mirrors Astralanx running with no volume array), rather than charging
     the missing-ADV penalty. The volume-impact term sizes trades against
     `cfg.impact_portfolio_size` (the authoritative cost-model book size), not the
     strategy's traded capital — so live paper impact matches the backtest.

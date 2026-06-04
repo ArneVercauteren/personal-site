@@ -80,7 +80,7 @@ export function age(birthIso: string, now: Date = new Date()): number {
 }
 
 /**
- * Normalize a date string the Darwin exporter may emit with a time suffix
+ * Normalize a date string the Astralanx exporter may emit with a time suffix
  * ("2008-11-20 00:00:00") down to the bare ISO day ("2008-11-20"), which every
  * other helper here expects. Pass-through for already-bare dates.
  */

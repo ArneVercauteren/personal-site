@@ -1,14 +1,14 @@
 """Pure-Python single-date ticker selection (vendored, scrubbed).
 
-Vendored from Darwin `src/backtest/select_on_date.py`. Computes the exact
+Vendored from Astralanx `src/backtest/select_on_date.py`. Computes the exact
 features a strategy AST references, evaluates the tree in Python, applies the
 same eligibility restrictions as the backtest, and returns the selected tickers
 and target weights.
 
-Changes from the Darwin original (all behavior-preserving for evaluation):
+Changes from the Astralanx original (all behavior-preserving for evaluation):
   * imports rewired to the vendored siblings (`dsl_compat`, `eligibility`,
     `tree_eval`, `select_helpers`); no `src.` imports.
-  * realism defaults are module constants (mirroring Darwin engine.py) instead
+  * realism defaults are module constants (mirroring Astralanx engine.py) instead
     of `src.config.get_config()`.
   * all yfinance download/cache, benchmark-CSV, and CLI code removed — the
     caller always supplies `prices_override` (and optionally a market series).
@@ -37,7 +37,7 @@ from .eligibility import build_eligibility_mask
 
 _log = logging.getLogger(__name__)
 
-# Realism defaults — mirror Darwin src/config/engine.py.
+# Realism defaults — mirror Astralanx src/config/engine.py.
 MIN_PRICE = 10.0
 MIN_MEDIAN_DOLLAR_VOLUME = 5_000_000.0
 DEFAULT_PORTFOLIO_SIZE = 1_000_000.0
@@ -783,7 +783,7 @@ def _target_share_count(
 def _load_market_segment_ids(columns: pd.Index) -> np.ndarray | None:
     """No per-segment ranking in the public engine.
 
-    Darwin loads per-ticker market segment ids from universe metadata; the
+    Astralanx loads per-ticker market segment ids from universe metadata; the
     public paper-trading engine runs unsegmented universes, so segmentation is
     disabled (global cross-sectional rank). Documented parity boundary.
     """

@@ -1,7 +1,7 @@
-"""Tests for the Darwin-faithful cost model.
+"""Tests for the Astralanx-faithful cost model.
 
 Numbers are hand-derived from the formulas in `paper_trading/costs.py`, which
-mirror Darwin's `native_eval.c` cost block and `cost_models.py` multiplier.
+mirror Astralanx's `native_eval.c` cost block and `cost_models.py` multiplier.
 """
 
 from __future__ import annotations

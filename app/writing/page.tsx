@@ -12,7 +12,7 @@ export default function WritingPage() {
       <PageHeader
         eyebrow="Writing"
         title="Essays"
-        intro="Essays and notes on quantitative work, software, and whatever else is on my mind."
+        intro="Essays and notes on various topics."
       />
       <ContentList
         items={essays}

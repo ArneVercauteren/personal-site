@@ -21,7 +21,7 @@
         "vol_cost_long_window": 252,
         "vol_cost_mult_max": 3.0
       },
-      "blurb": "gen0194 \u2014 deployed from Darwin.",
+      "blurb": "gen0194 \u2014 this was the first useable strategy found by the engine, it uses an old naming scheme.",
       "performance": {
         "training": {
           "start": "2000-01-01",
@@ -105,7 +105,7 @@
             "sector_neutrality": {
               "status": "ok",
               "methodology": "Estimated using current SEC SIC-derived sectors. Portfolio sector weights are compared with equal-weight eligible-universe sector weights on each rebalance.",
-              "sector_map_source": "C:\\Users\\arnev\\Projects\\Darwin\\data\\reference\\mappings\\sec_sector_map.csv",
+              "sector_map_source": "SEC SIC-derived",
               "rebalance_observations": 120,
               "average_sector_active_share": 0.3957009563389045,
               "median_sector_active_share": 0.40699490199333493,
@@ -61559,7 +61559,7 @@
             "sector_neutrality": {
               "status": "ok",
               "methodology": "Estimated using current SEC SIC-derived sectors. Portfolio sector weights are compared with equal-weight eligible-universe sector weights on each rebalance.",
-              "sector_map_source": "C:\\Users\\arnev\\Projects\\Darwin\\data\\reference\\mappings\\sec_sector_map.csv",
+              "sector_map_source": "SEC SIC-derived",
               "rebalance_observations": 36,
               "average_sector_active_share": 0.4013819279082475,
               "median_sector_active_share": 0.3860019712770474,
@@ -79025,7 +79025,7 @@
             "sector_neutrality": {
               "status": "ok",
               "methodology": "Estimated using current SEC SIC-derived sectors. Portfolio sector weights are compared with equal-weight eligible-universe sector weights on each rebalance.",
-              "sector_map_source": "C:\\Users\\arnev\\Projects\\Darwin\\data\\reference\\mappings\\sec_sector_map.csv",
+              "sector_map_source": "SEC SIC-derived",
               "rebalance_observations": 156,
               "average_sector_active_share": 0.39741522035935645,
               "median_sector_active_share": 0.4066072642964299,

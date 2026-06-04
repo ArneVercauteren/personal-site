@@ -1,6 +1,6 @@
 """Shared base indicator/fundamental sets used across evolution modules.
 
-Vendored verbatim from Darwin `src/evolution/indicator_constants.py`.
+Vendored verbatim from Astralanx `src/evolution/indicator_constants.py`.
 """
 
 from __future__ import annotations

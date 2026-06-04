@@ -5,7 +5,7 @@ to decide whether a transform wrapper (z/rank/log/qbin/lag/diff) applies to a
 feature or is stripped. The full `src/dsl/generator.py` is a 2000-line evolution
 module with config/feature-store dependencies; only this decision is needed for
 evaluation, so it is vendored here with its exact helpers and constants copied
-from Darwin's generator.py (the parts that build `_SELF_NORMALIZED_INDICATORS`
+from Astralanx's generator.py (the parts that build `_SELF_NORMALIZED_INDICATORS`
 and the fundamental / portfolio-state name sets).
 """
 

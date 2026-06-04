@@ -13,7 +13,7 @@ This repo is **independent** of the Darwin repo, and it contains **no secrets**.
 
 - **Price-data sources are keyless** to start (yfinance / stooq). If a source ever needs a credential, it comes from a **GitHub Actions secret** (for Tier 2) or a **Vercel/Cloudflare env var** (for Tier 1) — never a committed value.
 - **`.env*` is git-ignored.** No credential file is ever committed.
-- **Published strategy JSON is scrubbed.** The Tier-3 publish step strips internal absolute paths, internal-only fields, and anything secret before the JSON lands here. What arrives is the DSL tree + portable metadata, nothing more.
+- **Published strategy JSON is scrubbed.** The Tier-3 publish step strips internal absolute paths, internal-only fields, and anything secret before the JSON lands here. What arrives is the DSL tree + portable metadata, nothing more. As defense in depth — the exporter's `open_diagnostics` has leaked a `sector_map_source` pointing at an absolute Darwin-repo path before — the open updater **re-scrubs** the pass-through `performance` block via `paper_trading/publish_sanitize.py` (`scrub_internal_paths` + the `assert_no_internal_paths` guard) so a drive-letter / home-dir / UNC path fails the updater rather than reaching `public/data/`.
 
 ## Why both rules together
 
@@ -24,7 +24,7 @@ If the website repo could import Darwin, a leak in the website would expose Darw
 - [ ] No import path reaches `src/config/secrets.py` or any Darwin internal module.
 - [ ] No API keys committed; keyless sources or CI/host secrets only.
 - [ ] No trading/order/write endpoints exposed publicly.
-- [ ] Published strategy JSONs are scrubbed (no absolute paths, no internal-only fields).
+- [ ] Published strategy JSONs are scrubbed (no absolute paths, no internal-only fields); the open updater's `publish_sanitize` backstop + its committed-JSON test enforce this.
 - [ ] `.env` and credentials git-ignored.
 
 ## Related
@@ -39,4 +39,5 @@ If the website repo could import Darwin, a leak in the website would expose Darw
 - `paper_trading/darwin_eval/` — the vendored, scrubbed DSL evaluator (no `src.` imports).
 - `paper_trading/tests/test_evaluator_parity.py` — the test-only parity gate (the sole, guarded Darwin import).
 - `paper_trading/strategies/*.json` — scrubbed king exports (when published).
+- `paper_trading/publish_sanitize.py` — the open-updater path-scrub backstop (`scrub_internal_paths` / `assert_no_internal_paths`); `paper_trading/tests/test_publish_sanitize.py` also asserts no committed `public/data/*.json` carries an absolute path.
 - The Darwin repo's `scripts/publish_deployed_kings.py` — does the scrubbing (when built).

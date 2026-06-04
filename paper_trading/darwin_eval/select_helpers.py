@@ -1,6 +1,6 @@
 """Helpers extracted from ``select_tickers_on_date``.
 
-Vendored verbatim from Darwin `src/backtest/select_helpers.py`. Each function
+Vendored verbatim from Astralanx `src/backtest/select_helpers.py`. Each function
 captures one phase of per-date selection (pivots, eligibility, selection by
 mode, prior-holdings exit logic). No `src.` imports — numpy/pandas/stdlib only.
 """

@@ -165,21 +165,34 @@ export default async function StrategyDetailPage({
   const lastD = strategy.equity_curve.at(-1)?.d;
   const perf = meta?.performance;
 
-  // Lifecycle chart bands: everything before the live date is displayed as
-  // out-of-sample/backtest evidence. The original Darwin training/OOS split is
-  // still shown in the detailed stat panels below.
+  // Lifecycle chart bands: the in-sample training regime(s), the held-out
+  // out-of-sample window, and the live tail — each shaded distinctly behind the
+  // curve. A strategy with no training/OOS provenance falls back to shading all
+  // pre-live history as a single out-of-sample band.
   const regimes: Regime[] = [];
-  const firstLiveD = liveSince
-    ? strategy.equity_curve.find((p) => p.d >= liveSince)?.d
-    : undefined;
-  const preLiveEnd = liveSince
-    ? [...strategy.equity_curve].reverse().find((p) => p.d < liveSince)?.d
-    : lastD;
-  if (firstD && preLiveEnd && firstD <= preLiveEnd) {
-    regimes.push({ start: firstD, end: preLiveEnd, kind: "oos", label: "OOS" });
+  if (perf) {
+    const trainingWindows = perf.training.windows ?? [
+      { start: perf.training.start, end: perf.training.end },
+    ];
+    for (const w of trainingWindows) {
+      regimes.push({ start: w.start, end: w.end, kind: "training", label: w.label });
+    }
+    regimes.push({
+      start: perf.oos.start,
+      end: perf.oos.end,
+      kind: "oos",
+      label: "OOS",
+    });
+  } else {
+    const preLiveEnd = liveSince
+      ? [...strategy.equity_curve].reverse().find((p) => p.d < liveSince)?.d
+      : lastD;
+    if (firstD && preLiveEnd && firstD <= preLiveEnd) {
+      regimes.push({ start: firstD, end: preLiveEnd, kind: "oos", label: "OOS" });
+    }
   }
-  if (firstLiveD && lastD) {
-    regimes.push({ start: firstLiveD, end: lastD, kind: "live", label: "Live" });
+  if (liveSince && lastD) {
+    regimes.push({ start: liveSince, end: lastD, kind: "live", label: "Live" });
   }
 
   const cap = meta?.capacity;
@@ -187,7 +200,7 @@ export default async function StrategyDetailPage({
     meta?.active_share != null || cap?.liquidity_usd != null || cap?.impact_usd != null;
 
   // Show the deep-analytics CTA only when some run actually carries the rich
-  // open_diagnostics block (open strategies exported from Darwin).
+  // open_diagnostics block (open strategies exported from Astralanx).
   const hasAnalytics = perf
     ? [perf.combined, perf.oos, perf.training].some((r) => r?.open_diagnostics)
     : false;
@@ -234,11 +247,13 @@ export default async function StrategyDetailPage({
         </Link>
       ) : null}
 
-      <Section eyebrow="Lifecycle" title="Out-of-sample → live">
+      <Section eyebrow="Lifecycle" title="Training → out-of-sample → live">
         <p className="mb-4 max-w-prose text-sm text-ink-muted">
-          Everything before the live marker is grouped as out-of-sample backtest
-          history on this chart; the Darwin training/OOS breakdown remains in
-          the stat panels below.
+          The curve is shaded by phase: the in-sample{" "}
+          <span className="text-ink">training</span> window(s) it was fit on, the
+          held-out <span className="text-ink">out-of-sample</span> window, and{" "}
+          <span className="text-ink">live</span> paper-trading after the marker.
+          Per-phase stats are in the panels below.
         </p>
         <EquityExplorer
           points={strategy.equity_curve}

@@ -1,6 +1,6 @@
 """Operator dispatch tables for ``evaluate_tree``.
 
-Vendored verbatim from Darwin `src/backtest/tree_eval.py`. All operators accept
+Vendored verbatim from Astralanx `src/backtest/tree_eval.py`. All operators accept
 already-evaluated child values; control-flow constructs that need short-circuit
 semantics stay in the dispatcher in ``select_on_date``.
 """

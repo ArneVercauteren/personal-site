@@ -2,7 +2,7 @@
 
 Path-dependent DSL features (drawdown, invested fraction, trailing turnover /
 volatility / hit-rate, ...) are computed at runtime during a backtest, not
-stored in the feature store. The authoritative implementation is Darwin's
+stored in the feature store. The authoritative implementation is Astralanx's
 native engine (`src/native/native_eval.c`); this module ports its exact
 semantics into Python so the paper simulator feeds a deployed king the same
 state inputs the engine would.

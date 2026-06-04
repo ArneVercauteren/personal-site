@@ -2,7 +2,7 @@
 
 Walks a strategy forward from its simulation start to the last available bar.
 The start is `backfill_start` / `deployed_on`, or the final date of an
-authoritative Darwin `darwin_equity_curve` prefix when provided:
+authoritative Astralanx `darwin_equity_curve` prefix when provided:
 
   * On each rebalance date, evaluate the signal (`signals.evaluate`) to get
     target weights and execute the implied trades at the **next** bar's open,
@@ -68,7 +68,7 @@ def _darwin_equity_curve(strategy: dict) -> list[dict]:
 def simulation_curve_start(strategy: dict) -> str:
     """First date the Yahoo-backed simulator must cover for this spec.
 
-    Darwin can export the authoritative training+OOS prefix. When present, the
+    Astralanx can export the authoritative training+OOS prefix. When present, the
     site only needs Yahoo data from that prefix's last date onward.
     """
     curve = _darwin_equity_curve(strategy)
@@ -115,7 +115,7 @@ def _rebalance_dates(index: pd.DatetimeIndex, deployed_on: pd.Timestamp, cadence
 def _market_returns(closes: pd.DataFrame) -> pd.Series:
     """Equal-weighted market daily-return proxy (mean across tickers).
 
-    Feeds the volatility cost multiplier, mirroring Darwin's market proxy
+    Feeds the volatility cost multiplier, mirroring Astralanx's market proxy
     (`nanmean` of per-ticker returns) in `cost_models.py`.
     """
     return closes.pct_change().mean(axis=1)
@@ -200,11 +200,11 @@ def simulate(
 ) -> SimResult:
     """Simulate a strategy. Dispatches on the spec:
 
-    * ``formula`` (a DSL tree) → the real vendored Darwin evaluator, with
+    * ``formula`` (a DSL tree) → the real vendored Astralanx evaluator, with
       engine-faithful portfolio-state threading. Requires ``prices_long``.
     * ``signal`` (a momentum block) → the lightweight built-in path.
 
-    Costs are charged the Darwin way (see `costs.py`): a per-rebalance equity
+    Costs are charged the Astralanx way (see `costs.py`): a per-rebalance equity
     haircut from turnover-scaled commission + price-scaled slippage + sqrt volume
     impact. `dollar_volume` (review-date `price × volume`) and `raw_closes`
     (nominal price) feed that model; both are optional — without `dollar_volume`
@@ -256,7 +256,7 @@ def _simulate_signal(
 
     for i, day in enumerate(sim_index):
         # Execute the previous rebalance's target at today's open, then charge
-        # the Darwin equity haircut computed on the review date.
+        # the Astralanx equity haircut computed on the review date.
         if pending_target and i > 0:
             equity_open = cash + _position_value(shares, opens.loc[day], tickers)
             shares, cash, trades = _apply_targets(
@@ -313,7 +313,7 @@ def _simulate_dsl(
 
     At each rebalance the formula is evaluated with the **drifted actual** prior
     weights and engine-faithful portfolio-state features (drawdown, trailing
-    turnover/volatility/hit-rate), matching how Darwin's backtest engine carries
+    turnover/volatility/hit-rate), matching how Astralanx's backtest engine carries
     state. The returned `final_weights` are the target; fills happen at the next
     open under our cost model. See docs/subsystems/paper-trading-updater.md.
     """
@@ -349,7 +349,7 @@ def _simulate_dsl(
 
     for i, day in enumerate(sim_index):
         # Execute the previous rebalance's target at today's open, then charge
-        # the Darwin equity haircut computed on the review date.
+        # the Astralanx equity haircut computed on the review date.
         if pending_target is not None and i > 0:
             equity_open = cash + _position_value(shares, opens.loc[day], universe)
             shares, cash, trades = _apply_targets(
@@ -421,7 +421,7 @@ def _apply_targets(targets, shares, cash, open_px, equity, tickers):
     """Move holdings toward `targets` at today's open (cost-free fills).
 
     Fills happen at the open with no per-share slippage or commission — costs are
-    charged separately as a Darwin-style equity haircut (see `costs.py`), so the
+    charged separately as a Astralanx-style equity haircut (see `costs.py`), so the
     fill itself is equity-neutral. Returns (new_shares, new_cash, trades) where
     each trade records the *change in weight* for the ticker.
     """

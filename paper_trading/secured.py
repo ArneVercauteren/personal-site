@@ -42,7 +42,7 @@ CASH_GROUP = "Cash"
 # rather than failing the whole update. See docs/subsystems/secured-updater.md.
 OTHER_GROUP = "Other"
 
-# Bundled ticker → sector map (non-secret, SEC-derived, imported from Darwin).
+# Bundled ticker → sector map (non-secret, SEC-derived, imported from Astralanx).
 # Lives in the public engine so both the open updater and the private secured
 # updater can share one source of truth.
 DEFAULT_SECTOR_MAP_PATH = Path(__file__).resolve().parent / "ticker_sectors.json"

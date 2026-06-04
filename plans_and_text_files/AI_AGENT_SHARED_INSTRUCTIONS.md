@@ -28,6 +28,8 @@ These are the things easiest to break by accident. Full discussion in [docs/conc
 
 **If your change shifts a contract a test pins (the data-contract shape, a formatting helper, a snapshot fixture), update the test in the same change.** Never silence with `.skip`/`xfail`/`--ignore`. Full rule: [docs/playbook/test-maintenance.md]({{ROOT_PREFIX}}docs/playbook/test-maintenance.md).
 
+**Do not rewrite existing public-site wording unless the user explicitly asks for copy changes.** Treat existing phrasing in `app/`, `content/`, and visible component text as intentional. Fix only the requested wording, factual errors the user asked you to correct, or text that must change because the underlying behavior changed.
+
 ## Workflow for AI making changes
 
 Condensed in [docs/playbook/ai-workflow.md]({{ROOT_PREFIX}}docs/playbook/ai-workflow.md). Summary:

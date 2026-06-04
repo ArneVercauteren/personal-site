@@ -10,13 +10,13 @@ import pytest
 
 from paper_trading import prices
 
-# Default location of the Darwin repo for parity tests; override with DARWIN_REPO.
+# Default location of the Astralanx repo for parity tests; override with DARWIN_REPO.
 _DARWIN_DEFAULT = r"C:\Users\arnev\Projects\Darwin"
 
 
 @pytest.fixture
 def universe() -> list[str]:
-    # Synthetic ticker names (not real symbols) so Darwin's segment map never
+    # Synthetic ticker names (not real symbols) so Astralanx's segment map never
     # matches them — keeps both evaluators on global (unsegmented) rank.
     return [f"T{i:02d}" for i in range(12)]
 
@@ -28,9 +28,9 @@ def long_prices(universe):
 
 
 def darwin_select_fn():
-    """Return Darwin's own `select_tickers_on_date`, or None if unavailable.
+    """Return Astralanx's own `select_tickers_on_date`, or None if unavailable.
 
-    Parity tests are skipped (not failed) when the Darwin repo isn't present, so
+    Parity tests are skipped (not failed) when the Astralanx repo isn't present, so
     CI in the public repo stays green.
     """
     repo = os.environ.get("DARWIN_REPO", _DARWIN_DEFAULT)

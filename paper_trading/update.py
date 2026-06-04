@@ -27,6 +27,7 @@ import pandas as pd
 
 from . import portfolio, prices, universe
 from .darwin_eval.select_on_date import collect_all_needed_features, required_history_days
+from .publish_sanitize import assert_no_internal_paths, scrub_internal_paths
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STRATEGY_DIR = Path(__file__).resolve().parent / "strategies"
@@ -90,7 +91,7 @@ def _spec_fetch_window(spec: dict) -> tuple[list[str], str]:
     """The tickers and earliest start date this spec's simulation needs.
 
     The Yahoo-backed window begins `warmup` days before the simulation curve
-    start (the Darwin prefix's last date when present, else `backfill_start` /
+    start (the Astralanx prefix's last date when present, else `backfill_start` /
     `deployed_on`), with enough lookback for the longest feature window.
     """
     tickers = universe.resolve_universe(spec)
@@ -213,12 +214,16 @@ def run(strategy_ids: set[str] | None = None) -> str:
             "cost_model": spec["cost_model"],
             "blurb": spec["blurb"],
         }
-        # Optional Darwin provenance for the detail page: the three single-seed
+        # Optional Astralanx provenance for the detail page: the three single-seed
         # runs (training / OOS / combined) plus king-level liquidity measures.
-        # Passed straight through; the site only displays it.
+        # Passed through, but scrubbed first: the exporter's `open_diagnostics`
+        # embeds absolute Darwin-repo paths (e.g. `sector_map_source`) that must
+        # never reach the public CDN-served JSON. `scrub_internal_paths` redacts
+        # them and `assert_no_internal_paths` fails the updater if any remains.
+        # See `docs/concepts/separation-from-darwin.md` and `publish_sanitize.py`.
         for key in ("performance", "active_share", "capacity"):
             if spec.get(key) is not None:
-                meta_entry[key] = spec[key]
+                meta_entry[key] = assert_no_internal_paths(scrub_internal_paths(spec[key]))
         meta_entries.append(meta_entry)
 
         open_trades.extend(dict(strategy_id=spec["id"], **t) for t in result.trades)

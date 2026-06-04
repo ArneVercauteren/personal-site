@@ -9,6 +9,7 @@ import { HelpTip } from "@/components/HelpTip";
 import { AnnualReturnsChart } from "@/components/AnnualReturnsChart";
 import { RollingSharpeChart } from "@/components/RollingSharpeChart";
 import { DivergingBarChart, type DivergingDatum } from "@/components/DivergingBarChart";
+import { CompositionDonut, type CompositionSlice } from "@/components/charts/CompositionDonut";
 import { PicksHistory } from "@/components/PicksHistory";
 import {
   loadPortfolio,
@@ -16,6 +17,7 @@ import {
   type CapacityMethod,
   type OpenDiagnostics,
   type PerformanceRun,
+  type PickRecord,
 } from "@/lib/data";
 import { money, pct, signedPct, shortDate } from "@/lib/format";
 
@@ -98,6 +100,25 @@ function CapacityCard({
   m: CapacityMethod;
 }) {
   const ex = m.metric_explanations ?? {};
+  // Method knobs, surfaced as a compact footnote. The impact model exposes the
+  // square-root coefficient + worst-name cap; the heuristic exposes its ADV
+  // participation rule.
+  const params: { label: string; value: string; help?: string }[] = [];
+  if (m.volume_impact_coef != null) {
+    params.push({ label: "impact coef", value: num2(m.volume_impact_coef), help: ex.volume_impact_coef });
+  }
+  if (m.max_allowed_single_name_impact_bps != null) {
+    params.push({ label: "worst-name cap", value: bps(m.max_allowed_single_name_impact_bps), help: ex.max_allowed_single_name_impact_bps });
+  }
+  if (m.participation_rate != null) {
+    params.push({ label: "ADV participation", value: pct(m.participation_rate, 0), help: ex.participation_rate });
+  }
+  if (m.adv_lookback_days != null) {
+    params.push({ label: "ADV lookback", value: `${m.adv_lookback_days}d`, help: ex.adv_lookback_days });
+  }
+  if (m.execution_days_cap != null) {
+    params.push({ label: "exec days", value: `${m.execution_days_cap}d`, help: ex.execution_days_cap });
+  }
   return (
     <div className="panel p-5">
       <h4 className="text-sm font-semibold text-ink">{title}</h4>
@@ -110,6 +131,16 @@ function CapacityCard({
         <StatCell label="Impact @ 25th" value={bps(m.p25_capacity_estimated_impact_bps)} help={ex.p25_capacity_estimated_impact_bps} />
         <StatCell label="Rebalances" value={String(m.rebalance_observations)} help={ex.rebalance_observations} />
       </StatGrid>
+      {params.length > 0 ? (
+        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+          {params.map((p) => (
+            <span key={p.label}>
+              {p.label} <span className="text-ink">{p.value}</span>
+              <HelpTip text={p.help} />
+            </span>
+          ))}
+        </p>
+      ) : null}
       {m.current_worst_name_impact_bps_median != null &&
       m.current_worst_name_impact_bps_max != null ? (
         <p className="mt-3 text-xs text-ink-muted">
@@ -123,6 +154,35 @@ function CapacityCard({
       ) : null}
     </div>
   );
+}
+
+// Basket churn, derived from the sequence of target-weight baskets (the cost
+// model's turnover = Σ|wₜ − wₜ₋₁| over the union of names; a full rotation =
+// 2.0 = "two-way"). One-way is half that. Annualized using the rebalance
+// cadence so it's comparable to fund-reported turnover figures.
+function computeTurnover(records: PickRecord[], cadenceDays?: number) {
+  const sorted = [...records].sort((a, b) => a.date.localeCompare(b.date));
+  if (sorted.length < 2) return null;
+  let sumGross = 0;
+  let n = 0;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1].weights;
+    const curr = sorted[i].weights;
+    const names = new Set([...Object.keys(prev), ...Object.keys(curr)]);
+    let gross = 0;
+    for (const t of names) gross += Math.abs((curr[t] ?? 0) - (prev[t] ?? 0));
+    sumGross += gross;
+    n += 1;
+  }
+  const twoWay = sumGross / n;
+  const perYear = cadenceDays && cadenceDays > 0 ? 365.25 / cadenceDays : null;
+  return {
+    twoWay,
+    oneWay: twoWay / 2,
+    annualTwoWay: perYear ? twoWay * perYear : null,
+    annualOneWay: perYear ? (twoWay / 2) * perYear : null,
+    transitions: n,
+  };
 }
 
 export default async function StrategyAnalyticsPage({
@@ -158,6 +218,25 @@ export default async function StrategyAnalyticsPage({
         .map((s) => ({ label: s.name, value: s.value }))
         .sort((a, b) => b.value - a.value)
     : [];
+
+  // Average sector composition of the basket over the backtest. The export only
+  // carries the top sectors, so any residual weight is folded into an "Other
+  // sectors" slice to keep the pie summing to ~100%.
+  const sectorMix: CompositionSlice[] = sn
+    ? (() => {
+        const top = sn.top_average_portfolio_sectors.map((s) => ({
+          label: s.name,
+          value: s.value,
+        }));
+        const named = top.reduce((sum, s) => sum + s.value, 0);
+        const other = 1 - named;
+        return other > 0.005 ? [...top, { label: "Other sectors", value: other }] : top;
+      })()
+    : [];
+
+  const turnover = d.picks_records
+    ? computeTurnover(d.picks_records, meta.rebalance_cadence_days)
+    : null;
 
   return (
     <div>
@@ -266,6 +345,17 @@ export default async function StrategyAnalyticsPage({
             <StatCell label="Max deviation" value={pct(sn.average_max_sector_abs_deviation)} help={sn.metric_explanations?.average_max_sector_abs_deviation} />
             <StatCell label="Eff. sectors" value={num2(sn.average_effective_sector_count)} help={sn.metric_explanations?.average_effective_sector_count} />
           </StatGrid>
+          {sectorMix.length > 0 ? (
+            <div className="mt-5">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                Average sector mix
+              </p>
+              <CompositionDonut
+                slices={sectorMix}
+                footnote="Average share of the basket by SEC SIC-derived sector across the backtest; sectors outside the top holdings are grouped as “Other sectors.”"
+              />
+            </div>
+          ) : null}
           {sectorTilts.length > 0 ? (
             <div className="mt-5">
               <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
@@ -295,6 +385,45 @@ export default async function StrategyAnalyticsPage({
               m={cap.impact_model_capacity}
             />
           </div>
+        </Section>
+      ) : null}
+
+      {turnover ? (
+        <Section
+          eyebrow="Trading"
+          title="Turnover"
+          intro="Average basket churn between rebalances, measured from the target-weight baskets below. Two-way counts both buys and sells (a full rotation = 200%); one-way is half that."
+        >
+          <StatGrid cols={4}>
+            <StatCell
+              label="Two-way / rebalance"
+              value={pct(turnover.twoWay, 0)}
+              help="Average gross change in weights between consecutive rebalances — buys plus sells. A full portfolio rotation is 200%."
+            />
+            <StatCell
+              label="One-way / rebalance"
+              value={pct(turnover.oneWay, 0)}
+              help="Half the two-way figure — the share of the book actually replaced each rebalance."
+            />
+            {turnover.annualTwoWay != null ? (
+              <StatCell
+                label="Two-way / year"
+                value={pct(turnover.annualTwoWay, 0)}
+                help={`Per-rebalance two-way turnover annualized at the ${meta.rebalance_cadence_days}-day cadence (~${(365.25 / meta.rebalance_cadence_days).toFixed(1)} rebalances/yr).`}
+              />
+            ) : null}
+            {turnover.annualOneWay != null ? (
+              <StatCell
+                label="One-way / year"
+                value={pct(turnover.annualOneWay, 0)}
+                help="One-way turnover annualized at the rebalance cadence — comparable to fund-reported turnover."
+              />
+            ) : null}
+          </StatGrid>
+          <p className="mt-3 text-xs text-ink-muted">
+            Derived from {turnover.transitions.toLocaleString()} rebalance
+            transitions across the baskets below.
+          </p>
         </Section>
       ) : null}
 

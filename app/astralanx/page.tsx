@@ -37,14 +37,14 @@ function Bullets({ children }: { children: ReactNode }) {
   );
 }
 
-// Headline scale figures, gathered from the Darwin source tree. Honest,
-// de-duplicated counts: src/ Python (67,507 lines), the native_eval.c +
-// generator_native.c + ffill_fast.c kernels (12,522 lines), and the
+// Headline scale figures, gathered from the Astralanx source tree. Honest,
+// de-duplicated counts: src/ Python (~57,000 lines), the native_eval.c +
+// generator_native.c + ffill_fast.c kernels (~11,400 lines), and the
 // post-filter tradable universe (~3,500 names after the ≥$10 / ≥$5M median
 // dollar-volume screens; the raw listing file is far larger).
 const stats: { value: string; label: string }[] = [
-  { value: "65K+", label: "lines of Python" },
-  { value: "~12K", label: "lines of native C" },
+  { value: "~57K", label: "lines of Python" },
+  { value: "~11K", label: "lines of native C" },
   { value: "~3,500", label: "names in the tradable universe" },
 ];
 
@@ -111,7 +111,7 @@ export default function AstralanxPage() {
         </p>
       </Section>
 
-      <Section eyebrow="Data source" title="Tiingo price data, and nothing else">
+      <Section eyebrow="Data source" title="Tiingo price data">
         <p>
           Every strategy is purely price-based and cross-sectional. There are no
           fundamentals, no macro inputs, no alternative data, and no
@@ -148,6 +148,7 @@ export default function AstralanxPage() {
           NYSE, NASDAQ, AMEX, NYSE MKT, NYSE ARCA, and BATS exchanges. Forex,
           crypto, and mutual-fund entries are dropped at build time, along with
           obvious non-common share classes. It is important to note that this selection of exchanges is likely quite arbitrary, given their universe scale these strategies will likely work with any large stock-based universe.
+          (for the live trading component of this site, the yahoo finance API is used instead, but the simulated cost model from the engine is still applied)
         </p>
       </Section>
 
@@ -205,7 +206,7 @@ export default function AstralanxPage() {
           </li>
         </Bullets>
         <p>
-          Survivorship bias is handled the hard way. There is no
+          Survivorship bias is handled strictly. There is no
           present-day-survivors universe: a name becomes eligible only once it
           has actually begun trading in the historical record, and it leaves the
           universe once it is past its last real observation. When a name goes

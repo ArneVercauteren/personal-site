@@ -1,9 +1,9 @@
-"""Self-refreshing tradable universe — keyless, Darwin-independent.
+"""Self-refreshing tradable universe — keyless, Astralanx-independent.
 
 The paper sim needs a *current* set of tickers each deployed strategy picks from.
-Snapshotting Darwin's curated universe would inherit Darwin's data age (a king
+Snapshotting Astralanx's curated universe would inherit Astralanx's data age (a king
 deployed off six-month-old data could never hold anything newer), so instead this
-builds a fresh universe from public, keyless sources and the same filters Darwin
+builds a fresh universe from public, keyless sources and the same filters Astralanx
 uses:
 
 1. **Listings** — the Nasdaq Trader symbol directory (`nasdaqlisted.txt` +
@@ -11,11 +11,11 @@ uses:
    day, free and keyless, with ETF / test-issue flags. This is "the same
    exchanges", sourced from the exchanges (yfinance has no listing endpoint).
 2. **Symbol filters** — drop test issues, warrants / units / rights / preferred,
-   and leveraged / inverse products (regexes vendored from Darwin's
+   and leveraged / inverse products (regexes vendored from Astralanx's
    `src/data/ticker_filtering.py`).
 3. **Liquidity / price** — keep names with last close ≥ `min_price` and trailing
    median dollar volume ≥ `min_adv`, ranked by liquidity and capped to `cap` so
-   the daily sim's yfinance fetches stay bounded. These are Darwin's
+   the daily sim's yfinance fetches stay bounded. These are Astralanx's
    `FinancialRealism` thresholds, the same ones `darwin_eval/eligibility.py`
    re-applies at every rebalance.
 
@@ -56,7 +56,7 @@ DEFAULT_UNIVERSE_PATH = REPO_ROOT / "public" / "data" / "universe.json"
 NASDAQ_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
 
-# Darwin FinancialRealism defaults (src/config/engine.py).
+# Astralanx FinancialRealism defaults (src/config/engine.py).
 DEFAULT_MIN_PRICE = 10.0
 DEFAULT_MIN_ADV = 5_000_000.0
 DEFAULT_CAP = 1200
@@ -80,7 +80,7 @@ SKIP_TTL_DAYS = 180
 # Safety: never overwrite a good universe with a husk from a rate-limited run.
 MIN_RETENTION = 0.6
 
-# --- symbol filters (vendored from Darwin src/data/ticker_filtering.py) -------
+# --- symbol filters (vendored from Astralanx src/data/ticker_filtering.py) -------
 _NON_COMMON_SUFFIXES: set[str] = {
     "-WS", "-WS-A", "-WS-B", "-W", "-U", "-R", "-R-W", "-WD", "-CL",
 }

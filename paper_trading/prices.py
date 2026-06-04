@@ -230,7 +230,7 @@ def get_ohlcv(
     Columns: date, ticker, open, high, low, close, adj_close, volume. `close` is
     the raw (unadjusted) close used for the min-price eligibility rule; `adj_close`
     is split/dividend-adjusted and drives feature computation. This matches the
-    schema the vendored Darwin evaluator expects.
+    schema the vendored Astralanx evaluator expects.
 
     `session` (a rate-limited/cached requests session) and `threads` are passed to
     yfinance — the bulk universe build uses them to stay under Yahoo's rate limit
@@ -270,12 +270,12 @@ def long_to_wide(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def wide_raw_and_dollar_volume(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """`(raw_close, dollar_volume)` wide frames for the Darwin cost model.
+    """`(raw_close, dollar_volume)` wide frames for the Astralanx cost model.
 
     The cost model scales slippage by **nominal** share price and sizes market
     impact against **review-date dollar volume** — both of which are raw-price
     notions, so this returns the *unadjusted* close and `close × volume` (the
-    same `adv = price × volume` Darwin's engine uses). Indexed by date, columns
+    same `adv = price × volume` Astralanx's engine uses). Indexed by date, columns
     by ticker; callers align to the simulator's trading-day index.
     """
     raw_close = df.pivot_table(index="date", columns="ticker", values="close").sort_index()

@@ -1,6 +1,6 @@
 """Unified causal eligibility mask for cross-sectional computations.
 
-Vendored from Darwin `src/backtest/eligibility.py`. The only change from the
+Vendored from Astralanx `src/backtest/eligibility.py`. The only change from the
 original is that the `min_price` / `min_adv` fallback reads vendored module
 constants instead of `src.config.get_config()` (callers in `select_on_date`
 always pass explicit values, so this fallback is for safety only).
@@ -14,7 +14,7 @@ import numpy as np
 # Eligibility thresholds (constants; override via function args if needed)
 # ---------------------------------------------------------------------------
 _ADV_WINDOW_DEFAULT: int = 63  # trailing median window
-# Mirrors Darwin src/config/engine.py realism defaults.
+# Mirrors Astralanx src/config/engine.py realism defaults.
 _MIN_PRICE_DEFAULT: float = 10.0
 _MIN_MEDIAN_DOLLAR_VOLUME_DEFAULT: float = 5_000_000.0
 

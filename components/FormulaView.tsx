@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { FormulaNode, StrategyFormula } from "@/lib/data";
 
 // ---------------------------------------------------------------------------
-// FormulaView — renders a scrubbed Darwin DSL score tree as a readable, math-
+// FormulaView — renders a scrubbed Astralanx DSL score tree as a readable, math-
 // like expression. Pure presentation (server component): walks the tree the
 // same way the vendored evaluator does (paper_trading/darwin_eval), but emits
 // styled spans instead of numbers. The operator/indicator/transform tables and
@@ -488,7 +488,7 @@ export function FormulaView({
         ) : (
           " The highest-scoring names are held"
         )}
-        {cadence ? <>, refreshed about every {cadence}.</> : "."} The exact tree is
+        {cadence ? <>, refreshed about every {cadence}.</> : "."} The exact formula is
         published verbatim — nothing is hidden for open strategies.
       </p>
 
@@ -496,12 +496,12 @@ export function FormulaView({
         <li>
           <strong className="text-ink">Point-in-time.</strong> Every indicator is computed
           through the <em>prior</em> trading day, so a rebalance never peeks at the bar it
-          trades on — there is no look-ahead.
+          trades on, preventing look-ahead.
         </li>
         <li>
           <strong className="text-ink">Cross-sectional vs. time-series.</strong>{" "}
-          <code className="text-ink">rank</code> and <code className="text-ink">qbin</code>{" "}
-          compare a name against every other <em>eligible</em> name that day;{" "}
+          <code className="text-ink">rank</code> 
+           compares a name against every other <em>eligible</em> name that day;{" "}
           <code className="text-ink">z‑score</code> standardises a value against its own
           recent history.
         </li>
@@ -533,7 +533,7 @@ export function FormulaView({
             Exit rule
           </h4>
           <p className="mb-2 max-w-prose text-sm text-ink-muted">
-            Independently of the score, a held name is dropped when this gate becomes true.
+            Independently of the score, a held name is dropped when this gate becomes true. (if the gate is true, but the scoring formula still wants it, we ignore the exit rule)
           </p>
           <div className="panel overflow-x-auto p-4 font-mono text-sm leading-8 text-ink sm:text-[0.95rem]">
             {render(formula.exit_root)}

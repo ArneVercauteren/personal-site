@@ -57,7 +57,7 @@ interface StrategyBase {
 }
 
 /**
- * One node of a Darwin DSL formula tree — the scrubbed score expression an open
+ * One node of a Astralanx DSL formula tree — the scrubbed score expression an open
  * strategy publishes. A discriminated-ish union keyed on `kind`; every variant's
  * extra fields are optional so the reader stays tolerant of trees it renders but
  * doesn't evaluate. This is **open-only**: a secured entry must never carry it
@@ -94,7 +94,7 @@ export interface FormulaNode {
 
 /**
  * The published formula for an open strategy: the score expression (a
- * `FormulaNode` root) plus the top-level selection knobs Darwin attaches —
+ * `FormulaNode` root) plus the top-level selection knobs Astralanx attaches —
  * `top_n` (how many names it holds), an optional `exit_root` rule, and the
  * native `rebalance_interval`. Carries no secrets: open formulas are published
  * for auditability. See docs/concepts/open-vs-secured-strategies.md.
@@ -135,16 +135,16 @@ export interface CostModel {
   commission_bps: number;
   slippage_bps: number;
   /**
-   * Optional Darwin cost-model parameters. Omitted fields fall back to Darwin's
+   * Optional Astralanx cost-model parameters. Omitted fields fall back to Astralanx's
    * engine defaults in paper_trading/costs.py, so older specs keep working.
-   * See docs/concepts/data-contract.md and the Darwin methodology section.
+   * See docs/concepts/data-contract.md and the Astralanx methodology section.
    */
   /** Reference share price for price-scaled slippage (default 50). */
   spread_ref_price?: number;
   /** sqrt market-impact coefficient (default 0.5). */
   volume_impact_coef?: number;
   /** Authoritative book size the volume-impact term sizes trades against
-   *  (default Darwin's $1,000,000), independent of the traded portfolio_size. */
+   *  (default Astralanx's $1,000,000), independent of the traded portfolio_size. */
   impact_portfolio_size?: number;
   /** Crisis-aware vol cost scaling (defaults: enabled, k=0.75, 63/252d, max 3). */
   vol_scaled_cost_enable?: boolean;
@@ -155,9 +155,9 @@ export interface CostModel {
 }
 
 /**
- * A full per-run stat block from one deterministic (single-seed) Darwin
+ * A full per-run stat block from one deterministic (single-seed) Astralanx
  * backtest. Extends the headline `Stats` (cagr/sharpe/max_dd) with the richer
- * diagnostics Darwin records. Every extra field is optional — the detail page
+ * diagnostics Astralanx records. Every extra field is optional — the detail page
  * renders whatever the export provides. Numbers only; nothing secret, so this
  * publishes for secured strategies too.
  */
@@ -312,7 +312,7 @@ export interface PickRecord {
 }
 
 /**
- * The rich, optional analytics block the open Darwin exporter attaches to a
+ * The rich, optional analytics block the open Astralanx exporter attaches to a
  * run. Everything here is numbers / labels published for auditability — no
  * secret formula or internal path is ever read (the exporter's
  * `sector_map_source` and the duplicate `artifacts`/`holdings` payloads are
@@ -332,7 +332,7 @@ export interface OpenDiagnostics {
 }
 
 /**
- * One of the three single-seed runs the Darwin exporter records. `start`/`end`
+ * One of the three single-seed runs the Astralanx exporter records. `start`/`end`
  * is the window envelope; `windows` optionally lists sub-windows (e.g. the
  * training regimes) for display when the run spans more than one stretch.
  */
@@ -349,7 +349,7 @@ export interface PerformanceRun {
 }
 
 /**
- * The three runs Darwin computes for a deployed king: the in-sample training
+ * The three runs Astralanx computes for a deployed king: the in-sample training
  * window, the held-out out-of-sample window, and the two combined. Each is a
  * separate single-seed backtest, so the combined figures (Sharpe, max DD across
  * the boundary) are authoritative rather than stitched from the two halves.
@@ -371,7 +371,7 @@ export interface StrategyMeta {
   cost_model: CostModel;
   blurb: string;
   /**
-   * Optional provenance from Darwin (Tier 3), shown on the per-strategy detail
+   * Optional provenance from Astralanx (Tier 3), shown on the per-strategy detail
    * page. `performance` carries the three single-seed runs (training, OOS,
    * combined) each with detailed stats; `active_share` and `capacity` are
    * king-level liquidity/holdings measures. All optional and backward
