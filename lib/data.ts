@@ -131,6 +131,23 @@ export interface PortfolioFile {
   strategies: Strategy[];
 }
 
+export interface Benchmark {
+  id: string;
+  name: string;
+  /**
+   * Benchmark value series, normalized by the writer to `base_currency`.
+   * Charts rebase it to the visible strategy window before overlaying it.
+   */
+  equity_curve: EquityPoint[];
+}
+
+export interface BenchmarkFile {
+  /** Snapshot date, ISO. */
+  as_of: string;
+  base_currency: string;
+  benchmarks: Benchmark[];
+}
+
 export interface CostModel {
   commission_bps: number;
   slippage_bps: number;
@@ -414,6 +431,10 @@ function readJson<T>(file: string): T {
 
 export function loadPortfolio(): PortfolioFile {
   return readJson<PortfolioFile>("portfolio.json");
+}
+
+export function loadBenchmarks(): BenchmarkFile {
+  return readJson<BenchmarkFile>("benchmark.json");
 }
 
 export function loadStrategyMeta(): StrategiesFile {

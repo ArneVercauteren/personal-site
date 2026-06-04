@@ -8,6 +8,7 @@ export const CHART = {
   grid: "#222a35",
   panel: "#11151c",
   accent: "#39d0d8",
+  benchmark: "#e8b84c",
   gain: "#3fb950",
   loss: "#f85149",
 } as const;

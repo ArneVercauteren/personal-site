@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
 import { Disclaimer } from "@/components/Disclaimer";
 import { StrategyCard } from "@/components/StrategyCard";
-import { loadPortfolio, loadStrategyMeta, isOpen } from "@/lib/data";
+import { loadBenchmarks, loadPortfolio, loadStrategyMeta, isOpen } from "@/lib/data";
 import { shortDate } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Live" };
 
 export default function LivePage() {
   const portfolio = loadPortfolio();
+  const sp500 = loadBenchmarks().benchmarks.find((b) => b.id === "sp500");
   const metaById = new Map(
     loadStrategyMeta().strategies.map((m) => [m.id, m]),
   );
@@ -46,7 +47,12 @@ export default function LivePage() {
         {open.length > 0 ? (
           <div className="grid gap-5 lg:grid-cols-2">
             {open.map((s) => (
-              <StrategyCard key={s.id} strategy={s} meta={metaById.get(s.id)} />
+              <StrategyCard
+                key={s.id}
+                strategy={s}
+                meta={metaById.get(s.id)}
+                benchmark={sp500}
+              />
             ))}
           </div>
         ) : (
@@ -66,7 +72,12 @@ export default function LivePage() {
         {secured.length > 0 ? (
           <div className="grid gap-5 lg:grid-cols-2">
             {secured.map((s) => (
-              <StrategyCard key={s.id} strategy={s} meta={metaById.get(s.id)} />
+              <StrategyCard
+                key={s.id}
+                strategy={s}
+                meta={metaById.get(s.id)}
+                benchmark={sp500}
+              />
             ))}
           </div>
         ) : (

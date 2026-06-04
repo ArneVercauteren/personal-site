@@ -13,10 +13,12 @@ The boundary between Tier 2 (the Python updater that *writes* JSON) and Tier 1 (
 | File | Tier | Role |
 |---|---|---|
 | `public/data/portfolio.json` | published | equity curve, stats, and (open only) positions per strategy |
+| `public/data/benchmark.json` | published | static S&P 500 benchmark curve for chart overlays |
 | `public/data/trades.json` | published | trade log (open strategies) |
 | `public/data/strategies.json` | published | metadata per deployed strategy |
 | `lib/data.ts` | 1 (reader) | typed loaders + the type definitions |
 | `paper_trading/update.py` | 2b (writer) | open-strategy JSON, in the public repo |
+| `paper_trading/benchmark.py` | 2b (writer) | converts a local S&P 500 CSV into `benchmark.json` |
 | private repo `daily.yml` | 2a (writer) | secured sanitized JSON, pushed to the public repo |
 
 How an open strategy computes its weights — a lightweight momentum `signal` or a real Darwin
@@ -75,6 +77,29 @@ Notes on the shape:
 - `as_of` is the snapshot date; the site shows it so a reader knows how fresh the data is.
 - Money values are plain numbers in `base_currency`; the site formats them via `lib/format.ts`.
 - `exposure[].group` is a sector / asset-class label, never a ticker.
+
+## `benchmark.json` - S&P 500 overlay
+
+The dashboard also publishes a separate static benchmark snapshot:
+
+```json
+{
+  "as_of": "2026-03-13",
+  "base_currency": "USD",
+  "benchmarks": [
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "equity_curve": [{"d": "1993-01-29", "v": 1000000.0}]
+    }
+  ]
+}
+```
+
+`equity_curve[].v` is a benchmark value normalized by `paper_trading/benchmark.py` from an
+S&P 500 / SPY proxy CSV. Tier 1 charts rebase that curve again to the visible strategy window
+before overlaying it, so the comparison reads as relative growth over the selected range. This is
+still static-first: the browser never fetches market data.
 
 ### Backfill & the live marker
 
@@ -185,6 +210,8 @@ All in one commit (the private-repo writer in its own repo, kept in lockstep).
 
 ## Source files
 
+- `public/data/benchmark.json` - the published S&P 500 benchmark snapshot.
+- `paper_trading/benchmark.py` - the benchmark writer for `benchmark.json`.
 - `lib/data.ts` — type definitions + typed loaders (the source of truth) (built).
 - `lib/format.ts` — `%`, `$`, date formatting helpers (built).
 - `public/data/portfolio.json`, `public/data/trades.json`, `public/data/strategies.json` — the published artifacts (sample data committed).

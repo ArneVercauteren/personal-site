@@ -1,17 +1,20 @@
 "use client";
 
+import { useId, useState } from "react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  Line,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import type { EquityPoint } from "@/lib/data";
+import type { Benchmark, EquityPoint } from "@/lib/data";
 import { axisDate, compactMoney, money, shortDate, spanDays } from "@/lib/format";
+import { scaledBenchmarkOverlay } from "@/components/charts/benchmarkOverlay";
 import { CHART } from "@/components/charts/chartColors";
 
 // Full equity curve: a terminal-style line with a faint grid, a soft area
@@ -20,19 +23,26 @@ import { CHART } from "@/components/charts/chartColors";
 // segment, with a marker at the live-since boundary.
 export function EquityCurveChart({
   points,
+  benchmark,
   currency = "USD",
   height = 200,
   liveSince,
 }: {
   points: EquityPoint[];
+  benchmark?: Benchmark;
   currency?: string;
   height?: number;
   liveSince?: string;
 }) {
+  const rawId = useId().replace(/:/g, "");
+  const liveGradientId = `equity-live-${rawId}`;
+  const [showBenchmark, setShowBenchmark] = useState(Boolean(benchmark));
   if (points.length < 2) return null;
 
+  const { overlay, values: benchmarkValues } = scaledBenchmarkOverlay(points, benchmark);
+  const benchmarkVisible = Boolean(benchmark && showBenchmark && benchmarkValues.length > 1);
   // A tight domain makes the curve's shape legible rather than flat near zero.
-  const values = points.map((p) => p.v);
+  const values = benchmarkVisible ? points.map((p) => p.v).concat(benchmarkValues) : points.map((p) => p.v);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const pad = (max - min) * 0.08 || max * 0.02;
@@ -77,11 +87,40 @@ export function EquityCurveChart({
     labelStyle: { color: CHART.inkMuted },
     itemStyle: { color: CHART.ink },
     labelFormatter: (d: unknown) => shortDate(String(d)),
-    formatter: (v: unknown) =>
-      v == null
-        ? ([] as unknown as [string, string])
-        : ([money(Number(v), currency), "Equity"] as [string, string]),
+    formatter: (v: unknown, name: unknown) => {
+      if (v == null) return [] as unknown as [string, string];
+      const label = name === "vBenchmark" ? (benchmark?.name ?? "S&P 500") : "Equity";
+      return [money(Number(v), currency), label] as [string, string];
+    },
   } as const;
+  const BenchmarkLine = benchmarkVisible ? (
+    <Line
+      type="monotone"
+      dataKey="vBenchmark"
+      stroke={CHART.benchmark}
+      strokeWidth={1.35}
+      strokeDasharray="2 3"
+      dot={false}
+      activeDot={{ r: 3, fill: CHART.benchmark }}
+      connectNulls={false}
+      isAnimationActive={false}
+    />
+  ) : null;
+  const BenchmarkToggle = benchmark ? (
+    <label
+      className="inline-flex cursor-pointer items-center gap-1.5 font-mono text-[10px] text-ink-muted"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="checkbox"
+        checked={showBenchmark}
+        onChange={(e) => setShowBenchmark(e.target.checked)}
+        className="h-3 w-3 accent-accent"
+      />
+      <span className="inline-block h-0 w-3 border-t border-dashed" style={{ borderColor: CHART.benchmark }} />
+      {benchmark.name}
+    </label>
+  ) : null;
 
   // Boundary: first point on/after the live date. Split only when it falls
   // strictly inside the curve (some backfill before, some live after).
@@ -92,33 +131,38 @@ export function EquityCurveChart({
     // Single-tone fallback (no backfill, or curve entirely one side).
     const up = points[points.length - 1].v >= points[0].v;
     const stroke = up ? CHART.gain : CHART.loss;
-    const gradientId = `equity-${points[0].d}-${points[points.length - 1].d}`;
+    const gradientId = `equity-${rawId}`;
+    const data = points.map((p, i) => ({ ...p, vBenchmark: overlay[i]?.vBenchmark ?? null }));
     return (
-      <div style={{ width: "100%", height }}>
-        <ResponsiveContainer>
-          <AreaChart data={points} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={stroke} stopOpacity={0.22} />
-                <stop offset="100%" stopColor={stroke} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid {...gridProps} />
-            <XAxis {...xProps} />
-            <YAxis {...yProps} />
-            <Tooltip {...tooltipProps} />
-            <Area
-              type="monotone"
-              dataKey="v"
-              stroke={stroke}
-              strokeWidth={1.5}
-              fill={`url(#${gradientId})`}
-              dot={false}
-              activeDot={{ r: 3, fill: stroke }}
-              isAnimationActive={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      <div>
+        <div style={{ width: "100%", height }}>
+          <ResponsiveContainer>
+            <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={stroke} stopOpacity={0.22} />
+                  <stop offset="100%" stopColor={stroke} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid {...gridProps} />
+              <XAxis {...xProps} />
+              <YAxis {...yProps} />
+              <Tooltip {...tooltipProps} />
+              <Area
+                type="monotone"
+                dataKey="v"
+                stroke={stroke}
+                strokeWidth={1.5}
+                fill={`url(#${gradientId})`}
+                dot={false}
+                activeDot={{ r: 3, fill: stroke }}
+                isAnimationActive={false}
+              />
+              {BenchmarkLine}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        {BenchmarkToggle ? <div className="mt-1">{BenchmarkToggle}</div> : null}
       </div>
     );
   }
@@ -129,6 +173,7 @@ export function EquityCurveChart({
     d: p.d,
     vBack: i <= boundary ? p.v : null,
     vLive: i >= boundary ? p.v : null,
+    vBenchmark: overlay[i]?.vBenchmark ?? null,
   }));
   const liveUp = points[points.length - 1].v >= points[boundary].v;
   const liveStroke = liveUp ? CHART.gain : CHART.loss;
@@ -139,7 +184,7 @@ export function EquityCurveChart({
         <ResponsiveContainer>
           <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
-              <linearGradient id="equity-live" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={liveGradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={liveStroke} stopOpacity={0.22} />
                 <stop offset="100%" stopColor={liveStroke} stopOpacity={0} />
               </linearGradient>
@@ -176,12 +221,13 @@ export function EquityCurveChart({
               dataKey="vLive"
               stroke={liveStroke}
               strokeWidth={1.5}
-              fill="url(#equity-live)"
+              fill={`url(#${liveGradientId})`}
               dot={false}
               activeDot={{ r: 3, fill: liveStroke }}
               connectNulls={false}
               isAnimationActive={false}
             />
+            {BenchmarkLine}
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -197,6 +243,7 @@ export function EquityCurveChart({
           />
           Live since {shortDate(liveSince!)}
         </span>
+        {BenchmarkToggle}
       </p>
     </div>
   );

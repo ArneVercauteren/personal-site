@@ -23,6 +23,11 @@ The reader side of the live data: the dashboard page and the chart/stat componen
 
 Recharts loads only on `/astralanx/live` and `/astralanx/live/[id]` (code-split), so the rest of the site keeps its small bundle.
 
+The summary equity cards and per-strategy lifecycle graph both read `public/data/benchmark.json`
+through `lib/data.ts` and show a default-on S&P 500 overlay toggle. The overlay is rebased to the
+visible strategy window, so zooming the lifecycle explorer compares relative growth over that
+selected range. It remains static-first: no browser-side market-data fetch.
+
 ## Planned (next increment)
 
 - A trade-log view fed by `trades.json`.
@@ -49,4 +54,5 @@ See the recipe: [tasks/add-dashboard-chart.md](../tasks/add-dashboard-chart.md).
 
 ## Source files
 
+- `public/data/benchmark.json`, `paper_trading/benchmark.py`, `components/charts/benchmarkOverlay.ts`
 - `app/astralanx/live/page.tsx`, `app/astralanx/live/[id]/page.tsx`, `components/StrategyCard.tsx`, `components/EquityCurveChart.tsx`, `components/RegimeEquityChart.tsx`, `components/DrawdownChart.tsx`, `components/ExposureDonut.tsx`, `components/charts/CompositionDonut.tsx`, `components/FormulaView.tsx`, `components/charts/chartColors.ts`, `components/StatsTable.tsx`, `components/Disclaimer.tsx`, `lib/data.ts`.

@@ -21,7 +21,7 @@
         "vol_cost_long_window": 252,
         "vol_cost_mult_max": 3.0
       },
-      "blurb": "gen0194 \u2014 this was the first useable strategy found by the engine, it uses an old naming scheme.",
+      "blurb": "gen0194 \u2014 this was the first useable strategy found by the engine, it uses an old naming scheme. High-risk strategy, but great long-term returns",
       "performance": {
         "training": {
           "start": "2000-01-01",

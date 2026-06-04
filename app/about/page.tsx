@@ -10,15 +10,15 @@ export const metadata: Metadata = { title: "About" };
 const capabilities = [
   {
     title: "Quantitative strategy R&D",
-    body: "Development of strategies using GP algorithms, realistic backtesting, cost modelling, and out-of-sample validation.",
+    body: "Development of strategies using GP algorithms, realistic backtesting, cost modeling, and out-of-sample validation.",
   },
   {
     title: "High-performance systems",
-    body: "Performance-critical engines in Python and C",
+    body: "Optimizing high-performance engines.",
   },
   {
     title: "Conceptual and abstract reasoning",
-    body: "Reasoning about complex systems and their underlying principles.",
+    body: "Reasoning about complex systems, identifying their core principles and using those insights to design better solutions.",
   },
 ];
 
@@ -71,7 +71,7 @@ export default function AboutPage() {
             </p>
 
             <div className="mt-5 flex flex-wrap gap-2">
-              {["Strategy research", "Python · C · C# · Java" ].map(
+              {["Strategy research", "Python · C# · Java" ].map(
                 (tag) => (
                   <span
                     key={tag}

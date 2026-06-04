@@ -1,9 +1,11 @@
 "use client";
 
+import { useId, useState } from "react";
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  Line,
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
@@ -11,8 +13,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { EquityPoint } from "@/lib/data";
+import type { Benchmark, EquityPoint } from "@/lib/data";
 import { axisDate, compactMoney, money, shortDate, spanDays } from "@/lib/format";
+import { scaledBenchmarkOverlay } from "@/components/charts/benchmarkOverlay";
 import { CHART } from "@/components/charts/chartColors";
 
 export type RegimeKind = "training" | "oos" | "live";
@@ -38,16 +41,21 @@ const REGIME_STYLE: Record<RegimeKind, { color: string; name: string }> = {
 export function RegimeEquityChart({
   points,
   regimes,
+  benchmark,
   currency = "USD",
   liveSince,
   height = 260,
 }: {
   points: EquityPoint[];
   regimes: Regime[];
+  benchmark?: Benchmark;
   currency?: string;
   liveSince?: string;
   height?: number;
 }) {
+  const rawId = useId().replace(/:/g, "");
+  const gradientId = `regime-equity-${rawId}`;
+  const [showBenchmark, setShowBenchmark] = useState(Boolean(benchmark));
   if (points.length < 2) return null;
 
   const dates = points.map((p) => p.d);
@@ -74,7 +82,9 @@ export function RegimeEquityChart({
     .map((r) => ({ regime: r, span: snap(r.start, r.end) }))
     .filter((b): b is { regime: Regime; span: [string, string] } => b.span !== null);
 
-  const values = points.map((p) => p.v);
+  const { overlay, values: benchmarkValues } = scaledBenchmarkOverlay(points, benchmark);
+  const benchmarkVisible = Boolean(benchmark && showBenchmark && benchmarkValues.length > 1);
+  const values = benchmarkVisible ? points.map((p) => p.v).concat(benchmarkValues) : points.map((p) => p.v);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const pad = (max - min) * 0.08 || max * 0.02;
@@ -91,14 +101,27 @@ export function RegimeEquityChart({
 
   // Which regime kinds actually rendered — drives the legend.
   const shownKinds = Array.from(new Set(bands.map((b) => b.regime.kind)));
+  const data = points.map((p, i) => ({ ...p, vBenchmark: overlay[i]?.vBenchmark ?? null }));
+  const BenchmarkToggle = benchmark ? (
+    <label className="inline-flex cursor-pointer items-center gap-1.5">
+      <input
+        type="checkbox"
+        checked={showBenchmark}
+        onChange={(e) => setShowBenchmark(e.target.checked)}
+        className="h-3 w-3 accent-accent"
+      />
+      <span className="inline-block h-0 w-3 border-t border-dashed" style={{ borderColor: CHART.benchmark }} />
+      {benchmark.name}
+    </label>
+  ) : null;
 
   return (
     <div>
       <div style={{ width: "100%", height }}>
         <ResponsiveContainer>
-          <AreaChart data={points} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
-              <linearGradient id="regime-equity" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={stroke} stopOpacity={0.18} />
                 <stop offset="100%" stopColor={stroke} stopOpacity={0} />
               </linearGradient>
@@ -144,7 +167,10 @@ export function RegimeEquityChart({
               labelStyle={{ color: CHART.inkMuted }}
               itemStyle={{ color: CHART.ink }}
               labelFormatter={(d) => shortDate(String(d))}
-              formatter={(v) => [money(Number(v), currency), "Equity"]}
+              formatter={(v, name) => [
+                money(Number(v), currency),
+                name === "vBenchmark" ? (benchmark?.name ?? "S&P 500") : "Equity",
+              ]}
             />
             {markerD ? (
               <ReferenceLine
@@ -164,15 +190,28 @@ export function RegimeEquityChart({
               dataKey="v"
               stroke={stroke}
               strokeWidth={1.5}
-              fill="url(#regime-equity)"
+              fill={`url(#${gradientId})`}
               dot={false}
               activeDot={{ r: 3, fill: stroke }}
               isAnimationActive={false}
             />
+            {benchmarkVisible ? (
+              <Line
+                type="monotone"
+                dataKey="vBenchmark"
+                stroke={CHART.benchmark}
+                strokeWidth={1.35}
+                strokeDasharray="2 3"
+                dot={false}
+                activeDot={{ r: 3, fill: CHART.benchmark }}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            ) : null}
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      {shownKinds.length > 0 ? (
+      {shownKinds.length > 0 || BenchmarkToggle ? (
         <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] text-ink-muted">
           {shownKinds.map((k) => (
             <span key={k} className="inline-flex items-center gap-1.5">
@@ -183,6 +222,7 @@ export function RegimeEquityChart({
               {REGIME_STYLE[k].name}
             </span>
           ))}
+          {BenchmarkToggle}
         </p>
       ) : null}
     </div>

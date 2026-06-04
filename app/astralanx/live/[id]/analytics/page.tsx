@@ -12,9 +12,12 @@ import { DivergingBarChart, type DivergingDatum } from "@/components/DivergingBa
 import { CompositionDonut, type CompositionSlice } from "@/components/charts/CompositionDonut";
 import { PicksHistory } from "@/components/PicksHistory";
 import {
+  loadBenchmarks,
   loadPortfolio,
   loadStrategyMeta,
+  type Benchmark,
   type CapacityMethod,
+  type EquityPoint,
   type OpenDiagnostics,
   type PerformanceRun,
   type PickRecord,
@@ -185,6 +188,41 @@ function computeTurnover(records: PickRecord[], cadenceDays?: number) {
   };
 }
 
+function benchmarkCalendarReturns(
+  benchmark: Benchmark | undefined,
+  years: string[],
+): Record<string, number> | undefined {
+  if (!benchmark || benchmark.equity_curve.length < 2 || years.length === 0) {
+    return undefined;
+  }
+
+  const points = [...benchmark.equity_curve].sort((a, b) => a.d.localeCompare(b.d));
+  const out: Record<string, number> = {};
+  for (const year of years) {
+    const startBoundary = `${year}-01-01`;
+    const endBoundary = `${year}-12-31`;
+    let start: EquityPoint | undefined;
+    let firstInYear: EquityPoint | undefined;
+    let end: EquityPoint | undefined;
+
+    for (const p of points) {
+      if (p.d < startBoundary) start = p;
+      if (p.d >= startBoundary && p.d <= endBoundary) {
+        firstInYear ??= p;
+        end = p;
+      }
+      if (p.d > endBoundary) break;
+    }
+
+    const base = start ?? firstInYear;
+    if (base && end && base.v > 0 && end.d !== base.d) {
+      out[year] = end.v / base.v - 1;
+    }
+  }
+
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export default async function StrategyAnalyticsPage({
   params,
 }: {
@@ -193,6 +231,7 @@ export default async function StrategyAnalyticsPage({
   const { id } = await params;
   const strategy = loadPortfolio().strategies.find((s) => s.id === id);
   const meta = loadStrategyMeta().strategies.find((m) => m.id === id);
+  const sp500 = loadBenchmarks().benchmarks.find((b) => b.id === "sp500");
   if (!strategy || !meta) notFound();
 
   const run = meta.performance ? pickRun(meta) : undefined;
@@ -237,6 +276,9 @@ export default async function StrategyAnalyticsPage({
   const turnover = d.picks_records
     ? computeTurnover(d.picks_records, meta.rebalance_cadence_days)
     : null;
+  const benchmarkAnnualReturns = d.annual_returns
+    ? benchmarkCalendarReturns(sp500, Object.keys(d.annual_returns))
+    : undefined;
 
   return (
     <div>
@@ -263,9 +305,13 @@ export default async function StrategyAnalyticsPage({
         <Section
           eyebrow="Returns"
           title="Calendar-year returns"
-          intro="Each bar is one calendar year of the simulated strategy — green for a gain, red for a loss."
+          intro="Each year compares the simulated strategy with the S&P 500 benchmark over the same calendar window."
         >
-          <AnnualReturnsChart returns={d.annual_returns} />
+          <AnnualReturnsChart
+            returns={d.annual_returns}
+            benchmarkReturns={benchmarkAnnualReturns}
+            benchmarkName={sp500?.name}
+          />
         </Section>
       ) : null}
 
@@ -273,7 +319,7 @@ export default async function StrategyAnalyticsPage({
         <Section
           eyebrow="Risk-adjusted"
           title="Rolling 3-year Sharpe"
-          intro="Annualized Sharpe over a trailing three-year window — how steady the risk-adjusted return has been, not just the headline average."
+          intro="Annualized Sharpe over a trailing three-year window, this indicates how steady the risk-adjusted return has been, better than just the headline average."
         >
           <RollingSharpeChart series={d.rolling_3y_sharpe_series} />
           <div className="mt-4">
@@ -291,7 +337,7 @@ export default async function StrategyAnalyticsPage({
         <Section
           eyebrow="Risk"
           title="Worst drawdown anatomy"
-          intro="The single deepest peak-to-trough decline of the backtest, and how long the climb back took."
+          intro="The single deepest peak-to-trough decline of the backtest along with how long it took to recover."
         >
           <StatGrid cols={4}>
             <StatCell label="Depth" value={pct(dd.value)} help={dd.metric_explanations?.value} tone="loss" />
@@ -315,7 +361,7 @@ export default async function StrategyAnalyticsPage({
         <Section
           eyebrow="Attribution"
           title="Factor exposure (Fama–French)"
-          intro="Regressing the strategy's returns on standard risk factors shows what it's really tilted toward. Bars are factor betas; alpha is the return left unexplained."
+          intro="Regressing the strategy's returns on standard risk factors shows how much of its return is explainable by common factors. Bars are factor betas; alpha is the leftover return not explained by the factors."
         >
           <DivergingBarChart data={factorData} format="ratio" />
           <div className="mt-4">
@@ -337,7 +383,7 @@ export default async function StrategyAnalyticsPage({
         <Section
           eyebrow="Positioning"
           title="Sector tilts"
-          intro="How the basket leans versus an equal-weight eligible universe — the sectors it persistently over- and under-weights."
+          intro="How the basket's sectors lean versus an equal-weight eligible universe."
         >
           <StatGrid cols={4}>
             <StatCell label="Avg active share" value={pct(sn.average_sector_active_share)} help={sn.metric_explanations?.average_sector_active_share} />
@@ -371,7 +417,7 @@ export default async function StrategyAnalyticsPage({
         <Section
           eyebrow="Liquidity"
           title="Capacity"
-          intro="How much capital the strategy could deploy before its own trading moved prices — estimated two ways."
+          intro="How much capital the strategy could deploy before its own trading moved prices. The impact model is more practical."
         >
           <div className="grid gap-4 lg:grid-cols-2">
             <CapacityCard

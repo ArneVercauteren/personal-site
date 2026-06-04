@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { EquityPoint } from "@/lib/data";
+import type { Benchmark, EquityPoint } from "@/lib/data";
 import { RegimeEquityChart, type Regime } from "@/components/RegimeEquityChart";
 import { DrawdownChart } from "@/components/DrawdownChart";
 import { shortDate } from "@/lib/format";
@@ -28,11 +28,13 @@ function clamp(value: string, lo: string, hi: string): string {
 export function EquityExplorer({
   points,
   regimes,
+  benchmark,
   currency = "USD",
   liveSince,
 }: {
   points: EquityPoint[];
   regimes: Regime[];
+  benchmark?: Benchmark;
   currency?: string;
   liveSince?: string;
 }) {
@@ -167,6 +169,7 @@ export function EquityExplorer({
           <RegimeEquityChart
             points={visible}
             regimes={regimes}
+            benchmark={benchmark}
             currency={currency}
             liveSince={liveSince}
           />

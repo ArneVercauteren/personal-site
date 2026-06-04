@@ -10,6 +10,7 @@ import { FormulaView } from "@/components/FormulaView";
 import { Section } from "@/components/Section";
 import {
   loadPortfolio,
+  loadBenchmarks,
   loadStrategyMeta,
   isOpen,
   type DetailedStats,
@@ -159,6 +160,7 @@ export default async function StrategyDetailPage({
   const strategy = loadPortfolio().strategies.find((s) => s.id === id);
   if (!strategy) notFound();
 
+  const sp500 = loadBenchmarks().benchmarks.find((b) => b.id === "sp500");
   const meta = loadStrategyMeta().strategies.find((m) => m.id === id);
   const liveSince = strategy.live_since ?? meta?.deployed_on;
   const firstD = strategy.equity_curve[0]?.d;
@@ -266,6 +268,7 @@ export default async function StrategyDetailPage({
         <EquityExplorer
           points={strategy.equity_curve}
           regimes={regimes}
+          benchmark={sp500}
           currency={meta?.base_currency ?? "USD"}
           liveSince={liveSince}
         />

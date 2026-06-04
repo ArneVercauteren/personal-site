@@ -149,7 +149,7 @@ function Op({ children }: { children: ReactNode }) {
 // A functional call: name(a, b, …).
 function FuncCall({ name, kids }: { name: string; kids: (FormulaNode | undefined)[] }) {
   return (
-    <span className="whitespace-nowrap">
+    <span className="inline">
       <span className="text-ink">{name}</span>
       <Paren>
         {kids.map((k, i) => (
@@ -167,7 +167,7 @@ function FuncCall({ name, kids }: { name: string; kids: (FormulaNode | undefined
 // engine evaluates to exactly 1.0 (true) or 0.0 (false).
 function Gate({ children }: { children: ReactNode }) {
   return (
-    <span className="whitespace-nowrap">
+    <span className="inline">
       <span className="text-ink-muted/70">[</span>
       {children}
       <span className="text-ink-muted/70">]</span>
@@ -208,7 +208,7 @@ function render(node: FormulaNode | undefined, paren = false): ReactNode {
       const sub = subscriptParam(node.params);
       const info = TRANSFORM_INFO[node.name ?? ""];
       return (
-        <span className="inline-flex items-baseline whitespace-nowrap">
+        <span className="inline-flex items-baseline">
           <span className="text-ink" title={info?.desc}>
             {label}
           </span>
@@ -227,7 +227,7 @@ function render(node: FormulaNode | undefined, paren = false): ReactNode {
       // |a − b| reads better than abs_diff(a, b).
       if (name === "abs_diff" && kids.length === 2) {
         return (
-          <span className="whitespace-nowrap">
+          <span className="inline">
             <span className="text-ink-muted/60">|</span>
             {render(kids[0], true)}
             <Op>−</Op>
@@ -240,7 +240,7 @@ function render(node: FormulaNode | undefined, paren = false): ReactNode {
       // ln(a ÷ b) for the log_ratio operator.
       if (name === "log_ratio" && kids.length >= 2) {
         return (
-          <span className="whitespace-nowrap">
+          <span className="inline">
             <span className="text-ink">ln</span>
             <Paren>
               {render(kids[0], true)}
@@ -363,7 +363,7 @@ function render(node: FormulaNode | undefined, paren = false): ReactNode {
       // if_bool(cond, a, b): pick a when the condition holds, else b.
       if (name === "if_bool" && kids.length >= 3) {
         return (
-          <span className="whitespace-nowrap">
+          <span className="inline">
             <span className="text-ink-muted">if</span> {render(kids[0], true)}{" "}
             <span className="text-ink-muted">then</span> {render(kids[1])}{" "}
             <span className="text-ink-muted">else</span> {render(kids[2])}
@@ -453,6 +453,166 @@ function intervalLabel(interval?: string): string | null {
   return `${n} ${unit}${n === 1 ? "" : "s"}`;
 }
 
+function topLevelScorePieces(formula: StrategyFormula): FormulaNode[] {
+  if (
+    formula.kind === "arithmetic" &&
+    formula.children &&
+    formula.children.length > 1
+  ) {
+    return formula.children;
+  }
+  return [formula];
+}
+
+function opLabel(node: FormulaNode): string {
+  if (node.kind === "number") return "Constant";
+  if (node.kind === "indicator") return indicatorLabel(node.name ?? "indicator");
+  if (node.kind === "transform") {
+    const base = TRANSFORM_LABEL[node.name ?? ""] ?? humanize(node.name ?? "transform");
+    const sub = subscriptParam(node.params);
+    return sub ? `${base} ${sub}` : base;
+  }
+  if (node.kind === "arithmetic") {
+    const name = node.name ?? "score";
+    if (name === "add") return "Add terms";
+    if (name === "subtract") return "Subtract";
+    if (name === "multiply") return "Multiply terms";
+    if (name === "divide") return "Divide";
+    if (name === "abs_diff") return "Absolute difference";
+    if (name === "log_ratio") return "Log ratio";
+    if (name === "gate_pos") return "Positive gate";
+    if (name === "gate_neg") return "Negative gate";
+    return ARITHMETIC_FUNC[name] ?? humanize(name);
+  }
+  if (node.kind === "comparison") return `Gate: ${humanize(node.name ?? "comparison")}`;
+  if (node.kind === "logic") return `Logic: ${humanize(node.name ?? "logic")}`;
+  if (node.kind === "conditional") return "Conditional";
+  return humanize(node.kind);
+}
+
+function nodeNote(node: FormulaNode): string | null {
+  if (node.kind === "indicator" && node.name) {
+    return INDICATOR_INFO[node.name]?.desc ?? null;
+  }
+  if (node.kind === "transform" && node.name) {
+    return TRANSFORM_INFO[node.name]?.desc ?? null;
+  }
+  if (node.kind === "arithmetic") {
+    if (node.name === "multiply") return "Both sides matter: if either side is small, this term shrinks.";
+    if (node.name === "add") return "Adds these ingredients into one score contribution.";
+    if (node.name === "abs_diff") return "Rewards distance between the two inputs, regardless of direction.";
+    if (node.name === "divide") return "Scales the left input by the right input.";
+  }
+  if (node.kind === "comparison" || node.kind === "logic") {
+    return "Outputs a 1 / 0 switch used to include, exclude, or scale part of the score.";
+  }
+  return null;
+}
+
+function childNodes(node: FormulaNode): { label: string; node: FormulaNode }[] {
+  if (node.kind === "transform" && node.child) {
+    return [{ label: "Input", node: node.child }];
+  }
+  if (node.kind === "arithmetic" && node.children) {
+    return node.children.map((child, i) => ({ label: `Input ${i + 1}`, node: child }));
+  }
+  if (node.kind === "logic") {
+    const kids = node.children ?? node.clauses ?? [];
+    return kids.map((child, i) => ({ label: `Clause ${i + 1}`, node: child }));
+  }
+  if (node.kind === "comparison") {
+    return [
+      node.left ? { label: "Left", node: node.left } : null,
+      node.right ? { label: "Right", node: node.right } : null,
+      node.third ? { label: "Band", node: node.third } : null,
+    ].filter((v): v is { label: string; node: FormulaNode } => v !== null);
+  }
+  if (node.kind === "conditional") {
+    return (node.cases ?? []).flatMap((c, i) =>
+      [
+        c.condition ? { label: `Case ${i + 1} condition`, node: c.condition } : null,
+        c.result ? { label: `Case ${i + 1} result`, node: c.result } : null,
+        c.else ? { label: `Case ${i + 1} else`, node: c.else } : null,
+      ].filter((v): v is { label: string; node: FormulaNode } => v !== null),
+    );
+  }
+  return [];
+}
+
+function FormulaTree({
+  node,
+  label = "Score",
+  depth = 0,
+}: {
+  node: FormulaNode;
+  label?: string;
+  depth?: number;
+}) {
+  const children = childNodes(node);
+  const note = nodeNote(node);
+
+  return (
+    <div className={depth === 0 ? "rounded border border-hair bg-panel p-4" : "border-l border-hair pl-3"}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+          {label}
+        </p>
+        <p className="text-xs text-ink-muted">{kindSummary(node)}</p>
+      </div>
+      <h5 className="mt-1 text-sm font-semibold text-ink">{opLabel(node)}</h5>
+      {note ? <p className="mt-1 text-xs text-ink-muted">{note}</p> : null}
+      <div className="mt-2 whitespace-normal break-words font-mono text-sm leading-7 text-ink">
+        {render(node)}
+      </div>
+      {children.length > 0 ? (
+        <div className="mt-3 flex flex-col gap-3">
+          {children.map((child, i) => (
+            <FormulaTree
+              key={`${depth}-${i}-${child.label}`}
+              node={child.node}
+              label={child.label}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function kindSummary(node: FormulaNode): string {
+  if (node.kind === "indicator") {
+    return indicatorLabel(node.name ?? "indicator");
+  }
+  if (node.kind === "transform") {
+    const label = TRANSFORM_LABEL[node.name ?? ""] ?? humanize(node.name ?? "transform");
+    return `${label} transform`;
+  }
+  if (node.kind === "comparison") return "1 / 0 gate";
+  if (node.kind === "logic") return "logic gate";
+  if (node.kind === "conditional") return "conditional branch";
+  if (node.kind === "arithmetic") {
+    const name = node.name ?? "score";
+    if (name === "multiply") return "weighted or gated term";
+    if (name === "add") return "score sum";
+    if (name === "mean") return "average score";
+    return humanize(name);
+  }
+  return humanize(node.kind);
+}
+
+function SummaryCard({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="border border-hair bg-panel px-4 py-3">
+      <dt className="font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-semibold text-ink">{value}</dd>
+      <dd className="mt-1 text-xs text-ink-muted">{note}</dd>
+    </div>
+  );
+}
+
 export function FormulaView({
   formula,
   rebalanceDays,
@@ -473,9 +633,37 @@ export function FormulaView({
   const interval = intervalLabel(formula.rebalance_interval);
   const cadence =
     interval ?? (rebalanceDays ? `${rebalanceDays} trading days` : null);
+  const selectionValue = formula.top_n ? `Top ${formula.top_n}` : "Top ranked";
 
   return (
     <div className="flex flex-col gap-6">
+      <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-hair bg-hair sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryCard
+          label="Selection"
+          value={selectionValue}
+          note="Names are sorted by score; highest scores enter the basket."
+        />
+        <SummaryCard
+          label="Cadence"
+          value={cadence ?? "Strategy default"}
+          note="The formula is re-evaluated on each rebalance date."
+        />
+        <SummaryCard
+          label="Inputs"
+          value={`${glossary.length} indicators`}
+          note={`${transformGlossary.length} transforms shape those raw inputs.`}
+        />
+        <SummaryCard
+          label="Exit"
+          value={formula.exit_root ? "Has rule" : "Score only"}
+          note={
+            formula.exit_root
+              ? "A separate gate can force stale holdings out."
+              : "Holdings leave only when they fall out of the top ranks."
+          }
+        />
+      </dl>
+
       <p className="max-w-prose text-sm text-ink-muted">
         Each rebalance, every <strong className="text-ink">eligible</strong> stock is
         scored by the expression below.
@@ -520,9 +708,9 @@ export function FormulaView({
 
       <div>
         <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
-          Score
+          Full expression
         </h4>
-        <div className="panel overflow-x-auto p-4 font-mono text-sm leading-8 text-ink sm:text-[0.95rem]">
+        <div className="panel whitespace-normal break-words p-4 font-mono text-sm leading-8 text-ink sm:text-[0.95rem]">
           {render(formula)}
         </div>
       </div>
@@ -533,9 +721,10 @@ export function FormulaView({
             Exit rule
           </h4>
           <p className="mb-2 max-w-prose text-sm text-ink-muted">
-            Independently of the score, a held name is dropped when this gate becomes true. (if the gate is true, but the scoring formula still wants it, we ignore the exit rule)
+            Independently of the score, this gate can force a current holding out.
+            If the score still ranks that name back into the target basket, the score wins.
           </p>
-          <div className="panel overflow-x-auto p-4 font-mono text-sm leading-8 text-ink sm:text-[0.95rem]">
+          <div className="panel whitespace-normal break-words p-4 font-mono text-sm leading-8 text-ink sm:text-[0.95rem]">
             {render(formula.exit_root)}
           </div>
         </div>

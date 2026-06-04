@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { type Strategy, type StrategyMeta } from "@/lib/data";
+import { type Benchmark, type Strategy, type StrategyMeta } from "@/lib/data";
 import { money, shortDate } from "@/lib/format";
 import { EquityCurveChart } from "@/components/EquityCurveChart";
 import { StatsTable } from "@/components/StatsTable";
@@ -29,9 +29,11 @@ const MIN_LIVE_POINTS = 10;
 export function StrategyCard({
   strategy,
   meta,
+  benchmark,
 }: {
   strategy: Strategy;
   meta?: StrategyMeta;
+  benchmark?: Benchmark;
 }) {
   const liveSince = strategy.live_since ?? meta?.deployed_on;
   const liveCount = liveSince
@@ -50,10 +52,7 @@ export function StrategyCard({
       : "Performance";
 
   return (
-    <Link
-      href={`/astralanx/live/${strategy.id}`}
-      className="panel panel-hover flex flex-col gap-4 p-6"
-    >
+    <article className="panel flex flex-col gap-4 p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-ink">{strategy.name}</h3>
@@ -66,6 +65,7 @@ export function StrategyCard({
 
       <EquityCurveChart
         points={strategy.equity_curve}
+        benchmark={benchmark}
         currency={meta?.base_currency ?? "USD"}
         liveSince={liveSince}
       />
@@ -98,9 +98,12 @@ export function StrategyCard({
         </dl>
       ) : null}
 
-      <span className="mt-auto border-t border-hair pt-4 text-sm font-semibold text-accent">
+      <Link
+        href={`/astralanx/live/${strategy.id}`}
+        className="mt-auto border-t border-hair pt-4 text-sm font-semibold text-accent hover:underline"
+      >
         Full breakdown →
-      </span>
-    </Link>
+      </Link>
+    </article>
   );
 }
