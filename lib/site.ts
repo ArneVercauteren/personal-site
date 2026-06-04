@@ -1,7 +1,7 @@
 // Central site config. Edit name/tagline once the domain + identity are settled.
 export const site = {
   name: "astralanx",
-  tagline: "Software and quantitative research",
+  tagline: "Genetic programming for long-term investing",
   description:
     "A personal site for my work — astralanx, a system for evolving trading strategies, and the simulated portfolio it runs — alongside some essays, music, and art.",
   // Public contact email.
