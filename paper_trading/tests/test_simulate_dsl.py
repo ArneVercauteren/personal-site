@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 
 from paper_trading import portfolio, prices, signals
@@ -206,3 +208,30 @@ def test_state_dependent_formula_simulates(universe, long_prices):
     res = portfolio.simulate(_spec(universe, formula), opens, closes, prices_long=long_prices)
     assert len(res.positions) > 0
     assert all(p["weight"] > 0 for p in res.positions)
+
+
+@pytest.mark.parametrize("indicator", ["beta", "mkt_corr"])
+def test_benchmark_dependent_features_without_market_series_do_not_warn(
+    universe, long_prices, caplog, indicator
+):
+    formula = {
+        "mode": "top_n",
+        "top_n": 3,
+        "kind": "indicator",
+        "name": indicator,
+        "params": {"window": 5},
+    }
+
+    with caplog.at_level(logging.WARNING):
+        select_tickers_on_date(
+            strat_dict=formula,
+            target_date="2024-06-03",
+            tickers=universe,
+            prices_override=long_prices,
+            min_price=0.0,
+            min_adv=0.0,
+            portfolio_size=1_000_000.0,
+            market_series_override=None,
+        )
+
+    assert not any("Could not compute feature" in record.message for record in caplog.records)

@@ -13,7 +13,7 @@ The **secured** strategies have their *own* crons (`rebalance.yml`, `daily.yml`)
 - **Triggers:** two weekday crons — `30 11 * * 1-5` and `30 22 * * 1-5` (UTC; the evening run is after US market close) — plus manual `workflow_dispatch`.
 - **Concurrency:** a `open-strategies-update` group with `cancel-in-progress: false`, so two runs never race to commit.
 - **Permissions:** `contents: write` (the job pushes a data commit).
-- **Steps:** checkout → `actions/setup-python@v5` (3.12, pip cache) → `pip install -r paper_trading/requirements.txt` → `python -m paper_trading.update` → stage `public/data/{portfolio,trades,strategies}.json` → commit + push **only if** `git diff --staged` shows a change.
+- **Steps:** checkout → `actions/setup-python@v5` (3.12, pip cache) → `pip install -r paper_trading/requirements.txt` → `python -m paper_trading.update` → stage `public/data/{portfolio,trades,strategies,benchmark}.json` → commit + push **only if** `git diff --staged` shows a change.
 - **Bot identity:** commits as `paper-trading-bot <actions@users.noreply.github.com>`, message `data: refresh open-strategy paper portfolio [skip ci]` (the `[skip ci]` tag avoids retriggering CI on the data commit).
 
 ## Invariants it respects

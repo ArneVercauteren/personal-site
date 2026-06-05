@@ -20,6 +20,9 @@ from a private repo — see [secured-updater.md](secured-updater.md) and
   "Merge, not overwrite" below). Run locally or by GitHub Actions. For local debugging, pass
   `--strategy <id>` (repeatable / comma-separated) or set `PAPER_TRADING_STRATEGY=<id>` to update
   only selected open entries.
+- `paper_trading/benchmark.py` — builds `public/data/benchmark.json`. The scheduled updater
+  refreshes the SPY-backed S&P 500 curve from the same keyless price adapter; the CLI still accepts
+  a local CSV for one-off historical imports.
 - `paper_trading/prices.py` — keyless price adapter. `get_ohlcv(...)` → long-format OHLCV (what
   the DSL evaluator consumes); `get_price_history(...)` → adjusted `(opens, closes)` wide frames
   (the simulator's accounting). `PAPER_TRADING_SYNTHETIC=1` swaps in deterministic synthetic bars
@@ -82,7 +85,8 @@ are NaN, handled).
    (`portfolio.simulate` + `costs.py`).
 4. Mark to market daily; stitch onto any Darwin curve prefix; recompute CAGR / Sharpe / max-DD.
 5. Merge the open entries into `public/data/{portfolio,strategies,trades}.json`.
-6. (In CI) commit the JSON if it changed → Vercel redeploys.
+6. Refresh `public/data/benchmark.json` from the SPY-backed S&P 500 proxy through the same end date.
+7. (In CI) commit the JSON if it changed → Vercel redeploys.
 
 ## Cost model
 
@@ -138,7 +142,7 @@ Verified offline with `PAPER_TRADING_SYNTHETIC=1` (two runs produce byte-identic
 
 ## Source files
 
-- `paper_trading/update.py`, `paper_trading/prices.py`, `paper_trading/signals.py`, `paper_trading/portfolio.py`, `paper_trading/portfolio_state.py`
+- `paper_trading/update.py`, `paper_trading/benchmark.py`, `paper_trading/prices.py`, `paper_trading/signals.py`, `paper_trading/portfolio.py`, `paper_trading/portfolio_state.py`
 - `paper_trading/darwin_eval/` — vendored scrubbed DSL evaluator.
 - `paper_trading/strategies/open_momentum_v1.json` — the first open spec (momentum).
 - `paper_trading/requirements.txt`, `paper_trading/requirements-dev.txt`

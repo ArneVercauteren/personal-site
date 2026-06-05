@@ -13,12 +13,12 @@ The boundary between Tier 2 (the Python updater that *writes* JSON) and Tier 1 (
 | File | Tier | Role |
 |---|---|---|
 | `public/data/portfolio.json` | published | equity curve, stats, and (open only) positions per strategy |
-| `public/data/benchmark.json` | published | static S&P 500 benchmark curve for chart overlays |
+| `public/data/benchmark.json` | published | S&P 500 benchmark curve for chart overlays |
 | `public/data/trades.json` | published | trade log (open strategies) |
 | `public/data/strategies.json` | published | metadata per deployed strategy |
 | `lib/data.ts` | 1 (reader) | typed loaders + the type definitions |
 | `paper_trading/update.py` | 2b (writer) | open-strategy JSON, in the public repo |
-| `paper_trading/benchmark.py` | 2b (writer) | converts a local S&P 500 CSV into `benchmark.json` |
+| `paper_trading/benchmark.py` | 2b (writer) | fetches the SPY-backed S&P 500 curve, or converts a local CSV, into `benchmark.json` |
 | private repo `daily.yml` | 2a (writer) | secured sanitized JSON, pushed to the public repo |
 
 How an open strategy computes its weights — a lightweight momentum `signal` or a real Darwin
@@ -80,7 +80,7 @@ Notes on the shape:
 
 ## `benchmark.json` - S&P 500 overlay
 
-The dashboard also publishes a separate static benchmark snapshot:
+The dashboard also publishes a separate benchmark snapshot:
 
 ```json
 {
@@ -96,10 +96,12 @@ The dashboard also publishes a separate static benchmark snapshot:
 }
 ```
 
-`equity_curve[].v` is a benchmark value normalized by `paper_trading/benchmark.py` from an
-S&P 500 / SPY proxy CSV. Tier 1 charts rebase that curve again to the visible strategy window
-before overlaying it, so the comparison reads as relative growth over the selected range. This is
-still static-first: the browser never fetches market data.
+`equity_curve[].v` is a benchmark value normalized by `paper_trading/benchmark.py` from a
+keyless SPY price fetch, with the legacy CSV import still available for one-off historical loads.
+Tier 1 charts rebase that curve again to the visible strategy window before overlaying it, so the
+comparison reads as relative growth over the selected range. This is still static-first: the
+browser never fetches market data. Scheduled refreshes preserve the already-published prefix and
+append newly available bars, avoiding historical churn from tiny adjusted-price source revisions.
 
 ### Backfill & the live marker
 

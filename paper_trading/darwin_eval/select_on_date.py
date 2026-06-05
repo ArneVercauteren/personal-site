@@ -367,6 +367,10 @@ def _rank_pct_df(inner_df: pd.DataFrame, rank_segment_ids: np.ndarray | None) ->
     return pd.DataFrame(out, index=inner_df.index, columns=inner_df.columns)
 
 
+def _nan_feature_like(prices_aligned: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame(np.nan, index=prices_aligned.index, columns=prices_aligned.columns)
+
+
 def _compute_transformed_feature(
     name: str,
     *,
@@ -499,7 +503,9 @@ def _compute_self_normalized_feature(
         return daily_rets.rolling(window=window, min_periods=window).std().shift(1)
 
     window = _base_windowed_name(name, "beta")
-    if window is not None and market_series is not None:
+    if window is not None:
+        if market_series is None:
+            return _nan_feature_like(prices_aligned)
         px = prices_aligned.replace(0, np.nan)
         daily_rets = px.pct_change()
         mkt_rets = market_series.replace(0, np.nan).pct_change().reindex(daily_rets.index)
@@ -511,7 +517,9 @@ def _compute_self_normalized_feature(
         return (cov / mkt_var).shift(1)
 
     window = _base_windowed_name(name, "mkt_corr")
-    if window is not None and market_series is not None:
+    if window is not None:
+        if market_series is None:
+            return _nan_feature_like(prices_aligned)
         px = prices_aligned.replace(0, np.nan)
         daily_rets = px.pct_change()
         mkt_rets = market_series.replace(0, np.nan).pct_change().reindex(daily_rets.index)

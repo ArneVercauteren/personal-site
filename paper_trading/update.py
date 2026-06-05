@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import portfolio, prices, universe
+from . import benchmark, portfolio, prices, universe
 from .darwin_eval.select_on_date import collect_all_needed_features, required_history_days
 from .publish_sanitize import assert_no_internal_paths, scrub_internal_paths
 
@@ -248,6 +248,14 @@ def run(strategy_ids: set[str] | None = None) -> str:
     kept = [t for t in trades.get("trades", []) if t.get("strategy_id") not in owned_ids]
     trades["trades"] = kept + open_trades
     write_json("trades.json", trades)
+
+    benchmark_payload = benchmark.write_live_benchmark_snapshot(end=end)
+    benchmark_as_of = benchmark_payload["as_of"]
+    print(
+        "wrote public/data/benchmark.json "
+        f"({len(benchmark_payload['benchmarks'][0]['equity_curve'])} pts, "
+        f"as_of={benchmark_as_of})"
+    )
 
     return latest_date
 
