@@ -293,7 +293,7 @@ export default async function StrategyAnalyticsPage({
 
       <PageHeader
         eyebrow="Deep analytics"
-        title={`${strategy.name} — under the hood`}
+        title={`${strategy.name} Deep Analytics`}
         intro={`Risk, factor, sector and capacity diagnostics computed over the full single-seed backtest (training + out-of-sample), ${shortDate(run.start)} – ${shortDate(run.end)}.`}
       />
 

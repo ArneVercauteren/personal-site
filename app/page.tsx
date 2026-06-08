@@ -14,7 +14,7 @@ const featured = [
     href: "/astralanx/live",
     eyebrow: "Live · simulated",
     label: "Live",
-    blurb: "A simulated portfolio running a few of those strategies.",
+    blurb: "A simulated portfolio running strategies from Astralanx.",
   },
 ];
 
