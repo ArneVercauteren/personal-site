@@ -31,6 +31,12 @@ Thumbs.db
 # Vercel
 .vercel
 
-# Claude Code — keep shared launch.json, ignore personal/local files
-.claude/settings.local.json
-.claude/*.local.json
+# AI agent instructions — kept local, not published.
+# Generated from plans_and_text_files/AI_AGENT_SHARED_INSTRUCTIONS.md via scripts/sync_ai_docs.py
+CLAUDE.md
+AGENTS.md
+.github/copilot-instructions.md
+scripts/sync_ai_docs.py
+
+# Claude Code — entire local config, not published
+.claude/

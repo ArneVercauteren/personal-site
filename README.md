@@ -25,7 +25,7 @@ Trading is **paper / simulated only** — no broker, no real money, no order end
 - **AI agents:** read `CLAUDE.md` / `AGENTS.md` (the working agreement) and start from [docs/INDEX.md](docs/INDEX.md).
 - **Humans:** [docs/01-overview.md](docs/01-overview.md) for the mental scaffold; [plans_and_text_files/PERSONAL_WEBSITE_PLAN.md](plans_and_text_files/PERSONAL_WEBSITE_PLAN.md) for the full design and build order.
 
-The root AI-instruction files (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`) are **generated** from `plans_and_text_files/AI_AGENT_SHARED_INSTRUCTIONS.md`:
+The root AI-instruction files (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`) are **generated** from `plans_and_text_files/AI_AGENT_SHARED_INSTRUCTIONS.md` and are **git-ignored** (kept local, not published). Regenerate them after cloning:
 
 ```powershell
 python scripts/sync_ai_docs.py            # regenerate
