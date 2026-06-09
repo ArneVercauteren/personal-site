@@ -43,6 +43,13 @@ npm run build                   # production build
 python -m paper_trading.update  # regenerate public/data/*.json (Tier 2)
 ```
 
+## License
+
+- **Code** — [MIT](LICENSE). The application, scripts, and tooling are free to reuse.
+- **Content** — essays/writeups (`content/`) and any art/music are licensed under
+  [CC BY-NC-ND 4.0](LICENSE-content.md): share and cite with credit; no commercial
+  use or distribution of adaptations without permission.
+
 ## Security
 
 No secrets in this repo. Price-data sources are keyless or use a CI secret; `.env*` is git-ignored; the public site is read-only and holds no credentials. See [docs/concepts/separation-from-darwin.md](docs/concepts/separation-from-darwin.md).
