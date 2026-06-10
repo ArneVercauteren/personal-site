@@ -300,20 +300,21 @@ export default async function StrategyDetailPage({
               period={runPeriod(perf.oos)}
               windows={perf.oos.windows}
               stats={perf.oos.stats}
-              note="Never fit on — the strongest evidence short of live tracking."
+              note="Never used to train the strategy, the strongest evidence short of live tracking."
             />
             <DetailedStatsPanel
               title="Training (in-sample)"
               period={runPeriod(perf.training)}
               windows={perf.training.windows}
               stats={perf.training.stats}
-              note="The years the formula was fit on. In-sample by definition — context, not evidence."
+              note="The strategy was trained on this period, good returns here are not inherently indicative of quality or future performance."
             />
             <DetailedStatsPanel
               title="Combined · training + OOS"
               period={runPeriod(perf.combined)}
               windows={perf.combined.windows}
               stats={perf.combined.stats}
+              note="Combined figures are computed end to end, not stitched from the halves."
             />
           </div>
         </Section>
