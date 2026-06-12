@@ -27,7 +27,7 @@
       "d": "2026-05-19",
       "ticker": "AMPX",
       "side": "sell",
-      "weight": 0.0244
+      "weight": 0.0221
     },
     {
       "strategy_id": "gen0194",
@@ -125,21 +125,21 @@
       "d": "2026-05-19",
       "ticker": "HBM",
       "side": "sell",
-      "weight": 0.0015
+      "weight": 0.0011
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-05-19",
       "ticker": "HL",
       "side": "sell",
-      "weight": 0.0014
+      "weight": 0.0013
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-05-19",
       "ticker": "IAG",
       "side": "sell",
-      "weight": 0.0178
+      "weight": 0.0202
     },
     {
       "strategy_id": "gen0194",
@@ -174,7 +174,7 @@
       "d": "2026-05-19",
       "ticker": "NVDY",
       "side": "sell",
-      "weight": 0.0009
+      "weight": 0.0012
     },
     {
       "strategy_id": "gen0194",
@@ -265,7 +265,7 @@
       "d": "2026-05-19",
       "ticker": "RGTI",
       "side": "sell",
-      "weight": 0.0008
+      "weight": 0.0009
     },
     {
       "strategy_id": "gen0194",
@@ -307,7 +307,7 @@
       "d": "2026-05-19",
       "ticker": "TTI",
       "side": "buy",
-      "weight": 0.0048
+      "weight": 0.0047
     },
     {
       "strategy_id": "gen0194",
