@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
   "as_of": "2026-06-12",
-=======
-  "as_of": "2026-06-15",
->>>>>>> ae86c28f70ccc89a2fb3da95ab06909ad63b6f4d
   "trades": [
     {
       "strategy_id": "gen0194",
@@ -31,11 +27,7 @@
       "d": "2026-05-19",
       "ticker": "AMPX",
       "side": "sell",
-<<<<<<< HEAD
       "weight": 0.0089
-=======
-      "weight": 0.0221
->>>>>>> ae86c28f70ccc89a2fb3da95ab06909ad63b6f4d
     },
     {
       "strategy_id": "gen0194",
@@ -133,33 +125,21 @@
       "d": "2026-05-19",
       "ticker": "HBM",
       "side": "sell",
-<<<<<<< HEAD
       "weight": 0.0006
-=======
-      "weight": 0.0011
->>>>>>> ae86c28f70ccc89a2fb3da95ab06909ad63b6f4d
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-05-19",
       "ticker": "HL",
       "side": "sell",
-<<<<<<< HEAD
       "weight": 0.0008
-=======
-      "weight": 0.0013
->>>>>>> ae86c28f70ccc89a2fb3da95ab06909ad63b6f4d
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-05-19",
       "ticker": "IAG",
       "side": "sell",
-<<<<<<< HEAD
       "weight": 0.0081
-=======
-      "weight": 0.0202
->>>>>>> ae86c28f70ccc89a2fb3da95ab06909ad63b6f4d
     },
     {
       "strategy_id": "gen0194",
@@ -194,11 +174,7 @@
       "d": "2026-05-19",
       "ticker": "NVDY",
       "side": "sell",
-<<<<<<< HEAD
       "weight": 0.0007
-=======
-      "weight": 0.0012
->>>>>>> ae86c28f70ccc89a2fb3da95ab06909ad63b6f4d
     },
     {
       "strategy_id": "gen0194",
@@ -289,11 +265,7 @@
       "d": "2026-05-19",
       "ticker": "RGTI",
       "side": "sell",
-<<<<<<< HEAD
       "weight": 0.0005
-=======
-      "weight": 0.0009
->>>>>>> ae86c28f70ccc89a2fb3da95ab06909ad63b6f4d
     },
     {
       "strategy_id": "gen0194",
@@ -335,11 +307,7 @@
       "d": "2026-05-19",
       "ticker": "TTI",
       "side": "buy",
-<<<<<<< HEAD
       "weight": 0.0008
-=======
-      "weight": 0.0047
->>>>>>> ae86c28f70ccc89a2fb3da95ab06909ad63b6f4d
     },
     {
       "strategy_id": "gen0194",
