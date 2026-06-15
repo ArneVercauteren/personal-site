@@ -69,6 +69,9 @@ class CostModel:
     spread_ref_price: float = DEFAULT_SPREAD_REF_PRICE
     volume_impact_coef: float = DEFAULT_VOLUME_IMPACT_COEF
     impact_portfolio_size: float = DEFAULT_IMPACT_PORTFOLIO_SIZE
+    # Legacy field name for the invested-cap ceiling. `portfolio.py` scales
+    # target weights so excess account equity remains cash.
+    impact_book_cap: float = 0.0
     vol_scaled_cost_enable: bool = True
     vol_cost_k: float = DEFAULT_VOL_COST_K
     vol_cost_realized_window: int = DEFAULT_VOL_COST_REALIZED_WINDOW
@@ -83,6 +86,7 @@ class CostModel:
             spread_ref_price=float(cm.get("spread_ref_price", DEFAULT_SPREAD_REF_PRICE)),
             volume_impact_coef=float(cm.get("volume_impact_coef", DEFAULT_VOLUME_IMPACT_COEF)),
             impact_portfolio_size=float(cm.get("impact_portfolio_size", DEFAULT_IMPACT_PORTFOLIO_SIZE)),
+            impact_book_cap=float(cm.get("impact_book_cap", 0.0)),
             vol_scaled_cost_enable=bool(cm.get("vol_scaled_cost_enable", True)),
             vol_cost_k=float(cm.get("vol_cost_k", DEFAULT_VOL_COST_K)),
             vol_cost_realized_window=int(cm.get("vol_cost_realized_window", DEFAULT_VOL_COST_REALIZED_WINDOW)),
@@ -135,6 +139,7 @@ def rebalance_cost_fraction(
     review_dollar_volume: dict[str, float] | None,
     cfg: CostModel,
     vol_cost_mult: float = 1.0,
+    impact_book: float | None = None,
 ) -> dict:
     """Total equity-haircut fraction for one rebalance, Astralanx-faithful.
 
@@ -145,10 +150,15 @@ def rebalance_cost_fraction(
     `review_price` / `review_dollar_volume` are keyed by ticker at the review
     date. When `review_dollar_volume` is None the volume-impact term is skipped
     entirely (mirrors Astralanx running with no volume array), rather than charging
-    the missing-ADV penalty. The volume-impact term sizes trades against
-    `cfg.impact_portfolio_size` (the authoritative cost-model book size), not the
-    strategy's traded capital — so live paper impact matches the backtest.
+    the missing-ADV penalty.
+
+    The volume-impact term sizes trades against `impact_book` when given, else
+    `cfg.impact_portfolio_size`. The simulator passes the full compounded account
+    book; target weights already encode any cash retained above capacity.
     """
+    impact_portfolio_size = (
+        float(impact_book) if impact_book is not None else cfg.impact_portfolio_size
+    )
     names = set(prev_w) | set(target_w)
     turnover = sum(abs(target_w.get(t, 0.0) - prev_w.get(t, 0.0)) for t in names)
 
@@ -181,7 +191,7 @@ def rebalance_cost_fraction(
                 continue
             adv = review_dollar_volume.get(t)
             if adv is not None and adv > 0.0 and np.isfinite(adv):
-                impact = cfg.volume_impact_coef * float(np.sqrt(dw * cfg.impact_portfolio_size / adv))
+                impact = cfg.volume_impact_coef * float(np.sqrt(dw * impact_portfolio_size / adv))
                 volume_impact_fraction += dw * impact
             else:
                 volume_impact_fraction += dw * MISSING_ADV_PENALTY

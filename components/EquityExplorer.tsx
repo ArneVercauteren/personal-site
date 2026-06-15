@@ -27,12 +27,14 @@ function clamp(value: string, lo: string, hi: string): string {
 
 export function EquityExplorer({
   points,
+  segmentCurves,
   regimes,
   benchmark,
   currency = "USD",
   liveSince,
 }: {
   points: EquityPoint[];
+  segmentCurves?: Partial<Record<"training" | "oos", EquityPoint[]>>;
   regimes: Regime[];
   benchmark?: Benchmark;
   currency?: string;
@@ -48,26 +50,37 @@ export function EquityExplorer({
 
     const trainings = regimes.filter((r) => r.kind === "training");
     if (trainings.length > 0) {
-      const from = clamp(
-        trainings.reduce((m, r) => (r.start < m ? r.start : m), trainings[0].start),
-        first,
-        last,
-      );
-      const to = clamp(
-        trainings.reduce((m, r) => (r.end > m ? r.end : m), trainings[0].end),
-        first,
-        last,
-      );
+      const trainingCurve = segmentCurves?.training;
+      const from =
+        trainingCurve && trainingCurve.length >= 2
+          ? trainingCurve[0].d
+          : clamp(
+              trainings.reduce((m, r) => (r.start < m ? r.start : m), trainings[0].start),
+              first,
+              last,
+            );
+      const to =
+        trainingCurve && trainingCurve.length >= 2
+          ? trainingCurve[trainingCurve.length - 1].d
+          : clamp(
+              trainings.reduce((m, r) => (r.end > m ? r.end : m), trainings[0].end),
+              first,
+              last,
+            );
       out.push({ key: "training", label: "Training", from, to });
     }
 
     const oos = regimes.find((r) => r.kind === "oos");
     if (oos) {
+      const oosCurve = segmentCurves?.oos;
       out.push({
         key: "oos",
         label: "Out-of-sample",
-        from: clamp(oos.start, first, last),
-        to: clamp(oos.end, first, last),
+        from: oosCurve && oosCurve.length >= 2 ? oosCurve[0].d : clamp(oos.start, first, last),
+        to:
+          oosCurve && oosCurve.length >= 2
+            ? oosCurve[oosCurve.length - 1].d
+            : clamp(oos.end, first, last),
       });
     }
 
@@ -78,16 +91,17 @@ export function EquityExplorer({
     }
 
     return out;
-  }, [regimes, first, last, liveSince]);
+  }, [regimes, segmentCurves, first, last, liveSince]);
 
   const [from, setFrom] = useState(first);
   const [to, setTo] = useState(last);
   const [active, setActive] = useState("full");
 
-  const visible = useMemo(
-    () => points.filter((p) => p.d >= from && p.d <= to),
-    [points, from, to],
-  );
+  const visible = useMemo(() => {
+    const segment = active === "training" || active === "oos" ? segmentCurves?.[active] : undefined;
+    const source = segment && segment.length >= 2 ? segment : points;
+    return source.filter((p) => p.d >= from && p.d <= to);
+  }, [points, segmentCurves, active, from, to]);
 
   function applyPreset(p: Preset) {
     setFrom(p.from);

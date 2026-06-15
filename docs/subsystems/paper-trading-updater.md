@@ -84,6 +84,9 @@ are NaN, handled).
 3. Apply fills at the next bar's open, then charge the Darwin cost haircut for that rebalance
    (`portfolio.simulate` + `costs.py`).
 4. Mark to market daily; stitch onto any Darwin curve prefix; recompute CAGR / Sharpe / max-DD.
+   When `cost_model.impact_book_cap` is set, target weights are scaled so invested
+   capital stays at or below the cap and excess equity remains cash, matching how
+   Darwin generated the prefix.
 5. Merge the open entries into `public/data/{portfolio,strategies,trades}.json`.
 6. Refresh `public/data/benchmark.json` from the SPY-backed S&P 500 proxy through the same end date.
 7. (In CI) commit the JSON if it changed → Vercel redeploys.
@@ -106,6 +109,11 @@ where `price_scale = max(spread_ref_price / harmonic_mean_price, 0.1)` (cheaper 
 volatility multiplier `clip(1 + k·sqrt(realized_vol/long_vol), 1, mult_max)`. Parameters come from
 each spec's `cost_model`; omitted ones use Darwin's engine defaults. These are the **same**
 assumptions the Darwin Methodology page documents (plan §6.5).
+
+When `cost_model.impact_book_cap` is set, `portfolio._cap_target_weights` scales the target
+allocation so invested dollars do not exceed capacity. `rebalance_cost_fraction` receives the full
+compounded account book because the scaled weight changes already represent the smaller invested
+allocation; applying the cap again would understate trade dollars.
 
 ## Rebalance cadence
 

@@ -80,7 +80,7 @@ export function StrategyCard({
       {meta ? (
         <dl className="grid grid-cols-3 gap-3 border-t border-hair pt-4 text-xs">
           <div>
-            <dt className="text-ink-muted">Capital</dt>
+            <dt className="text-ink-muted">Starting Capital</dt>
             <dd className="num text-ink">
               {money(meta.portfolio_size, meta.base_currency)}
             </dd>

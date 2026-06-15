@@ -61,7 +61,7 @@ A deployed strategy is one `*.json` file matching the strategy-spec the updater 
     "combined": {"start": "2018-01-02", "end": "2025-12-31",
                  "stats": {"cagr": 0.131, "sharpe": 0.99, "max_dd": -0.205, "...": 0}}
   },
-  "darwin_equity_curve": [{"d": "2018-01-02", "v": 100000.0}],  // optional: combined train+OOS curve
+  "darwin_equity_curve": [{"d": "2018-01-02", "v": 100000.0}],  // optional: combined curve at deployed book
   "active_share": 0.66,                            // king-level liquidity/holdings measures
   "capacity": {"liquidity_usd": 42000000, "impact_usd": 18000000},
   "portfolio_size": 100000,
@@ -70,6 +70,7 @@ A deployed strategy is one `*.json` file matching the strategy-spec the updater 
   "cost_model": {                                 // the Darwin run's actual cost config (see below)
     "commission_bps": 5.0, "slippage_bps": 5.0,
     "spread_ref_price": 50.0, "volume_impact_coef": 0.5, "impact_portfolio_size": 1000000,
+    "impact_book_cap": 18000000,                  // optional: invested-cap ceiling; excess remains cash
     "vol_scaled_cost_enable": true, "vol_cost_k": 0.75,
     "vol_cost_realized_window": 63, "vol_cost_long_window": 252, "vol_cost_mult_max": 3.0
   },
@@ -95,6 +96,12 @@ formula or weights, so they clear the security boundary. They drive the per-stra
 present, the updater uses that prefix directly and only fetches Yahoo data from the prefix's final
 date onward.
 
+**Compound, then cap at capacity.** `darwin_equity_curve` models a disciplined investor: equity
+compounds until invested capital reaches capacity, then target weights are scaled so only the
+capped amount remains invested and excess equity stays cash. Darwin records that ceiling as
+`cost_model.impact_book_cap`; the updater continues the curve under the same rule. A spec without
+`impact_book_cap` is uncapped.
+
 ### `performance` — three single-seed runs
 
 To give the site authoritative figures, the exporter runs **three deterministic (single-seed)
@@ -107,6 +114,11 @@ diagnostics:
 3. **`combined`** — over training **and** OOS together. Run end to end (a fresh backtest over the
    union span), **not** stitched from the two halves — cross-boundary figures like max drawdown and
    Sharpe aren't additive.
+
+Each run includes its exact `equity_curve`. The detail page uses the standalone training and OOS
+curves for those presets, ensuring the plotted return matches the statistics from the same replay.
+The full-history view instead uses the continuous lifecycle curve and may differ because it carries
+accumulated AUM and the capacity cap across the training/OOS boundary.
 
 The combined run's equity curve is exported as top-level `darwin_equity_curve`, scaled to the
 deployed paper `portfolio_size`. The updater stitches later Yahoo-backed simulation onto that curve

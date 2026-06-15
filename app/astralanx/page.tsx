@@ -219,7 +219,7 @@ export default function AstralanxPage() {
 
       <Section eyebrow="Backtesting" title="The backtesting model">
         <p>
-          The backtest is deliberately simple, so the results are easy to reason
+          The backtest is designed to be realistic but simple, so the results are easy to reason
           about and hard to game.
         </p>
         <Bullets>
@@ -278,7 +278,7 @@ export default function AstralanxPage() {
           <li>
             <strong>Price scaling.</strong> Slippage is further scaled by{" "}
             <C>50 / harmonic_mean_portfolio_price</C> — lower-priced baskets pay
-            proportionally more.
+            proportionally more. The backtest equity is capped at the estimated capacity of the strategy. Any excess equity counts as part of the returns, but is not reinvested, as not to to incur major slipage costs.
           </li>
           <li>
             <strong>Market impact.</strong> A square-root impact term,{" "}
@@ -341,10 +341,9 @@ export default function AstralanxPage() {
             sector exposure.
           </li>
           <li>
-            <strong>Capacity</strong> — two views: a liquidity-screening estimate
-            (how large the book could get while staying a small fraction of each
-            name&apos;s volume) and a stricter impact-consistent estimate using the
-            same square-root impact model as the backtest that only allows 100bps slippage.
+            <strong>Capacity</strong> — a single estimate using the same square-root
+            impact model as the backtest, constrained by each name&apos;s liquidity
+            and a maximum of 100 bps modeled impact for the hardest trade.
           </li>
         </Bullets>
         <p>

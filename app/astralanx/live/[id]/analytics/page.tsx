@@ -96,10 +96,12 @@ function StatGrid({ children, cols = 3 }: { children: ReactNode; cols?: 2 | 3 | 
 function CapacityCard({
   title,
   intro,
+  capacity,
   m,
 }: {
   title: string;
   intro: string;
+  capacity: number;
   m: CapacityMethod;
 }) {
   const ex = m.metric_explanations ?? {};
@@ -126,12 +128,12 @@ function CapacityCard({
     <div className="panel p-5">
       <h4 className="text-sm font-semibold text-ink">{title}</h4>
       <p className="mt-1 mb-4 text-xs text-ink-muted">{intro}</p>
-      <StatGrid cols={3}>
-        <StatCell label="Median capacity" value={money(m.median_capacity_usd)} help={ex.median_capacity_usd} />
-        <StatCell label="25th pct" value={money(m.p25_capacity_usd)} help={ex.p25_capacity_usd} />
-        <StatCell label="Tightest" value={money(m.worst_rebalance_capacity_usd)} help={ex.worst_rebalance_capacity_usd} />
-        <StatCell label="Impact @ median" value={bps(m.median_capacity_estimated_impact_bps)} help={ex.median_capacity_estimated_impact_bps} />
-        <StatCell label="Impact @ 25th" value={bps(m.p25_capacity_estimated_impact_bps)} help={ex.p25_capacity_estimated_impact_bps} />
+      <StatGrid cols={2}>
+        <StatCell
+          label="Capacity"
+          value={money(capacity)}
+          help="The deployed capacity ceiling estimated from the uncapped strategy and applied to the published lifecycle backtest."
+        />
         <StatCell label="Rebalances" value={String(m.rebalance_observations)} help={ex.rebalance_observations} />
       </StatGrid>
       {params.length > 0 ? (
@@ -243,6 +245,8 @@ export default async function StrategyAnalyticsPage({
   const ff = d.fama_french_regression;
   const sn = d.sector_neutrality;
   const cap = d.capacity_analysis;
+  const deployedCapacity =
+    meta.cost_model.impact_book_cap ?? meta.capacity?.impact_usd ?? meta.capacity?.liquidity_usd;
 
   const factorData: DivergingDatum[] = ff
     ? ff.factors_used.map((f) => ({
@@ -323,8 +327,7 @@ export default async function StrategyAnalyticsPage({
         >
           <RollingSharpeChart series={d.rolling_3y_sharpe_series} />
           <div className="mt-4">
-            <StatGrid cols={4}>
-              <StatCell label="Current" value={num2(rs.current)} tone={rs.current >= 0 ? "gain" : "loss"} />
+            <StatGrid cols={3}>
               <StatCell label="Average" value={num2(rs.avg)} />
               <StatCell label="Best" value={`${num2(rs.max)} · ${shortDate(rs.max_date)}`} tone="gain" />
               <StatCell label="Worst" value={`${num2(rs.min)} · ${shortDate(rs.min_date)}`} tone={rs.min >= 0 ? undefined : "loss"} />
@@ -413,21 +416,17 @@ export default async function StrategyAnalyticsPage({
         </Section>
       ) : null}
 
-      {cap ? (
+      {cap && deployedCapacity != null ? (
         <Section
           eyebrow="Liquidity"
           title="Capacity"
-          intro="How much capital the strategy could deploy before its own trading moved prices. The impact model is more practical."
+          intro="How much capital the strategy could deploy before its own trading moved prices."
         >
-          <div className="grid gap-4 lg:grid-cols-2">
-            <CapacityCard
-              title="Liquidity screen"
-              intro="Participating in a fixed slice of each name's average daily volume over a few execution days."
-              m={cap.heuristic_capacity}
-            />
+          <div>
             <CapacityCard
               title="Impact model"
               intro="The capital at which the square-root impact model hits the configured worst-name impact cap."
+              capacity={deployedCapacity}
               m={cap.impact_model_capacity}
             />
           </div>

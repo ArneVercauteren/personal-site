@@ -65,6 +65,32 @@ def _darwin_equity_curve(strategy: dict) -> list[dict]:
     return curve
 
 
+def _impact_account_book(cfg, equity_now: float, base: float) -> float:
+    """Total account book used to translate weight changes into trade dollars."""
+    if base <= 0.0:
+        return float(cfg.impact_portfolio_size)
+    return float(cfg.impact_portfolio_size) * (float(equity_now) / float(base))
+
+
+def _cap_target_weights(
+    target: dict[str, float],
+    cfg,
+    equity_now: float,
+    base: float,
+) -> dict[str, float]:
+    """Scale target weights so invested capital stays at or below capacity."""
+    cap = float(getattr(cfg, "impact_book_cap", 0.0) or 0.0)
+    if cap <= 0.0 or not target:
+        return target
+    invested_weight = sum(max(0.0, float(weight)) for weight in target.values())
+    account_book = _impact_account_book(cfg, equity_now, base)
+    target_dollars = invested_weight * account_book
+    if target_dollars <= cap or target_dollars <= 0.0:
+        return target
+    scale = cap / target_dollars
+    return {ticker: float(weight) * scale for ticker, weight in target.items()}
+
+
 def simulation_curve_start(strategy: dict) -> str:
     """First date the Yahoo-backed simulator must cover for this spec.
 
@@ -210,6 +236,10 @@ def simulate(
     (nominal price) feed that model; both are optional — without `dollar_volume`
     the impact term is skipped, and without `raw_closes` the adjusted close is
     used for price scaling.
+
+    When the spec's `cost_model` carries `impact_book_cap`, target weights are
+    scaled so invested capital stays at or below capacity and excess equity
+    remains cash, matching how Astralanx generated the curve prefix.
     """
     if "formula" in strategy:
         if prices_long is None:
@@ -229,6 +259,7 @@ def _simulate_signal(
 ) -> SimResult:
     darwin_curve = _darwin_equity_curve(strategy)
     capital = _starting_capital(strategy, darwin_curve)
+    impact_base = float(strategy["portfolio_size"])
     sim_start = pd.Timestamp(simulation_curve_start(strategy))
     live_since = pd.Timestamp(strategy["deployed_on"])
     cadence = int(strategy["rebalance_cadence_days"])
@@ -272,12 +303,14 @@ def _simulate_signal(
         if day in rebal_dates:
             target = signals.evaluate(signal, closes, day)
             equity_now = cash + _position_value(shares, closes.loc[day], tickers)
+            target = _cap_target_weights(target, cfg, equity_now, impact_base)
             prior_w = _current_weights(shares, closes.loc[day], equity_now, tickers)
             names = set(prior_w) | set(target)
             price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
             vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
             pending_cost = costs.rebalance_cost_fraction(
-                prior_w, target, price, dvol, cfg, vol_mult
+                prior_w, target, price, dvol, cfg, vol_mult,
+                impact_book=_impact_account_book(cfg, equity_now, impact_base),
             )["total_fraction"]
             pending_target = target
 
@@ -319,6 +352,7 @@ def _simulate_dsl(
     """
     darwin_curve = _darwin_equity_curve(strategy)
     capital = _starting_capital(strategy, darwin_curve)
+    impact_base = float(strategy["portfolio_size"])
     sim_start = pd.Timestamp(simulation_curve_start(strategy))
     live_since = pd.Timestamp(strategy["deployed_on"])
     cadence = int(strategy["rebalance_cadence_days"])
@@ -386,13 +420,15 @@ def _simulate_dsl(
                 portfolio_state_override=override,
             )
             target = {t: float(w) for t, w in res["final_weights"].items() if w > 0}
+            target = _cap_target_weights(target, cfg, equity_now, impact_base)
             state.push_turnover(target, prior_w)
 
             names = set(prior_w) | set(target)
             price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
             vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
             pending_cost = costs.rebalance_cost_fraction(
-                prior_w, target, price, dvol, cfg, vol_mult
+                prior_w, target, price, dvol, cfg, vol_mult,
+                impact_book=_impact_account_book(cfg, equity_now, impact_base),
             )["total_fraction"]
             pending_target = target
             equity_at_prev_rebal = equity_now

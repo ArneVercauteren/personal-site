@@ -9,7 +9,7 @@ The reader side of the live data: the dashboard page and the chart/stat componen
 ## Shape (built)
 
 - `app/astralanx/live/page.tsx` — loads `portfolio.json` + `strategies.json` via `lib/data.ts`, shows the `as_of` date and the disclaimer, then renders strategies in two labelled sections — **Open strategies** (formula + positions shown) and **Secured strategies** (performance + exposure only) — splitting on `isOpen`. One `StrategyCard` per strategy.
-- `app/astralanx/live/[id]/page.tsx` — **per-strategy detail page** (statically generated from the published ids). Header + key facts, the continuous `RegimeEquityChart` that groups every pre-live curve point as OOS/backtest history, the live (forward) stats, then a **Backtest** section with three detailed-stat panels — **Out-of-sample**, **Training (in-sample)**, and **Combined (training + OOS)** — driven by `meta.performance` (the three single-seed runs), a king-level **Capacity & holdings** block (`active_share`, `capacity`), and the composition (basket for open, exposure donut for secured). The `DetailedStatsPanel` helper renders whichever of the ~18 `DetailedStats` fields a run carries; degrades gracefully when provenance is absent.
+- `app/astralanx/live/[id]/page.tsx` — **per-strategy detail page** (statically generated from the published ids). Header + key facts, the continuous `RegimeEquityChart` that groups every pre-live curve point as OOS/backtest history, the live (forward) stats, then a **Backtest** section with three detailed-stat panels — **Out-of-sample**, **Training (in-sample)**, and **Combined (training + OOS)** — driven by `meta.performance` (the three single-seed runs), a king-level **Capacity & holdings** block (`active_share`, `cost_model.impact_book_cap`), and the composition (basket for open, exposure donut for secured). Deep analytics uses that same deployed cap as its sole capacity figure; post-cap capacity distributions are diagnostics only and are not displayed as competing estimates. The `DetailedStatsPanel` helper renders whichever of the ~18 `DetailedStats` fields a run carries; degrades gracefully when provenance is absent.
 - `components/StrategyCard.tsx` — per-strategy summary card: name, open/secured badge, equity curve, split live/backtest stats, drawdown chart, positions table (open) or exposure donut (secured), metadata, and a "Full breakdown →" link to the detail page.
 - `components/EquityCurveChart.tsx` — Recharts area/line equity curve. With `liveSince` it renders two-tone: a muted/dashed out-of-sample backfill segment and a solid live segment, with a "Live" `ReferenceLine` marker and a small legend. Client component.
 - `components/RegimeEquityChart.tsx` — Recharts equity curve with translucent `ReferenceArea` bands behind it for OOS/backtest history and live paper-trading (boundaries snapped to the nearest curve date), the live marker, and a regime legend. Detail-page only. Client component.
@@ -26,7 +26,10 @@ Recharts loads only on `/astralanx/live` and `/astralanx/live/[id]` (code-split)
 The summary equity cards and per-strategy lifecycle graph both read `public/data/benchmark.json`
 through `lib/data.ts` and show a default-on S&P 500 overlay toggle. The overlay is rebased to the
 visible strategy window, so zooming the lifecycle explorer compares relative growth over that
-selected range. It remains static-first: no browser-side market-data fetch.
+selected range. Training and OOS presets use the corresponding standalone replay curve when the
+strategy metadata provides one, keeping the plotted segment consistent with its displayed stats;
+full history remains the continuous capacity-constrained account curve. It remains static-first:
+no browser-side market-data fetch.
 
 ## Planned (next increment)
 

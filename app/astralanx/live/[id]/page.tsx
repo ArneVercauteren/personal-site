@@ -129,7 +129,7 @@ function runPeriod(r: PerformanceRun): string {
 
 function Facts({ meta }: { meta: StrategyMeta }) {
   const facts: { label: string; value: string }[] = [
-    { label: "Capital", value: money(meta.portfolio_size, meta.base_currency) },
+    { label: "Starting Capital", value: money(meta.portfolio_size, meta.base_currency) },
     { label: "Rebalance", value: `${meta.rebalance_cadence_days}d` },
     {
       label: "Costs",
@@ -165,6 +165,9 @@ export default async function StrategyDetailPage({
   const liveSince = strategy.live_since ?? meta?.deployed_on;
   const firstD = strategy.equity_curve[0]?.d;
   const lastD = strategy.equity_curve.at(-1)?.d;
+  // Real live data exists only once the curve reaches the live date — a strategy
+  // deployed today has none yet, so its live stats are "accruing", not 0%.
+  const hasLiveData = Boolean(liveSince && lastD && lastD >= liveSince);
   const perf = meta?.performance;
 
   // Lifecycle chart bands: the in-sample training regime(s), the held-out
@@ -208,6 +211,9 @@ export default async function StrategyDetailPage({
   const cap = meta?.capacity;
   const hasLiquidity =
     meta?.active_share != null || cap?.liquidity_usd != null || cap?.impact_usd != null;
+  // Whether the published curve was capped at capacity (compound-then-cap model).
+  const impactBookCap = meta?.cost_model?.impact_book_cap;
+  const displayedCapacity = impactBookCap ?? cap?.impact_usd ?? cap?.liquidity_usd;
 
   // Show the deep-analytics CTA only when some run actually carries the rich
   // open_diagnostics block (open strategies exported from Astralanx).
@@ -267,21 +273,45 @@ export default async function StrategyDetailPage({
         </p>
         <EquityExplorer
           points={strategy.equity_curve}
+          segmentCurves={{
+            training: perf?.training.equity_curve,
+            oos: perf?.oos.equity_curve,
+          }}
           regimes={regimes}
           benchmark={sp500}
           currency={meta?.base_currency ?? "USD"}
           liveSince={liveSince}
         />
+        {impactBookCap ? (
+          <p className="mt-2 max-w-prose text-xs text-ink-muted">
+            Full history is a continuous account: above the estimated capacity (
+            {money(impactBookCap, meta?.base_currency ?? "USD")}), unsupported capital
+            remains cash. Training and out-of-sample presets use their standalone
+            replay curves so they match the statistics shown below.
+          </p>
+        ) : null}
       </Section>
 
       {strategy.stats_live ? (
         <Section eyebrow="Live" title="Forward paper-trading">
-          <DetailedStatsPanel
-            title="Live (paper)"
-            period={liveSince ? `since ${shortDate(liveSince)}` : undefined}
-            stats={strategy.stats_live}
-            note="Real forward tracking since the live date using the Yahoo Finance API, and the same cost model as the backtests."
-          />
+          {hasLiveData ? (
+            <DetailedStatsPanel
+              title="Live (paper)"
+              period={liveSince ? `since ${shortDate(liveSince)}` : undefined}
+              stats={strategy.stats_live}
+              note="Real forward tracking since the live date using the Yahoo Finance API, and the same cost model as the backtests."
+            />
+          ) : (
+            <div className="panel p-6">
+              <h3 className="text-base font-semibold text-ink">Live (paper)</h3>
+              <p className="mt-1 text-sm text-ink-muted">
+                Accruing — forward paper-trading begins{" "}
+                {liveSince ? shortDate(liveSince) : "at the live date"}. Live stats
+                appear once a few trading days have passed; everything above is
+                out-of-sample backtest history.
+              </p>
+            </div>
+          )}
         </Section>
       ) : null}
 
@@ -326,11 +356,8 @@ export default async function StrategyDetailPage({
             {meta?.active_share != null ? (
               <Cell label="Active share" value={pct(meta.active_share)} />
             ) : null}
-            {cap?.liquidity_usd != null ? (
-              <Cell label="Capacity · liquidity" value={money(cap.liquidity_usd)} />
-            ) : null}
-            {cap?.impact_usd != null ? (
-              <Cell label="Capacity · impact" value={money(cap.impact_usd)} />
+            {displayedCapacity != null ? (
+              <Cell label="Capacity" value={money(displayedCapacity)} />
             ) : null}
           </dl>
         </Section>

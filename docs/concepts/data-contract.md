@@ -117,12 +117,20 @@ as a single curve with one stat set:
 - `stats_live` — stats over the post-live segment `[live_since, last bar]`. Reports zeros while the
   segment is shorter than a handful of bars; the UI shows "accruing" until then.
 
-`stats` stays the full-curve summary. On the Tier-2 **writer** side, the curve start is set per-king by
+`stats` stays the full-curve summary. When `cost_model.impact_book_cap` is set, the curve models a
+disciplined investor: target weights are scaled so invested capital stays at capacity and excess
+equity remains cash, so the curve never assumes trading past capacity. The detail
+page notes the cap on the lifecycle chart. On the Tier-2 **writer** side, the curve start is set per-king by
 a `backfill_start` field in the strategy spec (an updater input, *not* part of this published
 contract); if Darwin also provides `darwin_equity_curve`, that training+OOS curve is used as the
 authoritative prefix and Yahoo-backed simulation starts only at the prefix's final date.
 `deployed_on` in `strategies.json` is the live-since date. See
 [subsystems/paper-trading-updater.md](../subsystems/paper-trading-updater.md).
+
+When `performance.training.equity_curve` or `performance.oos.equity_curve` is present, the
+corresponding chart preset uses that standalone replay curve. This keeps the chart consistent with
+the preset's CAGR and other statistics. The full-history chart still uses the continuous lifecycle
+curve, whose capacity cap and accumulated account size can produce different returns.
 
 ## `strategies.json` — per-strategy metadata
 

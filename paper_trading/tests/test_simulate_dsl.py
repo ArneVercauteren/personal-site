@@ -109,6 +109,61 @@ def test_darwin_equity_curve_is_authoritative_prefix(universe, long_prices):
     assert res.stats_backtest["cagr"] != 0.0
 
 
+def test_invested_book_cap_scales_targets_and_leaves_cash():
+    """Capacity scales invested weights while trade dollars use the full book."""
+    from paper_trading import costs
+
+    capped = costs.CostModel.from_spec(
+        {"commission_bps": 1.0, "slippage_bps": 5.0,
+         "impact_portfolio_size": 1_000_000.0, "impact_book_cap": 2_000_000.0}
+    )
+    target = {"A": 0.6, "B": 0.4}
+    assert portfolio._impact_account_book(capped, 150_000.0, 100_000.0) == pytest.approx(
+        1_500_000.0
+    )
+    assert portfolio._cap_target_weights(target, capped, 150_000.0, 100_000.0) == target
+
+    account_book = portfolio._impact_account_book(capped, 5_000_000.0, 100_000.0)
+    scaled = portfolio._cap_target_weights(target, capped, 5_000_000.0, 100_000.0)
+    assert sum(scaled.values()) * account_book == pytest.approx(2_000_000.0)
+
+    uncapped = costs.CostModel.from_spec({"commission_bps": 1.0, "slippage_bps": 5.0})
+    assert portfolio._cap_target_weights(target, uncapped, 5_000_000.0, 100_000.0) == target
+
+
+def test_different_capacity_caps_change_cash_allocation(universe, long_prices):
+    """Different invested-cap ceilings produce different cash allocations."""
+    opens, closes = prices.long_to_wide(long_prices)
+    raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long_prices)
+    available = closes.loc["2023-06-01":].index
+    prefix = available[:3]
+    base_spec = _spec(universe, _roc_topn())
+    base_spec["deployed_on"] = available[10].strftime("%Y-%m-%d")
+    # A prefix that compounds ~50x so both runs retain cash above capacity.
+    base_spec["darwin_equity_curve"] = [
+        {"d": prefix[0].strftime("%Y-%m-%d"), "v": 100_000.0},
+        {"d": prefix[1].strftime("%Y-%m-%d"), "v": 3_000_000.0},
+        {"d": prefix[2].strftime("%Y-%m-%d"), "v": 5_000_000.0},
+    ]
+
+    def run(cap: float):
+        spec = {**base_spec, "cost_model": {
+            "commission_bps": 1.0, "slippage_bps": 5.0,
+            "volume_impact_coef": 0.5, "impact_portfolio_size": 1_000_000.0,
+            "impact_book_cap": cap,
+        }}
+        return portfolio.simulate(
+            spec, opens, closes, prices_long=long_prices,
+            dollar_volume=dollar_volume, raw_closes=raw_closes,
+        )
+
+    low_cap = run(1_500_000.0)
+    high_cap = run(10_000_000.0)
+    # Same prefix; the lower cap leaves more cash and changes subsequent returns.
+    assert low_cap.equity_curve[:3] == high_cap.equity_curve[:3]
+    assert low_cap.equity_curve[-1]["v"] != high_cap.equity_curve[-1]["v"]
+
+
 def test_darwin_prefix_continuation_survives_sparse_yahoo_ticker(universe, long_prices):
     """One sparse universe member must not erase the Yahoo continuation dates."""
     spec = _spec(universe, _roc_topn())

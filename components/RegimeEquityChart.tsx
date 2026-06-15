@@ -56,6 +56,7 @@ export function RegimeEquityChart({
   const rawId = useId().replace(/:/g, "");
   const gradientId = `regime-equity-${rawId}`;
   const [showBenchmark, setShowBenchmark] = useState(Boolean(benchmark));
+  const [logScale, setLogScale] = useState(false);
   if (points.length < 2) return null;
 
   const dates = points.map((p) => p.d);
@@ -88,6 +89,10 @@ export function RegimeEquityChart({
   const min = Math.min(...values);
   const max = Math.max(...values);
   const pad = (max - min) * 0.08 || max * 0.02;
+  // Log scale needs strictly-positive, slightly-padded bounds; linear keeps the
+  // additive padding. Bands and the y-axis share these bounds.
+  const loBound = logScale ? Math.max(min * 0.9, 1e-9) : min - pad;
+  const hiBound = logScale ? max * 1.1 : max + pad;
   // Compact y labels (e.g. "$147M") once values run into the millions, where a
   // full "$146,638,651" would overflow the axis; full money below that.
   const fmtY = (v: number) => (max >= 1_000_000 ? compactMoney(v, currency) : money(v, currency));
@@ -114,6 +119,17 @@ export function RegimeEquityChart({
       {benchmark.name}
     </label>
   ) : null;
+  const LogToggle = (
+    <label className="inline-flex cursor-pointer items-center gap-1.5">
+      <input
+        type="checkbox"
+        checked={logScale}
+        onChange={(e) => setLogScale(e.target.checked)}
+        className="h-3 w-3 accent-accent"
+      />
+      Log scale
+    </label>
+  );
 
   return (
     <div>
@@ -132,8 +148,8 @@ export function RegimeEquityChart({
                 key={`${b.regime.kind}-${i}`}
                 x1={b.span[0]}
                 x2={b.span[1]}
-                y1={min - pad}
-                y2={max + pad}
+                y1={loBound}
+                y2={hiBound}
                 fill={REGIME_STYLE[b.regime.kind].color}
                 fillOpacity={0.1}
                 stroke="none"
@@ -150,11 +166,12 @@ export function RegimeEquityChart({
             />
             <YAxis
               width={56}
-              domain={[min - pad, max + pad]}
+              domain={[loBound, hiBound]}
               tickFormatter={fmtY}
               tick={{ fill: CHART.inkMuted, fontSize: 10 }}
               tickLine={false}
               axisLine={false}
+              {...(logScale ? { scale: "log" as const, allowDataOverflow: true } : {})}
             />
             <Tooltip
               cursor={{ stroke: CHART.inkMuted, strokeDasharray: "3 3" }}
@@ -211,20 +228,19 @@ export function RegimeEquityChart({
           </AreaChart>
         </ResponsiveContainer>
       </div>
-      {shownKinds.length > 0 || BenchmarkToggle ? (
-        <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] text-ink-muted">
-          {shownKinds.map((k) => (
-            <span key={k} className="inline-flex items-center gap-1.5">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-sm"
-                style={{ backgroundColor: REGIME_STYLE[k].color, opacity: 0.5 }}
-              />
-              {REGIME_STYLE[k].name}
-            </span>
-          ))}
-          {BenchmarkToggle}
-        </p>
-      ) : null}
+      <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[10px] text-ink-muted">
+        {shownKinds.map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-sm"
+              style={{ backgroundColor: REGIME_STYLE[k].color, opacity: 0.5 }}
+            />
+            {REGIME_STYLE[k].name}
+          </span>
+        ))}
+        {BenchmarkToggle}
+        {LogToggle}
+      </p>
     </div>
   );
 }

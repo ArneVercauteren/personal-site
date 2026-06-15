@@ -163,6 +163,10 @@ export interface CostModel {
   /** Authoritative book size the volume-impact term sizes trades against
    *  (default Astralanx's $1,000,000), independent of the traded portfolio_size. */
   impact_portfolio_size?: number;
+  /** Legacy field name for the invested-cap ceiling (USD). Target weights are
+   *  scaled at capacity and excess account equity remains cash. Absent means
+   *  uncapped. */
+  impact_book_cap?: number;
   /** Crisis-aware vol cost scaling (defaults: enabled, k=0.75, 63/252d, max 3). */
   vol_scaled_cost_enable?: boolean;
   vol_cost_k?: number;
@@ -360,6 +364,8 @@ export interface PerformanceRun {
   end: string;
   /** Optional sub-windows (e.g. training's constituent regimes), display only. */
   windows?: { start: string; end: string; label?: string }[];
+  /** Curve from this exact standalone replay, matching the run's statistics. */
+  equity_curve?: EquityPoint[];
   stats: DetailedStats;
   /** Optional rich analytics for the deep-dive page (open strategies). */
   open_diagnostics?: OpenDiagnostics;

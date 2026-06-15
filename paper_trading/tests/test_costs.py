@@ -84,6 +84,21 @@ def test_impact_portfolio_size_defaults_to_darwin_1m():
     assert cfg.impact_portfolio_size == DEFAULT_IMPACT_PORTFOLIO_SIZE == 1_000_000.0
 
 
+def test_impact_book_override_sizes_impact():
+    # portfolio.py passes a per-rebalance impact_book that overrides the cost
+    # model's impact_portfolio_size. 4× the book → 2× the impact (sqrt).
+    cfg = _cfg(volume_impact_coef=0.5, impact_portfolio_size=100_000.0)
+    args = ({}, {"A": 0.5}, {"A": 100.0}, {"A": 5e8})
+    base = rebalance_cost_fraction(*args, cfg, 1.0)["volume_impact_fraction"]
+    override = rebalance_cost_fraction(
+        *args, cfg, 1.0, impact_book=400_000.0
+    )["volume_impact_fraction"]
+    assert override == pytest.approx(2.0 * base)
+    # impact_book=None falls back to the cost model's impact_portfolio_size.
+    none_book = rebalance_cost_fraction(*args, cfg, 1.0, impact_book=None)["volume_impact_fraction"]
+    assert none_book == pytest.approx(base)
+
+
 def test_missing_adv_penalty():
     cfg = _cfg(volume_impact_coef=0.5)
     res = rebalance_cost_fraction(
