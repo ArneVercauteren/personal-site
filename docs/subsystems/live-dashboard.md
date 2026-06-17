@@ -40,8 +40,13 @@ no browser-side market-data fetch.
 The page renders both [open and secured](../concepts/open-vs-secured-strategies.md) strategies,
 keyed off `visibility`:
 
-- **open** → badge "Open · formula shown", full **positions** table, and (when the entry carries a `formula`) a rendered **Formula** section on the detail page via `FormulaView` — the actual DSL score tree, exit rule, and indicator glossary. The card's "View the formula →" link jumps to that `#formula` section.
+- **open** → badge "Open · formula shown", full **allocation** view (ticker weights plus derived cash residual), and (when the entry carries a `formula`) a rendered **Formula** section on the detail page via `FormulaView` — the actual DSL score tree, exit rule, and indicator glossary. The card's "View the formula →" link jumps to that `#formula` section.
 - **secured** → badge "Live paper · positions held private", **exposure donut** (sector/asset-class) instead of a positions table. Never render `positions` for a secured entry — the field isn't there, and the UI must not invent one.
+
+For open strategies, the positions table shows only invested ticker weights. If the simulator is
+capacity-capped, those weights can sum well below 100%; the residual is cash and should not be
+invented as an equity position. Weights also drift naturally between rebalances because shares are
+held buy-and-hold until the next scheduled fill.
 
 ## Invariants it must respect
 

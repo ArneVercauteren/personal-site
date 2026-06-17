@@ -91,6 +91,29 @@ are NaN, handled).
 6. Refresh `public/data/benchmark.json` from the SPY-backed S&P 500 proxy through the same end date.
 7. (In CI) commit the JSON if it changed → Vercel redeploys.
 
+## Backfill continuation semantics
+
+When a deployed king carries an engine-supplied `darwin_equity_curve`, that curve is the
+authoritative prefix. The Yahoo-backed simulator starts at the prefix's final date and continues
+the same paper account forward; it does **not** reset at `deployed_on` / `live_since`. The live
+marker is only the evidence boundary: dates before it are historical backfill / OOS replay, and
+dates on or after it are forward paper tracking of the already-running simulated account.
+
+The rebalance schedule should continue smoothly across the engine prefix, Yahoo backfill, and live
+tail. In the current public updater this means cadence is anchored at the Yahoo continuation start
+(the final `darwin_equity_curve` date when present, otherwise `backfill_start` / `deployed_on`) and
+then advanced by `rebalance_cadence_days`, with fills at the next open. A live date that falls
+between two scheduled rebalances therefore inherits the last backfilled basket until the next
+scheduled rebalance. Do not force a rebalance merely because the curve crosses `live_since`.
+
+Between rebalances, holdings are buy-and-hold: share counts stay fixed, weights drift with prices,
+and the next rebalance receives those drifted actual weights as `prior_weights`. Do not manually
+adjust weights back to the last target because prices moved.
+
+`next_rebalance_date` is cadence metadata for the private secured rebalance workflow; the public
+open-strategy simulator currently does not consume it. If it becomes authoritative for open
+strategies, update this section and `portfolio._rebalance_dates` together.
+
 ## Cost model
 
 Darwin-faithful, in `paper_trading/costs.py` (ported from Darwin's `native_eval.c` cost block and

@@ -214,6 +214,11 @@ export default async function StrategyDetailPage({
   // Whether the published curve was capped at capacity (compound-then-cap model).
   const impactBookCap = meta?.cost_model?.impact_book_cap;
   const displayedCapacity = impactBookCap ?? cap?.impact_usd ?? cap?.liquidity_usd;
+  const investedWeight = isOpen(strategy)
+    ? strategy.positions.reduce((sum, p) => sum + p.weight, 0)
+    : null;
+  const cashWeight =
+    investedWeight == null ? null : Math.max(0, 1 - investedWeight);
 
   // Show the deep-analytics CTA only when some run actually carries the rich
   // open_diagnostics block (open strategies exported from Astralanx).
@@ -264,8 +269,11 @@ export default async function StrategyDetailPage({
       ) : null}
 
       <Section eyebrow="Lifecycle" title="Training → out-of-sample → live">
+        <h3 className="mb-2 text-base font-semibold text-ink">
+          {impactBookCap ? "Capacity-capped account equity" : "Account equity"}
+        </h3>
         <p className="mb-4 max-w-prose text-sm text-ink-muted">
-          The curve is shaded by phase: the in-sample{" "}
+          The line is total simulated account value, shaded by phase: the in-sample{" "}
           <span className="text-ink">training</span> window(s) it was fit on, the
           held-out <span className="text-ink">out-of-sample</span> window, and{" "}
           <span className="text-ink">live</span> paper-trading after the marker.
@@ -374,10 +382,18 @@ export default async function StrategyDetailPage({
 
       <Section
         eyebrow={isOpen(strategy) ? "Composition" : "Exposure"}
-        title={isOpen(strategy) ? "Current basket" : "Aggregate sector exposure"}
+        title={isOpen(strategy) ? "Current allocation" : "Aggregate sector exposure"}
       >
         {isOpen(strategy) ? (
           <>
+            {investedWeight != null && cashWeight != null ? (
+              <p className="mb-4 max-w-prose text-sm text-ink-muted">
+                Current account allocation:{" "}
+                <span className="num text-ink">{pct(investedWeight)}</span>{" "}
+                invested, <span className="num text-ink">{pct(cashWeight)}</span>{" "}
+                cash / uninvested.
+              </p>
+            ) : null}
             <ul className="grid grid-cols-2 gap-x-8 gap-y-1 sm:grid-cols-3">
               {[...strategy.positions]
                 .sort((a, b) => b.weight - a.weight)
@@ -387,6 +403,12 @@ export default async function StrategyDetailPage({
                     <span className="num text-ink-muted">{pct(p.weight)}</span>
                   </li>
                 ))}
+              {cashWeight != null && cashWeight > 0.0005 ? (
+                <li className="flex items-center justify-between border-t border-hair pt-1 text-sm sm:col-span-3">
+                  <span className="text-ink">Cash / uninvested</span>
+                  <span className="num text-ink-muted">{pct(cashWeight)}</span>
+                </li>
+              ) : null}
             </ul>
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1">
               {strategy.formula ? (

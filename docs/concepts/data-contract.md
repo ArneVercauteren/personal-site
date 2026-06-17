@@ -77,6 +77,9 @@ Notes on the shape:
 - `as_of` is the snapshot date; the site shows it so a reader knows how fresh the data is.
 - Money values are plain numbers in `base_currency`; the site formats them via `lib/format.ts`.
 - `exposure[].group` is a sector / asset-class label, never a ticker.
+- Open `positions[].weight` values are current invested ticker weights only. They may sum to less
+  than 1.0 when a capacity cap leaves the rest of the account in cash; the cash residual is not
+  emitted as a fake ticker position. Between rebalances these weights drift with prices.
 
 ## `benchmark.json` - S&P 500 overlay
 

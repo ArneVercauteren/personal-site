@@ -186,7 +186,7 @@ export function RegimeEquityChart({
               labelFormatter={(d) => shortDate(String(d))}
               formatter={(v, name) => [
                 money(Number(v), currency),
-                name === "vBenchmark" ? (benchmark?.name ?? "S&P 500") : "Equity",
+                name === "vBenchmark" ? (benchmark?.name ?? "S&P 500") : "Account equity",
               ]}
             />
             {markerD ? (

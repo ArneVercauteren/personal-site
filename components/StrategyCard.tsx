@@ -50,6 +50,7 @@ export function StrategyCard({
     : strategy.stats_backtest
       ? "Backtest · out-of-sample"
       : "Performance";
+  const isCapacityCapped = Boolean(meta?.cost_model?.impact_book_cap);
 
   return (
     <article className="panel flex flex-col gap-4 p-6">
@@ -63,12 +64,22 @@ export function StrategyCard({
         <Badge visibility={strategy.visibility} />
       </div>
 
-      <EquityCurveChart
-        points={strategy.equity_curve}
-        benchmark={benchmark}
-        currency={meta?.base_currency ?? "USD"}
-        liveSince={liveSince}
-      />
+      <div>
+        <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+          {isCapacityCapped ? "Capacity-capped account equity" : "Account equity"}
+        </h4>
+        <EquityCurveChart
+          points={strategy.equity_curve}
+          benchmark={benchmark}
+          currency={meta?.base_currency ?? "USD"}
+          liveSince={liveSince}
+        />
+        {isCapacityCapped ? (
+          <p className="mt-1 text-[11px] text-ink-muted">
+            Excess account value above the capacity estimate remains in cash.
+          </p>
+        ) : null}
+      </div>
 
       <div>
         <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">

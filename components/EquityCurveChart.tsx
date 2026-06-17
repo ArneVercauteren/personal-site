@@ -89,7 +89,7 @@ export function EquityCurveChart({
     labelFormatter: (d: unknown) => shortDate(String(d)),
     formatter: (v: unknown, name: unknown) => {
       if (v == null) return [] as unknown as [string, string];
-      const label = name === "vBenchmark" ? (benchmark?.name ?? "S&P 500") : "Equity";
+      const label = name === "vBenchmark" ? (benchmark?.name ?? "S&P 500") : "Account equity";
       return [money(Number(v), currency), label] as [string, string];
     },
   } as const;
