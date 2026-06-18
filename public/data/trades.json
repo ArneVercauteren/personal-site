@@ -76,7 +76,7 @@
       "d": "2026-05-19",
       "ticker": "CIFR",
       "side": "sell",
-      "weight": 0.0083
+      "weight": 0.0084
     },
     {
       "strategy_id": "gen0194",
@@ -181,7 +181,7 @@
       "d": "2026-05-19",
       "ticker": "NVTS",
       "side": "sell",
-      "weight": 0.0018
+      "weight": 0.0008
     },
     {
       "strategy_id": "gen0194",
@@ -342,7 +342,7 @@
       "d": "2026-05-19",
       "ticker": "VISN",
       "side": "sell",
-      "weight": 0.003
+      "weight": 0.0031
     },
     {
       "strategy_id": "gen0194",
