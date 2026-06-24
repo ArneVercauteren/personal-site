@@ -27,7 +27,7 @@
       "d": "2026-05-19",
       "ticker": "AMPX",
       "side": "sell",
-      "weight": 0.009
+      "weight": 0.0098
     },
     {
       "strategy_id": "gen0194",
@@ -139,7 +139,7 @@
       "d": "2026-05-19",
       "ticker": "IAG",
       "side": "sell",
-      "weight": 0.0082
+      "weight": 0.0074
     },
     {
       "strategy_id": "gen0194",
