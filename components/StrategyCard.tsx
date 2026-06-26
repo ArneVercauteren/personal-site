@@ -57,7 +57,7 @@ export function StrategyCard({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-ink">{strategy.name}</h3>
-          {meta ? (
+          {meta?.blurb ? (
             <p className="mt-1 text-sm text-ink-muted">{meta.blurb}</p>
           ) : null}
         </div>
