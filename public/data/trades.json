@@ -34,7 +34,7 @@
       "d": "2026-06-30",
       "ticker": "APLD",
       "side": "sell",
-      "weight": 0.0013
+      "weight": 0.0012
     },
     {
       "strategy_id": "gen0194",
@@ -160,7 +160,7 @@
       "d": "2026-06-30",
       "ticker": "JOBY",
       "side": "sell",
-      "weight": 0.0001
+      "weight": 0.0006
     },
     {
       "strategy_id": "gen0194",
@@ -223,7 +223,7 @@
       "d": "2026-06-30",
       "ticker": "OSS",
       "side": "buy",
-      "weight": 0.0036
+      "weight": 0.0028
     },
     {
       "strategy_id": "gen0194",
@@ -265,21 +265,21 @@
       "d": "2026-06-30",
       "ticker": "QUBT",
       "side": "sell",
-      "weight": 0.0013
+      "weight": 0.0012
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "RCAT",
       "side": "buy",
-      "weight": 0.0054
+      "weight": 0.0055
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "RGTI",
       "side": "sell",
-      "weight": 0.0003
+      "weight": 0.0002
     },
     {
       "strategy_id": "gen0194",
@@ -300,7 +300,7 @@
       "d": "2026-06-30",
       "ticker": "SVM",
       "side": "buy",
-      "weight": 0.0024
+      "weight": 0.0025
     },
     {
       "strategy_id": "gen0194",
@@ -328,7 +328,7 @@
       "d": "2026-06-30",
       "ticker": "UMAC",
       "side": "sell",
-      "weight": 0.0128
+      "weight": 0.0116
     },
     {
       "strategy_id": "gen0194",
