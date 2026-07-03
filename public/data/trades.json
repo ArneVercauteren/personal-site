@@ -55,7 +55,7 @@
       "d": "2026-06-30",
       "ticker": "BB",
       "side": "buy",
-      "weight": 0.0137
+      "weight": 0.0138
     },
     {
       "strategy_id": "gen0194",
@@ -104,21 +104,21 @@
       "d": "2026-06-30",
       "ticker": "CX",
       "side": "buy",
-      "weight": 0.0027
+      "weight": 0.0028
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "EQX",
       "side": "sell",
-      "weight": 0.0004
+      "weight": 0.0003
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "ERAS",
       "side": "sell",
-      "weight": 0.0079
+      "weight": 0.0078
     },
     {
       "strategy_id": "gen0194",
@@ -181,14 +181,14 @@
       "d": "2026-06-30",
       "ticker": "NOK",
       "side": "buy",
-      "weight": 0.0003
+      "weight": 0.0004
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "NVDY",
       "side": "sell",
-      "weight": 0.0008
+      "weight": 0.0014
     },
     {
       "strategy_id": "gen0194",
@@ -258,7 +258,7 @@
       "d": "2026-06-30",
       "ticker": "QBTS",
       "side": "sell",
-      "weight": 0.0007
+      "weight": 0.0006
     },
     {
       "strategy_id": "gen0194",
@@ -286,7 +286,7 @@
       "d": "2026-06-30",
       "ticker": "SAN",
       "side": "sell",
-      "weight": 0.0019
+      "weight": 0.0018
     },
     {
       "strategy_id": "gen0194",
@@ -349,7 +349,7 @@
       "d": "2026-06-30",
       "ticker": "VISN",
       "side": "sell",
-      "weight": 0.0018
+      "weight": 0.0017
     },
     {
       "strategy_id": "gen0194",
