@@ -139,7 +139,7 @@
       "d": "2026-06-30",
       "ticker": "HIMX",
       "side": "buy",
-      "weight": 0.0025
+      "weight": 0.0033
     },
     {
       "strategy_id": "gen0194",
@@ -153,7 +153,7 @@
       "d": "2026-06-30",
       "ticker": "IAG",
       "side": "buy",
-      "weight": 0.001
+      "weight": 0.0002
     },
     {
       "strategy_id": "gen0194",
@@ -174,7 +174,7 @@
       "d": "2026-06-30",
       "ticker": "LWLG",
       "side": "sell",
-      "weight": 0.0024
+      "weight": 0.0023
     },
     {
       "strategy_id": "gen0194",
@@ -300,7 +300,7 @@
       "d": "2026-06-30",
       "ticker": "SVM",
       "side": "buy",
-      "weight": 0.0024
+      "weight": 0.0025
     },
     {
       "strategy_id": "gen0194",
