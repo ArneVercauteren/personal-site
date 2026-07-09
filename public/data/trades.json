@@ -104,7 +104,7 @@
       "d": "2026-06-30",
       "ticker": "CX",
       "side": "buy",
-      "weight": 0.0027
+      "weight": 0.0019
     },
     {
       "strategy_id": "gen0194",
@@ -118,7 +118,7 @@
       "d": "2026-06-30",
       "ticker": "ERAS",
       "side": "sell",
-      "weight": 0.0078
+      "weight": 0.0086
     },
     {
       "strategy_id": "gen0194",
@@ -174,7 +174,7 @@
       "d": "2026-06-30",
       "ticker": "LWLG",
       "side": "sell",
-      "weight": 0.0023
+      "weight": 0.0024
     },
     {
       "strategy_id": "gen0194",
@@ -286,7 +286,7 @@
       "d": "2026-06-30",
       "ticker": "SAN",
       "side": "sell",
-      "weight": 0.0019
+      "weight": 0.0017
     },
     {
       "strategy_id": "gen0194",
@@ -335,7 +335,7 @@
       "d": "2026-06-30",
       "ticker": "UMC",
       "side": "sell",
-      "weight": 0.0083
+      "weight": 0.007
     },
     {
       "strategy_id": "gen0194",
