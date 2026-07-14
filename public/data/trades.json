@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-07-13",
+  "as_of": "2026-07-14",
   "trades": [
     {
       "strategy_id": "gen0194",
@@ -34,7 +34,7 @@
       "d": "2026-06-30",
       "ticker": "APLD",
       "side": "sell",
-      "weight": 0.0013
+      "weight": 0.0012
     },
     {
       "strategy_id": "gen0194",
@@ -132,7 +132,7 @@
       "d": "2026-06-30",
       "ticker": "HBM",
       "side": "sell",
-      "weight": 0.0003
+      "weight": 0.0002
     },
     {
       "strategy_id": "gen0194",
@@ -300,7 +300,7 @@
       "d": "2026-06-30",
       "ticker": "SVM",
       "side": "buy",
-      "weight": 0.0025
+      "weight": 0.0024
     },
     {
       "strategy_id": "gen0194",
