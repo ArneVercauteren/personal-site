@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-07-14",
+  "as_of": "2026-07-15",
   "trades": [
     {
       "strategy_id": "gen0194",
@@ -41,7 +41,7 @@
       "d": "2026-06-30",
       "ticker": "ASX",
       "side": "sell",
-      "weight": 0.001
+      "weight": 0.0008
     },
     {
       "strategy_id": "gen0194",
@@ -88,6 +88,13 @@
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
+      "ticker": "CORZ",
+      "side": "sell",
+      "weight": 0.0005
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-06-30",
       "ticker": "CRVS",
       "side": "sell",
       "weight": 0.0009
@@ -125,7 +132,7 @@
       "d": "2026-06-30",
       "ticker": "HBM",
       "side": "sell",
-      "weight": 0.0004
+      "weight": 0.0002
     },
     {
       "strategy_id": "gen0194",
@@ -153,7 +160,7 @@
       "d": "2026-06-30",
       "ticker": "JOBY",
       "side": "sell",
-      "weight": 0.0004
+      "weight": 0.0005
     },
     {
       "strategy_id": "gen0194",
@@ -167,7 +174,7 @@
       "d": "2026-06-30",
       "ticker": "LWLG",
       "side": "sell",
-      "weight": 0.0024
+      "weight": 0.0023
     },
     {
       "strategy_id": "gen0194",
@@ -195,7 +202,7 @@
       "d": "2026-06-30",
       "ticker": "NXE",
       "side": "sell",
-      "weight": 0.0027
+      "weight": 0.0026
     },
     {
       "strategy_id": "gen0194",
@@ -251,7 +258,7 @@
       "d": "2026-06-30",
       "ticker": "QBTS",
       "side": "sell",
-      "weight": 0.0008
+      "weight": 0.0006
     },
     {
       "strategy_id": "gen0194",
@@ -343,13 +350,6 @@
       "ticker": "VISN",
       "side": "sell",
       "weight": 0.0018
-    },
-    {
-      "strategy_id": "gen0194",
-      "d": "2026-06-30",
-      "ticker": "VLY",
-      "side": "sell",
-      "weight": 0.0001
     },
     {
       "strategy_id": "gen0194",
