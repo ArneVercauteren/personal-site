@@ -6,21 +6,21 @@
       "d": "2026-06-30",
       "ticker": "AG",
       "side": "sell",
-      "weight": 0.0003
+      "weight": 0.0002
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "AGNC",
       "side": "buy",
-      "weight": 0.0044
+      "weight": 0.0043
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "ALM",
       "side": "buy",
-      "weight": 0.0008
+      "weight": 0.0006
     },
     {
       "strategy_id": "gen0194",
@@ -34,7 +34,7 @@
       "d": "2026-06-30",
       "ticker": "APLD",
       "side": "sell",
-      "weight": 0.0012
+      "weight": 0.0013
     },
     {
       "strategy_id": "gen0194",
@@ -62,28 +62,28 @@
       "d": "2026-06-30",
       "ticker": "BKD",
       "side": "buy",
-      "weight": 0.0021
+      "weight": 0.0013
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "BW",
       "side": "buy",
-      "weight": 0.0038
+      "weight": 0.0037
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "CDE",
       "side": "sell",
-      "weight": 0.0002
+      "weight": 0.0001
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "CIFR",
       "side": "sell",
-      "weight": 0.0042
+      "weight": 0.0043
     },
     {
       "strategy_id": "gen0194",
@@ -97,14 +97,14 @@
       "d": "2026-06-30",
       "ticker": "CRVS",
       "side": "sell",
-      "weight": 0.0009
+      "weight": 0.001
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "CX",
       "side": "buy",
-      "weight": 0.0019
+      "weight": 0.001
     },
     {
       "strategy_id": "gen0194",
@@ -118,28 +118,28 @@
       "d": "2026-06-30",
       "ticker": "ERAS",
       "side": "sell",
-      "weight": 0.0087
+      "weight": 0.0076
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "ERIC",
       "side": "buy",
-      "weight": 0.0042
+      "weight": 0.0041
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "HBM",
       "side": "sell",
-      "weight": 0.0002
+      "weight": 0.0003
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "HIMX",
       "side": "buy",
-      "weight": 0.0017
+      "weight": 0.0024
     },
     {
       "strategy_id": "gen0194",
@@ -153,77 +153,70 @@
       "d": "2026-06-30",
       "ticker": "IAG",
       "side": "buy",
-      "weight": 0.0002
+      "weight": 0.0001
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "JOBY",
       "side": "sell",
-      "weight": 0.0005
+      "weight": 0.0006
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "LPTH",
       "side": "sell",
-      "weight": 0.0021
+      "weight": 0.0023
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "LWLG",
       "side": "sell",
-      "weight": 0.0023
+      "weight": 0.0024
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "NOK",
       "side": "buy",
-      "weight": 0.0003
+      "weight": 0.0001
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "NVDY",
       "side": "buy",
-      "weight": 0.0018
+      "weight": 0.0048
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "NVTS",
       "side": "sell",
-      "weight": 0.0037
+      "weight": 0.0039
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "NXE",
       "side": "sell",
-      "weight": 0.0026
+      "weight": 0.0027
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "ONDS",
       "side": "sell",
-      "weight": 0.0018
-    },
-    {
-      "strategy_id": "gen0194",
-      "d": "2026-06-30",
-      "ticker": "ORLA",
-      "side": "sell",
-      "weight": 0.0001
+      "weight": 0.0019
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "OSS",
       "side": "buy",
-      "weight": 0.0028
+      "weight": 0.0026
     },
     {
       "strategy_id": "gen0194",
@@ -272,7 +265,7 @@
       "d": "2026-06-30",
       "ticker": "RCAT",
       "side": "buy",
-      "weight": 0.0055
+      "weight": 0.0054
     },
     {
       "strategy_id": "gen0194",
@@ -286,7 +279,7 @@
       "d": "2026-06-30",
       "ticker": "SAN",
       "side": "sell",
-      "weight": 0.0017
+      "weight": 0.0019
     },
     {
       "strategy_id": "gen0194",
@@ -300,42 +293,42 @@
       "d": "2026-06-30",
       "ticker": "SVM",
       "side": "buy",
-      "weight": 0.0024
+      "weight": 0.0023
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "TRVI",
       "side": "sell",
-      "weight": 0.001
+      "weight": 0.0007
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "TTI",
       "side": "buy",
-      "weight": 0.006
+      "weight": 0.0059
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "UEC",
       "side": "buy",
-      "weight": 0.0032
+      "weight": 0.0033
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "UMAC",
       "side": "sell",
-      "weight": 0.0124
+      "weight": 0.0126
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "UMC",
       "side": "sell",
-      "weight": 0.007
+      "weight": 0.0073
     },
     {
       "strategy_id": "gen0194",
@@ -349,14 +342,21 @@
       "d": "2026-06-30",
       "ticker": "VISN",
       "side": "sell",
-      "weight": 0.0018
+      "weight": 0.002
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-06-30",
+      "ticker": "VLY",
+      "side": "sell",
+      "weight": 0.0001
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "WULF",
       "side": "sell",
-      "weight": 0.0071
+      "weight": 0.0073
     }
   ]
 }
