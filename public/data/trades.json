@@ -118,14 +118,14 @@
       "d": "2026-06-30",
       "ticker": "ERAS",
       "side": "sell",
-      "weight": 0.0076
+      "weight": 0.0075
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "ERIC",
       "side": "buy",
-      "weight": 0.0041
+      "weight": 0.0048
     },
     {
       "strategy_id": "gen0194",
@@ -307,7 +307,7 @@
       "d": "2026-06-30",
       "ticker": "TTI",
       "side": "buy",
-      "weight": 0.0059
+      "weight": 0.005
     },
     {
       "strategy_id": "gen0194",
@@ -335,7 +335,7 @@
       "d": "2026-06-30",
       "ticker": "UUUU",
       "side": "sell",
-      "weight": 0.0003
+      "weight": 0.0004
     },
     {
       "strategy_id": "gen0194",
