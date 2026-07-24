@@ -26,8 +26,8 @@
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "AMPX",
-      "side": "sell",
-      "weight": 0.0006
+      "side": "buy",
+      "weight": 0.0001
     },
     {
       "strategy_id": "gen0194",
@@ -62,7 +62,7 @@
       "d": "2026-06-30",
       "ticker": "BKD",
       "side": "buy",
-      "weight": 0.0013
+      "weight": 0.0019
     },
     {
       "strategy_id": "gen0194",
@@ -153,14 +153,14 @@
       "d": "2026-06-30",
       "ticker": "IAG",
       "side": "buy",
-      "weight": 0.0001
+      "weight": 0.0009
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "JOBY",
       "side": "sell",
-      "weight": 0.0005
+      "weight": 0.0004
     },
     {
       "strategy_id": "gen0194",
@@ -188,7 +188,7 @@
       "d": "2026-06-30",
       "ticker": "NVDY",
       "side": "buy",
-      "weight": 0.0048
+      "weight": 0.0011
     },
     {
       "strategy_id": "gen0194",
@@ -223,7 +223,7 @@
       "d": "2026-06-30",
       "ticker": "PBI",
       "side": "sell",
-      "weight": 0.0006
+      "weight": 0.0004
     },
     {
       "strategy_id": "gen0194",
@@ -299,8 +299,8 @@
       "strategy_id": "gen0194",
       "d": "2026-06-30",
       "ticker": "TRVI",
-      "side": "sell",
-      "weight": 0.0007
+      "side": "buy",
+      "weight": 0.0004
     },
     {
       "strategy_id": "gen0194",
@@ -314,7 +314,7 @@
       "d": "2026-06-30",
       "ticker": "UEC",
       "side": "buy",
-      "weight": 0.0033
+      "weight": 0.0039
     },
     {
       "strategy_id": "gen0194",
@@ -335,7 +335,7 @@
       "d": "2026-06-30",
       "ticker": "UUUU",
       "side": "sell",
-      "weight": 0.0004
+      "weight": 0.0003
     },
     {
       "strategy_id": "gen0194",
