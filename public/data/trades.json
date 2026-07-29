@@ -279,7 +279,7 @@
       "d": "2026-06-30",
       "ticker": "SAN",
       "side": "sell",
-      "weight": 0.0019
+      "weight": 0.0021
     },
     {
       "strategy_id": "gen0194",
@@ -328,7 +328,7 @@
       "d": "2026-06-30",
       "ticker": "UMC",
       "side": "sell",
-      "weight": 0.0073
+      "weight": 0.007
     },
     {
       "strategy_id": "gen0194",
