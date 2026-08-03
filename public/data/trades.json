@@ -13,7 +13,7 @@
       "d": "2026-06-30",
       "ticker": "AGNC",
       "side": "buy",
-      "weight": 0.0035
+      "weight": 0.0043
     },
     {
       "strategy_id": "gen0194",
@@ -83,7 +83,7 @@
       "d": "2026-06-30",
       "ticker": "CIFR",
       "side": "sell",
-      "weight": 0.0043
+      "weight": 0.0033
     },
     {
       "strategy_id": "gen0194",
@@ -125,7 +125,7 @@
       "d": "2026-06-30",
       "ticker": "ERIC",
       "side": "buy",
-      "weight": 0.0048
+      "weight": 0.0032
     },
     {
       "strategy_id": "gen0194",
@@ -139,7 +139,7 @@
       "d": "2026-06-30",
       "ticker": "HIMX",
       "side": "buy",
-      "weight": 0.0016
+      "weight": 0.0024
     },
     {
       "strategy_id": "gen0194",
@@ -321,7 +321,7 @@
       "d": "2026-06-30",
       "ticker": "UMAC",
       "side": "sell",
-      "weight": 0.0118
+      "weight": 0.0126
     },
     {
       "strategy_id": "gen0194",
