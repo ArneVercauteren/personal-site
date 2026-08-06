@@ -83,7 +83,7 @@
       "d": "2026-06-30",
       "ticker": "CIFR",
       "side": "sell",
-      "weight": 0.0033
+      "weight": 0.0041
     },
     {
       "strategy_id": "gen0194",
@@ -153,7 +153,7 @@
       "d": "2026-06-30",
       "ticker": "IAG",
       "side": "buy",
-      "weight": 0.0009
+      "weight": 0.0017
     },
     {
       "strategy_id": "gen0194",
