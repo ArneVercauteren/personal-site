@@ -13,7 +13,7 @@
       "d": "2026-06-30",
       "ticker": "AGNC",
       "side": "buy",
-      "weight": 0.0043
+      "weight": 0.0051
     },
     {
       "strategy_id": "gen0194",
@@ -34,7 +34,7 @@
       "d": "2026-06-30",
       "ticker": "APLD",
       "side": "sell",
-      "weight": 0.0013
+      "weight": 0.0012
     },
     {
       "strategy_id": "gen0194",
@@ -55,7 +55,7 @@
       "d": "2026-06-30",
       "ticker": "BB",
       "side": "buy",
-      "weight": 0.0137
+      "weight": 0.0138
     },
     {
       "strategy_id": "gen0194",
@@ -83,7 +83,7 @@
       "d": "2026-06-30",
       "ticker": "CIFR",
       "side": "sell",
-      "weight": 0.0041
+      "weight": 0.0031
     },
     {
       "strategy_id": "gen0194",
@@ -167,7 +167,7 @@
       "d": "2026-06-30",
       "ticker": "LPTH",
       "side": "sell",
-      "weight": 0.0023
+      "weight": 0.0024
     },
     {
       "strategy_id": "gen0194",
@@ -188,7 +188,7 @@
       "d": "2026-06-30",
       "ticker": "NVDY",
       "side": "buy",
-      "weight": 0.0059
+      "weight": 0.0044
     },
     {
       "strategy_id": "gen0194",
@@ -321,7 +321,7 @@
       "d": "2026-06-30",
       "ticker": "UMAC",
       "side": "sell",
-      "weight": 0.0126
+      "weight": 0.0127
     },
     {
       "strategy_id": "gen0194",
