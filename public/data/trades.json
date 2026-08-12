@@ -153,7 +153,7 @@
       "d": "2026-08-11",
       "ticker": "HIMX",
       "side": "sell",
-      "weight": 0.0002
+      "weight": 0.0001
     },
     {
       "strategy_id": "gen0194",
@@ -265,14 +265,14 @@
       "d": "2026-08-11",
       "ticker": "PSNL",
       "side": "buy",
-      "weight": 0.0076
+      "weight": 0.0084
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-08-11",
       "ticker": "PTEN",
       "side": "buy",
-      "weight": 0.0084
+      "weight": 0.0076
     },
     {
       "strategy_id": "gen0194",
