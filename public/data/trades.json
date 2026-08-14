@@ -13,7 +13,7 @@
       "d": "2026-08-11",
       "ticker": "AGNC",
       "side": "buy",
-      "weight": 0.0014
+      "weight": 0.0015
     },
     {
       "strategy_id": "gen0194",
@@ -41,28 +41,28 @@
       "d": "2026-08-11",
       "ticker": "ASX",
       "side": "sell",
-      "weight": 0.0005
+      "weight": 0.0004
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-08-11",
       "ticker": "AXIA",
       "side": "sell",
-      "weight": 0.0003
+      "weight": 0.0002
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-08-11",
       "ticker": "AXTI",
       "side": "sell",
-      "weight": 0.0009
+      "weight": 0.0008
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-08-11",
       "ticker": "BB",
       "side": "sell",
-      "weight": 0.0018
+      "weight": 0.0017
     },
     {
       "strategy_id": "gen0194",
@@ -83,7 +83,7 @@
       "d": "2026-08-11",
       "ticker": "BW",
       "side": "sell",
-      "weight": 0.0044
+      "weight": 0.0043
     },
     {
       "strategy_id": "gen0194",
@@ -97,7 +97,7 @@
       "d": "2026-08-11",
       "ticker": "CIFR",
       "side": "sell",
-      "weight": 0.0016
+      "weight": 0.0022
     },
     {
       "strategy_id": "gen0194",
@@ -111,7 +111,7 @@
       "d": "2026-08-11",
       "ticker": "CRVS",
       "side": "buy",
-      "weight": 0.0044
+      "weight": 0.0045
     },
     {
       "strategy_id": "gen0194",
@@ -125,7 +125,7 @@
       "d": "2026-08-11",
       "ticker": "EQX",
       "side": "buy",
-      "weight": 0.0073
+      "weight": 0.0074
     },
     {
       "strategy_id": "gen0194",
@@ -167,7 +167,7 @@
       "d": "2026-08-11",
       "ticker": "IAG",
       "side": "sell",
-      "weight": 0.0008
+      "weight": 0.0006
     },
     {
       "strategy_id": "gen0194",
@@ -195,7 +195,7 @@
       "d": "2026-08-11",
       "ticker": "NOK",
       "side": "sell",
-      "weight": 0.0019
+      "weight": 0.0018
     },
     {
       "strategy_id": "gen0194",
@@ -216,7 +216,7 @@
       "d": "2026-08-11",
       "ticker": "NXE",
       "side": "buy",
-      "weight": 0.0025
+      "weight": 0.0026
     },
     {
       "strategy_id": "gen0194",
@@ -314,7 +314,7 @@
       "d": "2026-08-11",
       "ticker": "SAN",
       "side": "sell",
-      "weight": 0.0025
+      "weight": 0.0024
     },
     {
       "strategy_id": "gen0194",
@@ -328,7 +328,7 @@
       "d": "2026-08-11",
       "ticker": "SVM",
       "side": "sell",
-      "weight": 0.003
+      "weight": 0.0032
     },
     {
       "strategy_id": "gen0194",
@@ -356,14 +356,14 @@
       "d": "2026-08-11",
       "ticker": "UMAC",
       "side": "sell",
-      "weight": 0.0006
+      "weight": 0.0005
     },
     {
       "strategy_id": "gen0194",
       "d": "2026-08-11",
       "ticker": "UMC",
       "side": "sell",
-      "weight": 0.0044
+      "weight": 0.0052
     },
     {
       "strategy_id": "gen0194",
@@ -375,6 +375,13 @@
     {
       "strategy_id": "gen0194",
       "d": "2026-08-11",
+      "ticker": "VALE",
+      "side": "sell",
+      "weight": 0.0001
+    },
+    {
+      "strategy_id": "gen0194",
+      "d": "2026-08-11",
       "ticker": "VISN",
       "side": "buy",
       "weight": 0.0004
@@ -382,16 +389,9 @@
     {
       "strategy_id": "gen0194",
       "d": "2026-08-11",
-      "ticker": "VLY",
-      "side": "sell",
-      "weight": 0.0001
-    },
-    {
-      "strategy_id": "gen0194",
-      "d": "2026-08-11",
       "ticker": "WULF",
       "side": "buy",
-      "weight": 0.0003
+      "weight": 0.001
     }
   ]
 }
