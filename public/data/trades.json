@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-08-14",
+  "as_of": "2026-08-17",
   "trades": [
     {
       "strategy_id": "gen0194",
@@ -125,7 +125,7 @@
       "d": "2026-08-11",
       "ticker": "ERAS",
       "side": "buy",
-      "weight": 0.0016
+      "weight": 0.0015
     },
     {
       "strategy_id": "gen0194",
@@ -209,7 +209,7 @@
       "d": "2026-08-11",
       "ticker": "NXE",
       "side": "buy",
-      "weight": 0.0024
+      "weight": 0.0025
     },
     {
       "strategy_id": "gen0194",
@@ -356,7 +356,7 @@
       "d": "2026-08-11",
       "ticker": "UMC",
       "side": "sell",
-      "weight": 0.0044
+      "weight": 0.0052
     },
     {
       "strategy_id": "gen0194",
@@ -384,7 +384,7 @@
       "d": "2026-08-11",
       "ticker": "WULF",
       "side": "buy",
-      "weight": 0.0002
+      "weight": 0.001
     }
   ]
 }
