@@ -46,7 +46,7 @@ Why no always-on backend: scheduled jobs recompute snapshots and commit them; Ve
 
 | Concern | Choice | Notes |
 |---|---|---|
-| Frontend | Next.js 15 (App Router) + React 19 + Tailwind | Darwin UI is React 18; Next 15 + MDX needs 19 |
+| Frontend | Next.js 16 (App Router) + React 19 + Tailwind | Static-first, with route-specific verified data |
 | Content | MDX | Writeups as Markdown with embedded React |
 | Charts | Recharts | Equity curve, drawdown |
 | Hosting | Vercel Hobby (free) | Push-to-deploy from GitHub |
@@ -67,11 +67,11 @@ Each is cheap to break by accident and expensive to debug. Long versions in [con
 4. **Paper / simulated only.** Deterministic, re-runnable, with a standing "not investment advice" disclaimer.
 5. **Separate from Darwin; no secrets in the repo.** No reach into `src/config/secrets.py`; secret formulas/weights live only in the private repo.
 6. **Static-first.** Pre-computed JSON over a live server until daily snapshots genuinely aren't enough.
-7. **The data contract is the single source of truth.** `lib/data.ts` types define the JSON (gated by `visibility`); change reader and writer(s) together.
+7. **The data contract is the single source of truth.** Versioned schemas in `schemas/` and matching Python/TypeScript validators define the JSON (gated by `visibility`); change reader and writer(s) together.
 
 ## The data contract
 
-The one piece of coupling between Tier 2 (writer) and Tier 1 (reader) is the JSON shape, defined once by the TypeScript types in `lib/data.ts`. A `visibility` field gates which fields appear:
+The one piece of coupling between Tier 2 (writer) and Tier 1 (reader) is the versioned JSON shape in `schemas/`, enforced by `paper_trading/contracts.py` and `lib/data.ts`. A `visibility` field gates which fields appear:
 
 ```json
 {
@@ -92,7 +92,7 @@ The one piece of coupling between Tier 2 (writer) and Tier 1 (reader) is the JSO
 
 Secured entries carry `exposure` (aggregate) and never `positions` or a formula. Keep it small and stable. See [concepts/data-contract.md](concepts/data-contract.md).
 
-## Planned layout on disk
+## Layout on disk
 
 ```
 personal-site/              (PUBLIC repo)
@@ -112,7 +112,7 @@ personal-site-trading/      (PRIVATE repo — Tier 2a)
 └─ .github/workflows/{rebalance,daily}.yml      # pushes sanitized JSON to the public repo
 ```
 
-Full layout: [reference/file-layout.md](reference/file-layout.md). This is the *target* — the repo is scaffolded incrementally per the plan's build order (§12).
+Full layout: [reference/file-layout.md](reference/file-layout.md).
 
 ## What to read next
 
@@ -123,6 +123,6 @@ Full layout: [reference/file-layout.md](reference/file-layout.md). This is the *
 ## Source files
 
 - `plans_and_text_files/PERSONAL_WEBSITE_PLAN.md` — full design rationale and build order.
-- `lib/data.ts` — the data contract (when built).
-- `app/`, `components/` — Tier 1 site (when built).
-- `paper_trading/` — Tier 2 updater (when built).
+- `schemas/`, `paper_trading/contracts.py`, `lib/data.ts` — versioned contracts and validators.
+- `app/`, `components/` — Tier 1 site.
+- `paper_trading/`, `paper_state/`, `paper_ledger/` — Tier 2 updater and immutable state.

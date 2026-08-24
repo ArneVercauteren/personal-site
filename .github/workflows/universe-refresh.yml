@@ -16,7 +16,7 @@ on:
         default: "1200"
 
 concurrency:
-  group: universe-refresh
+  group: paper-data-writer-main
   cancel-in-progress: false
 
 permissions:
@@ -27,15 +27,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r paper_trading/requirements.txt
+        run: pip install -r paper_trading/requirements-lock.txt
 
       - name: Rebuild the shared universe
         env:
@@ -46,10 +48,11 @@ jobs:
         run: |
           git config user.name "universe-bot"
           git config user.email "actions@users.noreply.github.com"
-          git add public/data/universe.json public/data/universe_skip.json
+          git add public/data/universe.json public/data/universe_skip.json public/data/universe_snapshots
           if git diff --staged --quiet; then
             echo "No universe changes; nothing to commit."
           else
             git commit -m "data: refresh tradable universe [skip ci]"
-            git push
+            git pull --rebase --autostash origin main
+            git push origin HEAD:main
           fi

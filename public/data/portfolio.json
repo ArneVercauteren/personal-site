@@ -4,7 +4,7 @@
   "strategies": [
     {
       "id": "gen0194",
-      "name": "gen0194",
+      "name": "Adaptive Cross-Sectional Selection",
       "visibility": "open",
       "equity_curve": [
         {

@@ -1,6 +1,7 @@
 # Reference — File layout on disk
 
-The target layout (from the plan's §9). Items marked *(planned)* don't exist yet; this repo is scaffolded incrementally. The Next.js shell (`app/`, `components/`, `lib/`, configs) **is built**; `content/`, `paper_trading/`, and `public/data/` are still planned.
+The implemented layout. Optional media/content entries remain labelled planned; the site, paper engine,
+ledger, schemas, snapshots, and workflows are live code.
 
 ```
 personal-site/                          (PUBLIC repo)
@@ -11,7 +12,9 @@ personal-site/                          (PUBLIC repo)
 ├─ .github/
 │  ├─ copilot-instructions.md           # generated — same content for Copilot
 │  └─ workflows/
-│     └─ open-strategies-update.yml     (planned) cron: run OPEN strategies, commit JSON
+│     ├─ open-strategies-update.yml     # incremental weekday writer
+│     ├─ universe-refresh.yml           # monthly point-in-time universe writer
+│     └─ stale-data-alert.yml           # freshness alert
 ├─ app/                                 # Next.js App Router — Tier 1
 │  ├─ layout.tsx                        # nav, footer, dark theme
 │  ├─ page.tsx                          # home
@@ -35,17 +38,24 @@ personal-site/                          (PUBLIC repo)
 │  ├─ content.ts                       # MDX/frontmatter loading
 │  └─ format.ts                        # %, $, date helpers
 ├─ paper_trading/                       Tier-2b ENGINE + OPEN strategies (not secret)
-│  ├─ requirements.txt  update.py  prices.py  portfolio.py  signals.py
+│  ├─ requirements-lock.txt  update.py  prices.py  portfolio.py  signals.py
+│  ├─ contracts.py  ledger.py  migrate.py  audit.py  publish.py  validate_data.py
 │  ├─ costs.py  secured.py             # Darwin cost model; secured sanitizer + leak guard
 │  ├─ universe.py  update_universe.py  ticker_sectors.json  # self-refreshing universe + sector map
 │  ├─ darwin_eval/                     # vendored Darwin DSL evaluator
 │  ├─ tests/                           # pytest suite
 │  └─ strategies/                      # OPEN (public) formulas only
 ├─ public/
-│  ├─ data/{portfolio.json,trades.json,strategies.json,universe.json}  # published snapshots
+│  ├─ data/manifest.json                # active content-addressed snapshot pointer
+│  ├─ data/snapshots/<hash>/            # index + per-route strategy/benchmark payloads
+│  ├─ data/{portfolio.json,trades.json,strategies.json,universe.json}  # writer compatibility boundary
 │  ├─ resume.pdf                       (planned)
 │  └─ art/  audio/                     (planned) static media for Studio
 ├─ docs/                                # this tree
+├─ paper_state/<id>.json                # accepted incremental checkpoints
+├─ paper_ledger/<id>.jsonl              # append-only audited events
+├─ paper_migration/                     # reviewed migration evidence
+├─ schemas/                             # versioned portable JSON contracts
 ├─ plans_and_text_files/                # plan + shared AI-instructions source
 └─ scripts/sync_ai_docs.py             # renders CLAUDE/AGENTS/copilot from the shared source
 

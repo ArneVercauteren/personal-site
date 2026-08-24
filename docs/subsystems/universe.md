@@ -35,7 +35,8 @@ would also pull a keyed paid feed + Darwin's data into the public repo, breaking
 ## Cadence — heavy work monthly, daily stays light
 
 `update_universe.py` (the monthly `universe-refresh.yml` cron) does steps 1–3 — fetching bars for
-a few thousand names is the expensive part — and commits `public/data/universe.json`. The
+a few thousand names is the expensive part — and commits both the current pointer in
+`public/data/universe.json` and an effective-date/hash snapshot under `universe_snapshots/`. The
 **daily** updater never rebuilds it; it just reads the committed file via `resolve_universe`. So
 the thousands of fetches happen ~monthly, not daily, keeping the site cheap and CI reliable.
 
@@ -62,6 +63,7 @@ is the point: Darwin's frozen universe is the thing that goes stale for a forwar
 ```json
 {
   "as_of": "2026-06-01",
+  "snapshot_id": "<sha256>",
   "source": "nasdaqtrader",
   "filters": {"min_price": 10.0, "min_median_dollar_volume": 5000000.0, "cap": 1200, "exclude_etf": false},
   "count": 1200,
@@ -69,7 +71,8 @@ is the point: Darwin's frozen universe is the thing that goes stale for a forwar
 }
 ```
 
-It is **updater data**, not part of the site's read contract (`lib/data.ts`) — the public site
+Every review event records the exact `snapshot_id`; positions selected under an older membership
+continue to be marked even when the current universe changes. It is updater data, not part of the site's read contract (`lib/data.ts`) — the public site
 never renders it. Env overrides for the build: `UNIVERSE_CAP`, `UNIVERSE_MIN_PRICE`,
 `UNIVERSE_MIN_ADV`, `UNIVERSE_EXCLUDE_ETF`, `UNIVERSE_FETCH_CHUNK`, `UNIVERSE_FETCH_PAUSE`.
 

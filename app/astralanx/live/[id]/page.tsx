@@ -9,10 +9,14 @@ import { type Regime } from "@/components/RegimeEquityChart";
 import { FormulaView } from "@/components/FormulaView";
 import { Section } from "@/components/Section";
 import {
-  loadPortfolio,
-  loadBenchmarks,
-  loadStrategyMeta,
+  loadSnapshotBenchmark,
+  loadManifest,
+  loadStrategyAnalytics,
+  loadStrategyDetail,
+  loadStrategyIndex,
+  loadStrategyRebalances,
   isOpen,
+  type LedgerEvent,
   type DetailedStats,
   type PerformanceRun,
   type StrategyMeta,
@@ -21,7 +25,7 @@ import {
 import { money, pct, signedPct, shortDate } from "@/lib/format";
 
 export function generateStaticParams() {
-  return loadPortfolio().strategies.map((s) => ({ id: s.id }));
+  return loadStrategyIndex().strategies.map((s) => ({ id: s.id }));
 }
 
 export async function generateMetadata({
@@ -30,9 +34,13 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const s = loadPortfolio().strategies.find((x) => x.id === id);
+  const s = loadStrategyIndex().strategies.find((x) => x.id === id);
   if (!s) return {};
-  return { title: `${s.name} · strategy detail` };
+  return {
+    title: `${s.name} · strategy detail`,
+    description: s.blurb,
+    alternates: { canonical: `/astralanx/live/${s.id}` },
+  };
 }
 
 // --- detailed stat rendering ----------------------------------------------
@@ -154,17 +162,66 @@ function Facts({ meta }: { meta: StrategyMeta }) {
   );
 }
 
+function RebalanceTimeline({ events }: { events: LedgerEvent[] }) {
+  const sessions = new Map<string, LedgerEvent[]>();
+  for (const event of events) {
+    sessions.set(event.session, [...(sessions.get(event.session) ?? []), event]);
+  }
+  const rows = [...sessions.entries()].sort(([left], [right]) => right.localeCompare(left));
+  if (!rows.length) {
+    return <p className="text-sm text-ink-muted">No live rebalance has occurred yet.</p>;
+  }
+  return (
+    <ol className="space-y-3" aria-label="Audited rebalance events">
+      {rows.map(([session, sessionEvents]) => {
+        const target = sessionEvents.find((event) => event.event_type === "targets_computed");
+        const fill = sessionEvents.find((event) => event.event_type === "fills_applied");
+        const cost = sessionEvents.find((event) => event.event_type === "costs_charged");
+        const reviewed = sessionEvents.find((event) => event.event_type === "rebalance_reviewed");
+        const weights = target?.payload.weights as Record<string, number> | undefined;
+        const trades = fill?.payload.trades as unknown[] | undefined;
+        const costAmount = typeof cost?.payload.amount === "number" ? cost.payload.amount : null;
+        return (
+          <li key={session} className="panel p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="num text-sm text-ink">{shortDate(session)}</span>
+              <span className="font-mono text-[10px] uppercase tracking-wider text-ink-muted">
+                {sessionEvents.map((event) => event.event_type.replaceAll("_", " ")).join(" · ")}
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-ink-muted">
+              {weights ? `${Object.keys(weights).length} targets` : "Review recorded"}
+              {trades ? ` · ${trades.length} fills` : ""}
+              {costAmount != null ? ` · ${money(costAmount, "USD")} estimated costs` : ""}
+            </p>
+            {reviewed ? (
+              <p className="mt-1 break-all font-mono text-[10px] text-ink-faint">
+                universe {String(reviewed.payload.universe_snapshot_id).slice(0, 12)} · prices{" "}
+                {String(reviewed.payload.price_snapshot_id).slice(0, 12)}
+              </p>
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export default async function StrategyDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const strategy = loadPortfolio().strategies.find((s) => s.id === id);
-  if (!strategy) notFound();
-
-  const sp500 = loadBenchmarks().benchmarks.find((b) => b.id === "sp500");
-  const meta = loadStrategyMeta().strategies.find((m) => m.id === id);
+  const summary = loadStrategyIndex().strategies.find((s) => s.id === id);
+  if (!summary) notFound();
+  const detail = loadStrategyDetail(id);
+  const strategy = detail.strategy;
+  const sp500 = loadSnapshotBenchmark();
+  const analytics = loadStrategyAnalytics(id);
+  const rebalanceEvents = loadStrategyRebalances(id);
+  const meta: StrategyMeta = { ...detail.meta, ...analytics };
+  const manifest = loadManifest();
   const liveSince = strategy.live_since ?? meta?.deployed_on;
   const firstD = strategy.equity_curve[0]?.d;
   const lastD = strategy.equity_curve.at(-1)?.d;
@@ -251,6 +308,37 @@ export default async function StrategyDetailPage({
         <Facts meta={meta ?? defaultMeta(strategy.id, strategy.name)} />
       </div>
 
+      {meta.thesis || meta.expected_behavior || meta.risks?.length || meta.failure_modes?.length ? (
+        <Section eyebrow="Plain English" title="Thesis, behaviour & risks">
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-4 text-sm text-ink-muted">
+              {meta.thesis ? <p><strong className="text-ink">Thesis.</strong> {meta.thesis}</p> : null}
+              {meta.expected_behavior ? (
+                <p><strong className="text-ink">Expected behaviour.</strong> {meta.expected_behavior}</p>
+              ) : null}
+            </div>
+            <div className="space-y-4">
+              {meta.risks?.length ? (
+                <div>
+                  <h3 className="text-sm font-semibold text-ink">Risks</h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-muted">
+                    {meta.risks.map((risk) => <li key={risk}>{risk}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+              {meta.failure_modes?.length ? (
+                <div>
+                  <h3 className="text-sm font-semibold text-ink">What failure looks like</h3>
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-muted">
+                    {meta.failure_modes.map((failure) => <li key={failure}>{failure}</li>)}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </Section>
+      ) : null}
+
       {hasAnalytics ? (
         <Link
           href={`/astralanx/live/${strategy.id}/analytics`}
@@ -293,6 +381,22 @@ export default async function StrategyDetailPage({
           currency={meta?.base_currency ?? "USD"}
           liveSince={liveSince}
         />
+        <div className="mt-3 flex flex-wrap gap-4 text-xs">
+          <a
+            className="text-accent hover:underline"
+            href={`/data/snapshots/${manifest.snapshot_id}/strategies/${strategy.id}/live.json`}
+            download
+          >
+            Download live data
+          </a>
+          <a
+            className="text-accent hover:underline"
+            href={`/data/snapshots/${manifest.snapshot_id}/strategies/${strategy.id}/research-full.json`}
+            download
+          >
+            Download full-resolution research data
+          </a>
+        </div>
         {impactBookCap ? (
           <p className="mt-2 max-w-prose text-xs text-ink-muted">
             Full history is a continuous account: above the estimated capacity (
@@ -382,6 +486,14 @@ export default async function StrategyDetailPage({
           />
         </Section>
       ) : null}
+
+      <Section eyebrow="Audit trail" title="Rebalance timeline">
+        <p className="mb-4 max-w-prose text-sm text-ink-muted">
+          Append-only review, target, next-open fill, and cost events. Short hashes identify
+          the point-in-time universe and price inputs used for each decision.
+        </p>
+        <RebalanceTimeline events={rebalanceEvents} />
+      </Section>
 
       <Section
         eyebrow={isOpen(strategy) ? "Composition" : "Exposure"}

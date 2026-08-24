@@ -2,20 +2,22 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/PageHeader";
 import { Disclaimer } from "@/components/Disclaimer";
 import { StrategyCard } from "@/components/StrategyCard";
-import { loadBenchmarks, loadPortfolio, loadStrategyMeta, isOpen } from "@/lib/data";
+import { loadManifest, loadSnapshotBenchmark, loadStrategyIndex } from "@/lib/data";
 import { shortDate } from "@/lib/format";
 
-export const metadata: Metadata = { title: "Live" };
+export const metadata: Metadata = {
+  title: "Live paper strategies",
+  description: "Forward paper returns, drawdowns, schedules, allocations, and audited update freshness.",
+  alternates: { canonical: "/astralanx/live" },
+};
 
 export default function LivePage() {
-  const portfolio = loadPortfolio();
-  const sp500 = loadBenchmarks().benchmarks.find((b) => b.id === "sp500");
-  const metaById = new Map(
-    loadStrategyMeta().strategies.map((m) => [m.id, m]),
-  );
+  const portfolio = loadStrategyIndex();
+  const manifest = loadManifest();
+  const sp500 = loadSnapshotBenchmark();
 
-  const open = portfolio.strategies.filter(isOpen);
-  const secured = portfolio.strategies.filter((s) => !isOpen(s));
+  const open = portfolio.strategies.filter((s) => s.visibility === "open");
+  const secured = portfolio.strategies.filter((s) => s.visibility === "secured");
 
   return (
     <div>
@@ -32,7 +34,9 @@ export default function LivePage() {
       <p className="mb-10 font-mono text-xs text-ink-muted">
         Snapshot as of{" "}
         <span className="text-ink">{shortDate(portfolio.as_of)}</span> ·{" "}
-        {portfolio.base_currency}
+        {portfolio.base_currency} ·{" "}
+        <span className="text-gain">validated</span>{" "}
+        · snapshot {manifest.snapshot_id.slice(0, 8)}
       </p>
 
       <section>
@@ -49,8 +53,7 @@ export default function LivePage() {
             {open.map((s) => (
               <StrategyCard
                 key={s.id}
-                strategy={s}
-                meta={metaById.get(s.id)}
+                summary={s}
                 benchmark={sp500}
               />
             ))}
@@ -74,8 +77,7 @@ export default function LivePage() {
             {secured.map((s) => (
               <StrategyCard
                 key={s.id}
-                strategy={s}
-                meta={metaById.get(s.id)}
+                summary={s}
                 benchmark={sp500}
               />
             ))}

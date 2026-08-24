@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astralanx.example/schemas/strategy-spec-v1.json",
+  "title": "Open paper strategy specification",
+  "type": "object",
+  "required": ["id", "name", "visibility", "deployed_on", "portfolio_size", "base_currency", "rebalance_cadence_days", "cost_model"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "name": {"type": "string", "minLength": 1},
+    "visibility": {"const": "open"},
+    "deployed_on": {"type": "string", "format": "date"},
+    "portfolio_size": {"type": "number", "exclusiveMinimum": 0},
+    "base_currency": {"type": "string", "minLength": 3, "maxLength": 3},
+    "rebalance_cadence_days": {"type": "integer", "minimum": 1},
+    "rebalance_cadence_unit": {"enum": ["calendar_days", "trading_days"]},
+    "rebalance_transition_anchor": {"type": "string", "format": "date"},
+    "next_review_date": {"type": "string", "format": "date"},
+    "cost_model": {
+      "type": "object",
+      "required": ["commission_bps", "slippage_bps"],
+      "properties": {
+        "commission_bps": {"type": "number", "minimum": 0},
+        "slippage_bps": {"type": "number", "minimum": 0}
+      }
+    },
+    "formula": {"type": "object"},
+    "signal": {"type": "object"}
+  },
+  "anyOf": [{"required": ["formula"]}, {"required": ["signal"]}]
+}

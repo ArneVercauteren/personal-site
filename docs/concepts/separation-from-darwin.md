@@ -21,11 +21,11 @@ If the website repo could import Darwin, a leak in the website would expose Darw
 
 ## The checklist (from the plan's §9)
 
-- [ ] No import path reaches `src/config/secrets.py` or any Darwin internal module.
-- [ ] No API keys committed; keyless sources or CI/host secrets only.
-- [ ] No trading/order/write endpoints exposed publicly.
-- [ ] Published strategy JSONs are scrubbed (no absolute paths, no internal-only fields); the open updater's `publish_sanitize` backstop + its committed-JSON test enforce this.
-- [ ] `.env` and credentials git-ignored.
+- [x] No production import path reaches `src/config/secrets.py` or a Darwin internal module.
+- [x] No API keys committed; keyless sources or CI/host secrets only.
+- [x] No trading/order/write endpoints exposed publicly.
+- [x] Published strategy JSONs are scrubbed and contract-tested.
+- [x] `.env` and credentials are git-ignored.
 
 ## Related
 
@@ -40,4 +40,4 @@ If the website repo could import Darwin, a leak in the website would expose Darw
 - `paper_trading/tests/test_evaluator_parity.py` — the test-only parity gate (the sole, guarded Darwin import).
 - `paper_trading/strategies/*.json` — scrubbed king exports (when published).
 - `paper_trading/publish_sanitize.py` — the open-updater path-scrub backstop (`scrub_internal_paths` / `assert_no_internal_paths`); `paper_trading/tests/test_publish_sanitize.py` also asserts no committed `public/data/*.json` carries an absolute path.
-- The Darwin repo's `scripts/publish_deployed_kings.py` — does the scrubbing (when built).
+- The Darwin repo's `scripts/publish_deployed_kings.py` — produces the one-way scrubbed export.

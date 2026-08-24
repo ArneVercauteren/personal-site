@@ -35,5 +35,5 @@ See [subsystems/paper-trading-updater.md](../subsystems/paper-trading-updater.md
 
 ## Source files
 
-- `paper_trading/update.py`, `paper_trading/portfolio.py`, `paper_trading/signals.py`, `paper_trading/prices.py` (when built).
-- The dashboard components that render the disclaimer (when built).
+- `paper_trading/update.py`, `paper_trading/portfolio.py`, `paper_trading/signals.py`, `paper_trading/prices.py`.
+- The dashboard components that render the disclaimer.

@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Astralanx",
   description:
     "How Astralanx works: the Tiingo price data, the investable universe and filters, the backtesting model, the cost model, and out-of-sample testing",
+  alternates: { canonical: "/astralanx" },
 };
 
 function Section({

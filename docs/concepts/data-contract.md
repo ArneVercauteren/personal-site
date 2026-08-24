@@ -1,10 +1,10 @@
 # Concept — The data contract
 
-The boundary between Tier 2 (the Python updater that *writes* JSON) and Tier 1 (the site that *reads* it) is a single, small, stable contract: the JSON shape. The **TypeScript types in `lib/data.ts` are the single source of truth** for that shape.
+The boundary between Tier 2 (the Python updater that writes JSON) and Tier 1 (the site that reads it) is a small, versioned contract. Portable JSON Schemas in `schemas/` document the wire format; Python runtime guards and the validated TypeScript loaders enforce its safety-critical invariants on both sides.
 
 ## The rule
 
-- **`lib/data.ts` defines the shape.** The types there describe exactly what `public/data/*.json` contains. The site loads and types its data through this module; nothing else hand-parses the JSON.
+- **Schemas define the portable shape.** `lib/data.ts` supplies the corresponding frontend types and hash-verifying loaders; `paper_trading/contracts.py` supplies updater guards.
 - **Writer and reader change together.** If you change a field, you change the Tier-2 writer (`paper_trading/`) and `lib/data.ts` in the **same commit**. A shape change that lands on only one side is a broken contract.
 - **Keep it small and stable.** The contract is a coupling point — every field is a thing both tiers must agree on forever. Add fields deliberately; don't leak internal simulator state into the public JSON.
 
@@ -12,10 +12,11 @@ The boundary between Tier 2 (the Python updater that *writes* JSON) and Tier 1 (
 
 | File | Tier | Role |
 |---|---|---|
-| `public/data/portfolio.json` | published | equity curve, stats, and (open only) positions per strategy |
-| `public/data/benchmark.json` | published | S&P 500 benchmark curve for chart overlays |
-| `public/data/trades.json` | published | trade log (open strategies) |
-| `public/data/strategies.json` | published | metadata per deployed strategy |
+| `public/data/manifest.json` | published entry point | schema version, active snapshot id, dates, per-file SHA-256 and byte size |
+| `public/data/snapshots/<hash>/index.json` | dashboard | small live-first summaries only |
+| `public/data/snapshots/<hash>/strategies/<id>/*.json` | route/download | summary, live, analytics, rebalance events, and full research files |
+| `public/data/snapshots/<hash>/benchmarks/*.json` | chart route | benchmark series loaded only where required |
+| `public/data/{portfolio,benchmark,trades,strategies}.json` | compatibility writer boundary | mixed open/secured merge inputs retained during migration |
 | `lib/data.ts` | 1 (reader) | typed loaders + the type definitions |
 | `paper_trading/update.py` | 2b (writer) | open-strategy JSON, in the public repo |
 | `paper_trading/benchmark.py` | 2b (writer) | fetches the SPY-backed S&P 500 curve, or converts a local CSV, into `benchmark.json` |
@@ -23,8 +24,7 @@ The boundary between Tier 2 (the Python updater that *writes* JSON) and Tier 1 (
 
 How an open strategy computes its weights — a lightweight momentum `signal` or a real Darwin
 `formula` (DSL tree) run through the vendored evaluator — is an implementation detail of the
-writer. It does **not** change this contract: both paths emit the same `portfolio.json` /
-`strategies.json` / `trades.json` shape, so `lib/data.ts` is unaffected.
+writer. It does not change the route-level public contract.
 
 ## `visibility` gates the shape
 
@@ -228,4 +228,4 @@ All in one commit (the private-repo writer in its own repo, kept in lockstep).
 - `lib/data.ts` — type definitions + typed loaders (the source of truth) (built).
 - `lib/format.ts` — `%`, `$`, date formatting helpers (built).
 - `public/data/portfolio.json`, `public/data/trades.json`, `public/data/strategies.json` — the published artifacts (sample data committed).
-- `paper_trading/update.py` — the open writer that must match (when built).
+- `paper_trading/update.py` and `paper_trading/publish.py` — the open writer and manifest-last publisher.

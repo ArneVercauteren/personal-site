@@ -1,24 +1,40 @@
 # Codebase and site improvement plan
 
 **Created:** 2026-08-24  
-**Status:** active — Phase 0 implemented; Phase 1 is next  
+**Status:** complete — Phases 0–5 implemented and verified on 2026-08-24
 **Scope:** public site, open-strategy paper engine, published data contract, CI, and repository hygiene
 
-## Implementation progress
+## Implementation record
 
-Completed on 2026-08-24:
+Completed and locally verified on 2026-08-24:
 
-- migrated `gen0194` forward from calendar days to 42 observed trading sessions while preserving every
-  legacy review through 2026-08-10;
-- pinned the next review/fill fixture to 2026-10-08/2026-10-09;
-- introduced an explicit public performance allowlist and source/public path-safety tests;
-- reduced `public/data/strategies.json` from 9.74 MB to 3.26 MB without removing a typed site field;
-- added pull-request CI for Python compilation/tests, ESLint, TypeScript, and a production build;
-- removed tracked local runtime logs and fixed server-render chart sizing warnings.
+- Phase 0: moved `gen0194` to an explicit 42-trading-session cadence after the preserved 2026-08-10
+  review, pinned the 2026-10-08/09 review/fill fixture, added allowlisted publishing and path-safety gates,
+  and added complete pull-request CI.
+- Phase 1: introduced versioned checkpoints in `paper_state/`, immutable JSONL ledgers in `paper_ledger/`,
+  stable event ids, exact accounting reconciliation, crash recovery, correction proposals, a reviewed
+  migration boundary, an incremental-only updater, and a read-only point-in-time audit command.
+- Phase 2: archived hash-addressed universe snapshots, recorded causal OHLCV/formula/universe/cost/engine
+  hashes, added JSON Schemas plus matching Python and TypeScript runtime validation, and pinned the complete
+  Python environment.
+- Phase 3: replaced the frontend's monolithic read path with a content-addressed, manifest-last snapshot
+  containing a small index and route-specific live, analytics, research, rebalance, provenance, and benchmark
+  payloads. Builds verify every file hash, size, schema, and path-safety rule before reading it.
+- Phase 4: made the dashboard and strategy pages live-first, added plain-language strategy context and a
+  traceable rebalance timeline, separated research from forward evidence, added downloads and accessible
+  chart summaries, and shipped canonical metadata, Open Graph, robots, sitemap, and structured data.
+- Phase 5: moved the updater after the US close with bounded retries, coordinated all data writers with one
+  concurrency group, added stale-data alerting, pinned Actions, upgraded the frontend to Next.js 16 with zero
+  known npm audit findings, self-hosted fonts, removed runtime debris, and added a deployment runbook.
 
-Repository setting still required: make both `paper-trading` and `frontend` CI jobs required checks in branch
-protection. The next code slice is the synthetic ledger/checkpoint schema and reconciliation test harness; it
-must not replace the live updater until the migration checkpoint is independently reviewed.
+Verification evidence: the committed data/ledger validator and point-in-time audit pass; 132 Python tests
+pass (7 skipped optional/native tests); ESLint, TypeScript, the Next.js production build, static-content checks,
+and rendered WCAG/keyboard/layout checks pass. The compatibility JSON files remain only as a transition surface
+for the independently deployed secured writer; the site itself reads one immutable manifest snapshot.
+
+One repository-host setting cannot be encoded in this codebase: enable branch protection/rulesets on `main`
+and require the `paper-trading` and `frontend` jobs. CI defines and enforces both jobs; an administrator must
+make them required in GitHub.
 
 ## Objective
 

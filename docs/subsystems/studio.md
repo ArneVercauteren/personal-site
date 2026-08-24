@@ -1,6 +1,6 @@
 # Subsystem — Studio (music + art)
 
-> **Status: stub.** Not built yet. This page states what it will own; fill it in the same change that builds it.
+> **Status: built.** The route and media components are implemented; add assets as the portfolio grows.
 
 ## What this will own
 
@@ -33,4 +33,4 @@ behaviour, and image-optimization conventions.
 
 ## Source files
 
-- `app/studio/page.tsx`, `components/studio/*`, `public/art/`, `public/audio/` (when built).
+- `app/studio/page.tsx`, `components/studio/*`, `public/art/`, `public/audio/`.

@@ -18,9 +18,15 @@ The static-first, read-only design means there is **very little** to configure, 
 
 ## Current vars
 
-None defined yet. When the first env var or CI secret is introduced, add a row here with its name, which tier reads it, and where it's set — in the same change that introduces it (see [playbook/doc-maintenance.md](../playbook/doc-maintenance.md)).
+| Name | Tier | Purpose | Secret? |
+|---|---|---|---|
+| `NEXT_PUBLIC_SITE_URL` | site build | Canonical public origin for metadata, sitemap, and robots; defaults to localhost for development | no |
+| `PAPER_TRADING_STRATEGY` / `PAPER_TRADING_STRATEGIES` | updater | Limit an incremental run to one or more ids | no |
+| `PAPER_TRADING_SYNTHETIC` | updater/tests | Use deterministic offline prices; never enabled by publication CI | no |
+| `PAPER_TRADING_PRICE_CACHE` / `PAPER_TRADING_PRICE_CACHE_DIR` | updater | Control the local OHLCV cache | no |
+| `UNIVERSE_*` | universe job | Override cap, filters, chunking, or pacing | no |
 
 ## Source files
 
 - `.gitignore` — must ignore `.env*`.
-- `.github/workflows/open-strategies-update.yml` (public) and the private repo's `{rebalance,daily}.yml` — where CI secrets are referenced (when built).
+- `.github/workflows/open-strategies-update.yml` (public) and the private repo's `{rebalance,daily}.yml` — where CI secrets are referenced.

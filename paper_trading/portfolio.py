@@ -18,7 +18,8 @@ history always yields the same result (see `docs/concepts/paper-trading-only.md`
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+import hashlib
 
 import numpy as np
 import pandas as pd
@@ -26,8 +27,10 @@ import pandas as pd
 from . import costs
 from . import portfolio_state as ps
 from . import signals
+from .contracts import CONTRACT_VERSION, ENGINE_VERSION, content_hash
+from .ledger import make_event
 
-__all__ = ["simulate", "SimResult", "simulation_curve_start"]
+__all__ = ["simulate", "simulate_incremental", "SimResult", "simulation_curve_start"]
 
 TRADING_DAYS = 252
 
@@ -45,6 +48,8 @@ class SimResult:
     # paper-trading. Either may be all-zeros when its segment has < 2 points.
     stats_backtest: dict = None       # [curve start, live_since)
     stats_live: dict = None           # [live_since, last bar]
+    checkpoint: dict | None = None    # exact accounting state at ``as_of``
+    ledger_events: list[dict] = field(default_factory=list)
 
 
 def _darwin_equity_curve(strategy: dict) -> list[dict]:
@@ -223,7 +228,7 @@ def _market_returns(closes: pd.DataFrame) -> pd.Series:
     return closes.pct_change().mean(axis=1)
 
 
-def _review_maps(day, names, raw_closes, closes, dollar_volume):
+def _review_maps(day, names, raw_closes, closes, dollar_volume, impact_volatility=None):
     """Per-ticker review-date `(price, dollar_volume)` for the cost model.
 
     Price uses nominal (raw) close when available — the price-scaled slippage is
@@ -247,7 +252,41 @@ def _review_maps(day, names, raw_closes, closes, dollar_volume):
                 dvol[t] = float(val) if pd.notna(val) else None
             else:
                 dvol[t] = None
-    return price, dvol
+    volatility = None
+    if impact_volatility is not None:
+        volatility = {}
+        for ticker in names:
+            if ticker in impact_volatility.columns and day in impact_volatility.index:
+                value = impact_volatility.at[day, ticker]
+                volatility[ticker] = float(value) if pd.notna(value) else None
+            else:
+                volatility[ticker] = None
+    return price, dvol, volatility
+
+
+def _impact_inputs(
+    closes: pd.DataFrame,
+    dollar_volume: pd.DataFrame | None,
+    cfg: costs.CostModel,
+) -> tuple[pd.DataFrame | None, pd.DataFrame | None]:
+    """Causal rolling ADV and daily volatility used by Darwin's impact model."""
+    if dollar_volume is None:
+        return None, None
+    # Specs exported before the sliced-execution contract used review-day
+    # dollar volume directly. Keep that path byte-for-byte compatible; only
+    # an explicit positive execution_max_days opts a strategy into Darwin's
+    # rolling, lagged liquidity and volatility inputs.
+    if cfg.execution_max_days <= 0:
+        return dollar_volume, None
+    lookback = max(1, int(cfg.impact_lookback_days))
+    adv = dollar_volume.rolling(window=lookback, min_periods=lookback).median().shift(1)
+    volatility = (
+        closes.pct_change(fill_method=None)
+        .rolling(window=lookback, min_periods=lookback)
+        .std()
+        .shift(1)
+    )
+    return adv, volatility
 
 
 def _finite_price(row, ticker: str) -> float | None:
@@ -292,6 +331,118 @@ def _current_weights(
     return out
 
 
+def _price_snapshot_id(day: pd.Timestamp, row, tickers: list[str]) -> str:
+    prices = {}
+    for ticker in tickers:
+        value = _finite_price(row, ticker)
+        if value is not None:
+            prices[ticker] = round(value, 8)
+    return content_hash({"session": day.strftime("%Y-%m-%d"), "closes": prices})
+
+
+def _review_price_snapshot_id(
+    day: pd.Timestamp,
+    close_row,
+    tickers: list[str],
+    prices_long: pd.DataFrame | None,
+) -> str:
+    """Hash the exact causal OHLCV frame supplied to a formula review."""
+    if prices_long is None:
+        return _price_snapshot_id(day, close_row, tickers)
+    columns = [
+        column for column in ("date", "ticker", "open", "high", "low", "close", "adj_close", "volume")
+        if column in prices_long.columns
+    ]
+    frame = prices_long[
+        (prices_long["date"] <= day) & prices_long["ticker"].isin(tickers)
+    ][columns].sort_values(["date", "ticker"], kind="stable").copy()
+    frame["date"] = pd.to_datetime(frame["date"]).dt.strftime("%Y-%m-%d")
+    digest = hashlib.sha256()
+    digest.update("ohlcv-v1\n".encode())
+    digest.update("|".join(columns).encode())
+    digest.update(pd.util.hash_pandas_object(frame, index=False).to_numpy().tobytes())
+    return digest.hexdigest()
+
+
+def _nonzero_shares(shares: dict[str, float]) -> dict[str, float]:
+    return {
+        ticker: round(float(quantity), 12)
+        for ticker, quantity in sorted(shares.items())
+        if abs(float(quantity)) > 1e-12
+    }
+
+
+def _checkpoint(
+    strategy: dict,
+    *,
+    day: pd.Timestamp,
+    cash: float,
+    shares: dict[str, float],
+    equity: float,
+    peak_equity: float,
+    state: ps.PortfolioState,
+    pending_target: dict[str, float] | None,
+    pending_cost: float,
+    equity_at_prev_rebal: float | None,
+    last_review: str | None,
+    sessions_until_review: int | None,
+    universe: list[str],
+    price_snapshot_id: str,
+    universe_snapshot_id: str | None = None,
+) -> dict:
+    formula = strategy.get("formula") or strategy.get("signal") or {}
+    return {
+        "schema_version": CONTRACT_VERSION,
+        "strategy_id": strategy["id"],
+        "last_processed_session": day.strftime("%Y-%m-%d"),
+        "cash": float(cash),
+        "shares": {
+            ticker: float(quantity)
+            for ticker, quantity in sorted(shares.items())
+            if abs(float(quantity)) > 1e-12
+        },
+        "equity": float(equity),
+        "peak_equity": float(peak_equity),
+        "portfolio_state": state.to_dict(),
+        "pending_target": dict(sorted((pending_target or {}).items())),
+        "pending_cost_fraction": float(pending_cost),
+        "equity_at_previous_review": equity_at_prev_rebal,
+        "last_review_session": last_review,
+        "sessions_until_review": sessions_until_review,
+        "deployment_hash": content_hash({
+            key: strategy.get(key)
+            for key in (
+                "id", "visibility", "deployed_on", "portfolio_size", "base_currency",
+                "rebalance_cadence_days", "rebalance_cadence_unit",
+                "rebalance_transition_anchor", "cost_model", "formula", "signal",
+            )
+        }),
+        "formula_hash": content_hash(formula),
+        "universe_snapshot_id": (
+            universe_snapshot_id
+            or strategy.get("_universe_snapshot_id")
+            or content_hash(sorted(universe))
+        ),
+        "price_snapshot_id": price_snapshot_id,
+        "price_tickers": sorted(universe),
+        "cost_model_hash": content_hash(strategy["cost_model"]),
+        "engine_version": ENGINE_VERSION,
+    }
+
+
+def _sessions_until_next_review(
+    sim_index: pd.DatetimeIndex,
+    rebal_dates: list[pd.Timestamp],
+    cadence_days: int,
+    cadence_unit: str,
+) -> int | None:
+    if cadence_unit != "trading_days" or not rebal_dates:
+        return None
+    last_review = rebal_dates[-1]
+    observed_after = int((sim_index > last_review).sum())
+    return max(0, cadence_days - observed_after)
+
+
 def simulate(
     strategy: dict,
     opens: pd.DataFrame,
@@ -326,6 +477,220 @@ def simulate(
     return _simulate_signal(strategy, opens, closes, dollar_volume, raw_closes)
 
 
+def simulate_incremental(
+    strategy: dict,
+    checkpoint: dict,
+    prior_curve: list[dict],
+    opens: pd.DataFrame,
+    closes: pd.DataFrame,
+    prices_long: pd.DataFrame | None = None,
+    dollar_volume: pd.DataFrame | None = None,
+    raw_closes: pd.DataFrame | None = None,
+    active_universe: list[str] | None = None,
+) -> SimResult:
+    """Advance an accepted checkpoint across unseen sessions only.
+
+    Historical accounting comes exclusively from ``checkpoint`` and
+    ``prior_curve``.  Older bars may be supplied as causal feature warm-up, but
+    are never replayed or rewritten.  A same-session price revision is rejected
+    so the caller can publish a correction proposal instead of silently
+    mutating the record.
+    """
+    if checkpoint.get("strategy_id") != strategy["id"]:
+        raise ValueError("checkpoint strategy does not match spec")
+    if strategy.get("rebalance_cadence_unit", "calendar_days") != "trading_days":
+        raise ValueError("incremental updates require a trading_days cadence")
+    if "formula" in strategy and prices_long is None:
+        raise ValueError(f"{strategy['id']}: DSL strategies require prices_long")
+
+    expected = _checkpoint_hashes(strategy)
+    for key, value in expected.items():
+        if checkpoint.get(key) != value:
+            raise ValueError(f"{strategy['id']}: accepted checkpoint {key} no longer matches spec")
+
+    last = pd.Timestamp(checkpoint["last_processed_session"])
+    if last not in closes.index:
+        raise ValueError(f"{strategy['id']}: checkpoint session {last.date()} is absent from prices")
+    price_tickers = list(checkpoint.get("price_tickers") or closes.columns)
+    observed_hash = _price_snapshot_id(last, closes.loc[last], price_tickers)
+    if observed_hash != checkpoint["price_snapshot_id"]:
+        raise ValueError(
+            f"{strategy['id']}: price revision at accepted session {last.date()}; "
+            "create a correction proposal"
+        )
+
+    existing = list(prior_curve)
+    if not existing or existing[-1]["d"] != last.strftime("%Y-%m-%d"):
+        raise ValueError("published curve does not end at the accepted checkpoint")
+
+    new_index = closes.index[closes.index > last]
+    tickers = list(closes.columns)
+    decision_universe = list(active_universe or tickers)
+    cash = float(checkpoint["cash"])
+    shares = {ticker: float(checkpoint["shares"].get(ticker, 0.0)) for ticker in tickers}
+    pending_target = {
+        ticker: float(weight) for ticker, weight in checkpoint.get("pending_target", {}).items()
+    }
+    pending_cost = float(checkpoint.get("pending_cost_fraction", 0.0))
+    equity_at_prev_rebal = checkpoint.get("equity_at_previous_review")
+    state = ps.PortfolioState.from_dict(checkpoint["portfolio_state"])
+    account_peak = float(checkpoint["peak_equity"])
+    last_review = checkpoint.get("last_review_session")
+    decision_universe_snapshot_id = checkpoint["universe_snapshot_id"]
+    remaining = checkpoint.get("sessions_until_review")
+    if remaining is None:
+        raise ValueError("incremental trading-day checkpoint lacks sessions_until_review")
+    remaining = int(remaining)
+    cadence = int(strategy["rebalance_cadence_days"])
+    cfg = costs.CostModel.from_spec(strategy["cost_model"])
+    impact_base = float(strategy["portfolio_size"])
+    market_rets = _market_returns(closes)
+    impact_adv, impact_volatility = _impact_inputs(closes, dollar_volume, cfg)
+    needed_state = signals.formula_state_features(strategy["formula"]) if "formula" in strategy else set()
+    live_since = pd.Timestamp(strategy["deployed_on"])
+    ledger_events: list[dict] = []
+    tail: list[dict] = []
+    last_trades: list[dict] = []
+    final_equity = float(checkpoint["equity"])
+
+    for day in new_index:
+        session = day.strftime("%Y-%m-%d")
+        if pending_target:
+            equity_open = cash + _position_value(shares, opens.loc[day], tickers)
+            shares, cash, trades = _apply_targets(
+                pending_target, shares, cash, opens.loc[day], equity_open, tickers,
+            )
+            cash -= equity_open * pending_cost
+            if trades:
+                last_trades = [dict(d=session, **trade) for trade in trades]
+                ledger_events.append(make_event(
+                    strategy["id"], "fills_applied", session,
+                    {
+                        "trades": last_trades, "equity_open": round(equity_open, 8),
+                        "cash_after": round(cash, 8), "shares_after": _nonzero_shares(shares),
+                    },
+                ))
+            if pending_cost:
+                ledger_events.append(make_event(
+                    strategy["id"], "costs_charged", session,
+                    {"fraction": pending_cost, "amount": equity_open * pending_cost},
+                ))
+            pending_target = {}
+            pending_cost = 0.0
+
+        remaining -= 1
+        if remaining <= 0:
+            equity_now = cash + _position_value(shares, closes.loc[day], tickers)
+            prior_w = _current_weights(shares, closes.loc[day], equity_now, tickers)
+            if "formula" in strategy:
+                if equity_at_prev_rebal is not None and float(equity_at_prev_rebal) > 0:
+                    state.push_period_return(equity_now / float(equity_at_prev_rebal) - 1.0)
+                    state.update_peak(equity_now)
+                override = state.scalars_for(needed_state, equity=equity_now, weights=prior_w)
+                evaluated = signals.evaluate_formula(
+                    strategy["formula"], prices_long=prices_long, asof=day,
+                    universe=decision_universe, portfolio_size=float(strategy["portfolio_size"]),
+                    prior_weights=prior_w, prior_holdings=list(prior_w),
+                    portfolio_state_override=override,
+                )
+                target = {
+                    ticker: float(weight)
+                    for ticker, weight in evaluated["final_weights"].items()
+                    if weight > 0
+                }
+                state.push_turnover(target, prior_w)
+            else:
+                target = signals.evaluate(strategy["signal"], closes[decision_universe], day)
+            target = _cap_target_weights(target, cfg, equity_now, impact_base)
+            names = set(prior_w) | set(target)
+            review_price, review_adv, review_vol = _review_maps(
+                day, names, raw_closes, closes, impact_adv, impact_volatility,
+            )
+            multiplier = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
+            pending_cost = costs.rebalance_cost_fraction(
+                prior_w, target, review_price, review_adv, cfg, multiplier,
+                impact_book=_impact_account_book(cfg, equity_now, impact_base),
+                review_daily_volatility=review_vol,
+            )["total_fraction"]
+            pending_target = target
+            equity_at_prev_rebal = equity_now
+            last_review = session
+            remaining = cadence
+            decision_universe_snapshot_id = (
+                strategy.get("_universe_snapshot_id")
+                or content_hash(sorted(decision_universe))
+            )
+            common = {
+                "formula_hash": expected["formula_hash"],
+                "cost_model_hash": expected["cost_model_hash"],
+                "universe_snapshot_id": decision_universe_snapshot_id,
+                "price_snapshot_id": _review_price_snapshot_id(
+                    day, closes.loc[day], decision_universe, prices_long,
+                ),
+            }
+            ledger_events.append(make_event(strategy["id"], "rebalance_reviewed", session, common))
+            ledger_events.append(make_event(
+                strategy["id"], "targets_computed", session,
+                {**common, "weights": dict(sorted(target.items()))},
+            ))
+
+        equity_close = cash + _position_value(shares, closes.loc[day], tickers)
+        final_equity = equity_close
+        account_peak = max(account_peak, equity_close)
+        tail.append({"d": session, "v": round(equity_close, 2)})
+        ledger_events.append(make_event(
+            strategy["id"], "session_marked", session,
+            {
+                "equity": round(equity_close, 8), "cash": round(cash, 8),
+                "shares": _nonzero_shares(shares),
+                "price_snapshot_id": _price_snapshot_id(day, closes.loc[day], tickers),
+            },
+        ))
+
+    curve = existing + tail
+    equity = pd.Series(
+        [float(point["v"]) for point in curve],
+        index=pd.DatetimeIndex([pd.Timestamp(point["d"]) for point in curve]),
+    )
+    final_day = new_index[-1] if len(new_index) else last
+    final_checkpoint = dict(checkpoint)
+    if len(new_index):
+        final_checkpoint = _checkpoint(
+            strategy, day=final_day, cash=cash, shares=shares, equity=final_equity,
+            peak_equity=account_peak, state=state, pending_target=pending_target,
+            pending_cost=pending_cost, equity_at_prev_rebal=equity_at_prev_rebal,
+            last_review=last_review, sessions_until_review=remaining,
+            universe=tickers,
+            price_snapshot_id=_price_snapshot_id(final_day, closes.loc[final_day], tickers),
+            universe_snapshot_id=decision_universe_snapshot_id,
+        )
+    positions = _latest_positions(shares, closes.loc[final_day], final_equity, tickers)
+    stats_backtest, stats_live = _split_stats(equity, live_since)
+    return SimResult(
+        equity_curve=curve, stats=_stats(equity), positions=positions,
+        trades=last_trades, as_of=final_day.strftime("%Y-%m-%d"),
+        stats_backtest=stats_backtest, stats_live=stats_live,
+        checkpoint=final_checkpoint, ledger_events=ledger_events,
+    )
+
+
+def _checkpoint_hashes(strategy: dict) -> dict[str, str]:
+    formula = strategy.get("formula") or strategy.get("signal") or {}
+    return {
+        "deployment_hash": content_hash({
+            key: strategy.get(key)
+            for key in (
+                "id", "visibility", "deployed_on", "portfolio_size", "base_currency",
+                "rebalance_cadence_days", "rebalance_cadence_unit",
+                "rebalance_transition_anchor", "cost_model", "formula", "signal",
+            )
+        }),
+        "formula_hash": content_hash(formula),
+        "cost_model_hash": content_hash(strategy["cost_model"]),
+        "engine_version": ENGINE_VERSION,
+    }
+
+
 def _simulate_signal(
     strategy: dict,
     opens: pd.DataFrame,
@@ -342,6 +707,7 @@ def _simulate_signal(
     signal = strategy["signal"]
     tickers = list(closes.columns)
     market_rets = _market_returns(closes)
+    impact_adv, impact_volatility = _impact_inputs(closes, dollar_volume, cfg)
 
     sim_index = closes.loc[sim_start:].index
     if len(sim_index) == 0:
@@ -349,13 +715,17 @@ def _simulate_signal(
             f"{strategy['id']}: no price bars on/after curve start {sim_start.date()}"
         )
 
-    rebal_dates = set(_strategy_rebalance_dates(sim_index, sim_start, strategy))
+    review_dates = _strategy_rebalance_dates(sim_index, sim_start, strategy)
+    rebal_dates = set(review_dates)
 
     cash = capital
     shares = {t: 0.0 for t in tickers}
     pending_target: dict[str, float] = {}
     pending_cost = 0.0
     last_trades: list[dict] = []
+    state = ps.PortfolioState(capital)
+    account_peak = capital
+    ledger_events: list[dict] = []
 
     curve: list[dict] = []
     equity_values: list[float] = []
@@ -371,6 +741,19 @@ def _simulate_signal(
             cash -= equity_open * pending_cost
             if trades:
                 last_trades = [dict(d=day.strftime("%Y-%m-%d"), **tr) for tr in trades]
+                if day >= live_since:
+                    ledger_events.append(make_event(
+                        strategy["id"], "fills_applied", day.strftime("%Y-%m-%d"),
+                        {
+                            "trades": last_trades, "equity_open": round(equity_open, 8),
+                            "cash_after": round(cash, 8), "shares_after": _nonzero_shares(shares),
+                        },
+                    ))
+            if pending_cost and day >= live_since:
+                ledger_events.append(make_event(
+                    strategy["id"], "costs_charged", day.strftime("%Y-%m-%d"),
+                    {"fraction": pending_cost, "amount": equity_open * pending_cost},
+                ))
             pending_target = {}
             pending_cost = 0.0
 
@@ -381,23 +764,73 @@ def _simulate_signal(
             target = _cap_target_weights(target, cfg, equity_now, impact_base)
             prior_w = _current_weights(shares, closes.loc[day], equity_now, tickers)
             names = set(prior_w) | set(target)
-            price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
+            price, dvol, daily_vol = _review_maps(
+                day, names, raw_closes, closes, impact_adv, impact_volatility,
+            )
             vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
             pending_cost = costs.rebalance_cost_fraction(
                 prior_w, target, price, dvol, cfg, vol_mult,
                 impact_book=_impact_account_book(cfg, equity_now, impact_base),
+                review_daily_volatility=daily_vol,
             )["total_fraction"]
             pending_target = target
+            if day >= live_since:
+                session = day.strftime("%Y-%m-%d")
+                common = {
+                    "formula_hash": content_hash(strategy.get("formula") or strategy.get("signal")),
+                    "cost_model_hash": content_hash(strategy["cost_model"]),
+                    "universe_snapshot_id": strategy.get("_universe_snapshot_id") or content_hash(sorted(tickers)),
+                    "price_snapshot_id": _review_price_snapshot_id(
+                        day, closes.loc[day], tickers, None,
+                    ),
+                }
+                ledger_events.append(make_event(
+                    strategy["id"], "rebalance_reviewed", session, common,
+                ))
+                ledger_events.append(make_event(
+                    strategy["id"], "targets_computed", session,
+                    {**common, "weights": dict(sorted(target.items()))},
+                ))
 
         equity_close = cash + _position_value(shares, closes.loc[day], tickers)
+        account_peak = max(account_peak, equity_close)
         equity_values.append(equity_close)
         curve.append({"d": day.strftime("%Y-%m-%d"), "v": round(equity_close, 2)})
+        if day >= live_since:
+            ledger_events.append(make_event(
+                strategy["id"], "session_marked", day.strftime("%Y-%m-%d"),
+                {
+                    "equity": round(equity_close, 8),
+                    "cash": round(cash, 8), "shares": _nonzero_shares(shares),
+                    "price_snapshot_id": _price_snapshot_id(day, closes.loc[day], tickers),
+                },
+            ))
 
     curve, equity = _stitch_curve(darwin_curve, curve)
     stats = _stats(equity)
     stats_backtest, stats_live = _split_stats(equity, live_since)
     positions = _latest_positions(shares, closes.iloc[-1], equity_values[-1], tickers)
 
+    final_day = sim_index[-1]
+    checkpoint = _checkpoint(
+        strategy,
+        day=final_day,
+        cash=cash,
+        shares=shares,
+        equity=equity_values[-1],
+        peak_equity=account_peak,
+        state=state,
+        pending_target=pending_target,
+        pending_cost=pending_cost,
+        equity_at_prev_rebal=None,
+        last_review=review_dates[-1].strftime("%Y-%m-%d") if review_dates else None,
+        sessions_until_review=_sessions_until_next_review(
+            sim_index, review_dates, int(strategy["rebalance_cadence_days"]),
+            strategy.get("rebalance_cadence_unit", "calendar_days"),
+        ),
+        universe=tickers,
+        price_snapshot_id=_price_snapshot_id(final_day, closes.loc[final_day], tickers),
+    )
     return SimResult(
         equity_curve=curve,
         stats=stats,
@@ -406,6 +839,8 @@ def _simulate_signal(
         as_of=equity.index[-1].strftime("%Y-%m-%d"),
         stats_backtest=stats_backtest,
         stats_live=stats_live,
+        checkpoint=checkpoint,
+        ledger_events=ledger_events,
     )
 
 
@@ -434,6 +869,7 @@ def _simulate_dsl(
     formula = strategy["formula"]
     universe = list(closes.columns)
     market_rets = _market_returns(closes)
+    impact_adv, impact_volatility = _impact_inputs(closes, dollar_volume, cfg)
 
     sim_index = closes.loc[sim_start:].index
     if len(sim_index) == 0:
@@ -441,7 +877,8 @@ def _simulate_dsl(
             f"{strategy['id']}: no price bars on/after curve start {sim_start.date()}"
         )
 
-    rebal_set = set(_strategy_rebalance_dates(sim_index, sim_start, strategy))
+    review_dates = _strategy_rebalance_dates(sim_index, sim_start, strategy)
+    rebal_set = set(review_dates)
     needed_state = signals.formula_state_features(formula)
 
     state = ps.PortfolioState(capital)
@@ -451,6 +888,8 @@ def _simulate_dsl(
     pending_cost = 0.0
     equity_at_prev_rebal: float | None = None
     last_trades: list[dict] = []
+    account_peak = capital
+    ledger_events: list[dict] = []
 
     curve: list[dict] = []
     equity_values: list[float] = []
@@ -466,6 +905,19 @@ def _simulate_dsl(
             cash -= equity_open * pending_cost
             if trades:
                 last_trades = [dict(d=day.strftime("%Y-%m-%d"), **tr) for tr in trades]
+                if day >= live_since:
+                    ledger_events.append(make_event(
+                        strategy["id"], "fills_applied", day.strftime("%Y-%m-%d"),
+                        {
+                            "trades": last_trades, "equity_open": round(equity_open, 8),
+                            "cash_after": round(cash, 8), "shares_after": _nonzero_shares(shares),
+                        },
+                    ))
+            if pending_cost and day >= live_since:
+                ledger_events.append(make_event(
+                    strategy["id"], "costs_charged", day.strftime("%Y-%m-%d"),
+                    {"fraction": pending_cost, "amount": equity_open * pending_cost},
+                ))
             pending_target = None
             pending_cost = 0.0
 
@@ -498,24 +950,74 @@ def _simulate_dsl(
             state.push_turnover(target, prior_w)
 
             names = set(prior_w) | set(target)
-            price, dvol = _review_maps(day, names, raw_closes, closes, dollar_volume)
+            price, dvol, daily_vol = _review_maps(
+                day, names, raw_closes, closes, impact_adv, impact_volatility,
+            )
             vol_mult = costs.volatility_cost_multiplier(market_rets.loc[:day].to_numpy(), cfg)
             pending_cost = costs.rebalance_cost_fraction(
                 prior_w, target, price, dvol, cfg, vol_mult,
                 impact_book=_impact_account_book(cfg, equity_now, impact_base),
+                review_daily_volatility=daily_vol,
             )["total_fraction"]
             pending_target = target
             equity_at_prev_rebal = equity_now
+            if day >= live_since:
+                session = day.strftime("%Y-%m-%d")
+                common = {
+                    "formula_hash": content_hash(formula),
+                    "cost_model_hash": content_hash(strategy["cost_model"]),
+                    "universe_snapshot_id": strategy.get("_universe_snapshot_id") or content_hash(sorted(universe)),
+                    "price_snapshot_id": _review_price_snapshot_id(
+                        day, closes.loc[day], universe, prices_long,
+                    ),
+                }
+                ledger_events.append(make_event(
+                    strategy["id"], "rebalance_reviewed", session, common,
+                ))
+                ledger_events.append(make_event(
+                    strategy["id"], "targets_computed", session,
+                    {**common, "weights": dict(sorted(target.items()))},
+                ))
 
         equity_close = cash + _position_value(shares, closes.loc[day], universe)
+        account_peak = max(account_peak, equity_close)
         equity_values.append(equity_close)
         curve.append({"d": day.strftime("%Y-%m-%d"), "v": round(equity_close, 2)})
+        if day >= live_since:
+            ledger_events.append(make_event(
+                strategy["id"], "session_marked", day.strftime("%Y-%m-%d"),
+                {
+                    "equity": round(equity_close, 8),
+                    "cash": round(cash, 8), "shares": _nonzero_shares(shares),
+                    "price_snapshot_id": _price_snapshot_id(day, closes.loc[day], universe),
+                },
+            ))
 
     curve, equity = _stitch_curve(darwin_curve, curve)
     stats = _stats(equity)
     stats_backtest, stats_live = _split_stats(equity, live_since)
     positions = _latest_positions(shares, closes.iloc[-1], equity_values[-1], universe)
 
+    final_day = sim_index[-1]
+    checkpoint = _checkpoint(
+        strategy,
+        day=final_day,
+        cash=cash,
+        shares=shares,
+        equity=equity_values[-1],
+        peak_equity=account_peak,
+        state=state,
+        pending_target=pending_target,
+        pending_cost=pending_cost,
+        equity_at_prev_rebal=equity_at_prev_rebal,
+        last_review=review_dates[-1].strftime("%Y-%m-%d") if review_dates else None,
+        sessions_until_review=_sessions_until_next_review(
+            sim_index, review_dates, int(strategy["rebalance_cadence_days"]),
+            strategy.get("rebalance_cadence_unit", "calendar_days"),
+        ),
+        universe=universe,
+        price_snapshot_id=_price_snapshot_id(final_day, closes.loc[final_day], universe),
+    )
     return SimResult(
         equity_curve=curve,
         stats=stats,
@@ -524,6 +1026,8 @@ def _simulate_dsl(
         as_of=equity.index[-1].strftime("%Y-%m-%d"),
         stats_backtest=stats_backtest,
         stats_live=stats_live,
+        checkpoint=checkpoint,
+        ledger_events=ledger_events,
     )
 
 
@@ -556,9 +1060,15 @@ def _apply_targets(targets, shares, cash, open_px, equity, tickers):
         cash -= qty * px
         side = "buy" if delta_val > 0 else "sell"
 
-        trades.append(
-            {"ticker": t, "side": side, "weight": round(abs(delta_w), 4)}
-        )
+        trades.append({
+            "ticker": t,
+            "side": side,
+            "weight": round(abs(delta_w), 4),
+            "target_weight": round(float(tgt_w), 8),
+            "quantity": round(float(qty), 12),
+            "price": round(float(px), 8),
+            "notional": round(abs(float(delta_val)), 8),
+        })
 
     return new_shares, cash, trades
 

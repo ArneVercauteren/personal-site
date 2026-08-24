@@ -1,8 +1,8 @@
 # Tier-2b open-strategy updater dependencies (public repo).
 # Keyless price source — no API keys, no broker SDKs.
-yfinance>=0.2.40
-pandas>=2.0
-numpy>=1.24
+yfinance==1.6.0
+pandas==3.0.5
+numpy==2.5.2
 # Optional for older yfinance builds. Current yfinance releases use curl_cffi
 # sessions, so the updater falls back to sequential chunks + pauses instead.
-requests-ratelimiter>=0.7
+requests-ratelimiter==0.10.0

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astralanx.example/schemas/ledger-event-v1.json",
+  "title": "Paper ledger event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "event_id", "strategy_id", "event_type", "session", "engine_version", "payload"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "event_id": {"type": "string", "pattern": "^[a-f0-9]{24}$"},
+    "strategy_id": {"type": "string"},
+    "event_type": {"enum": ["strategy_deployed", "migration_checkpoint", "session_marked", "rebalance_reviewed", "targets_computed", "fills_applied", "costs_charged", "correction_proposed", "correction_accepted"]},
+    "session": {"type": "string", "format": "date"},
+    "engine_version": {"const": "paper-runtime-v1"},
+    "payload": {"type": "object"}
+  }
+}

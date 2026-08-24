@@ -1,0 +1,20 @@
+name: Paper data — stale snapshot alert
+
+on:
+  schedule:
+    - cron: "30 14 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
+        with:
+          python-version: "3.12"
+      - name: Fail visibly when the last good snapshot is stale
+        run: python -m paper_trading.validate_data --max-age-days 4

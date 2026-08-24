@@ -10,17 +10,18 @@ The **secured** strategies have their *own* crons (`rebalance.yml`, `daily.yml`)
 
 ## Shape
 
-- **Triggers:** two weekday crons — `30 11 * * 1-5` and `30 22 * * 1-5` (UTC; the evening run is after US market close) — plus manual `workflow_dispatch`.
-- **Concurrency:** a `open-strategies-update` group with `cancel-in-progress: false`, so two runs never race to commit.
+- **Triggers:** one weekday cron at `30 22 * * 1-5` (UTC, after the regular US session and normal data finalization), plus manual `workflow_dispatch`.
+- **Concurrency:** the shared `paper-data-writer-main` group with `cancel-in-progress: false`, also used by the universe writer. A pull/rebase immediately before push detects writers from other repositories.
 - **Permissions:** `contents: write` (the job pushes a data commit).
-- **Steps:** checkout → `actions/setup-python@v5` (3.12, pip cache) → `pip install -r paper_trading/requirements.txt` → `python -m paper_trading.update` → stage `public/data/{portfolio,trades,strategies,benchmark}.json` → commit + push **only if** `git diff --staged` shows a change.
+- **Steps:** pinned checkout/setup-python actions → install `requirements-lock.txt` → retry the incremental updater up to three times → run the Python suite and public-data validator → stage compatibility data, manifest/snapshots, ledger, checkpoint, and migration evidence → rebase → commit/push only when changed.
 - **Bot identity:** commits as `paper-trading-bot <actions@users.noreply.github.com>`, message `data: refresh open-strategy paper portfolio [skip ci]` (the `[skip ci]` tag avoids retriggering CI on the data commit).
 
 ## Invariants it respects
 
 - **No committed secret.** The price source is keyless. If a keyed source were ever used, the key would be a GitHub Actions repo secret referenced as `${{ secrets.NAME }}` — never inlined. See [reference/env-vars.md](../reference/env-vars.md).
-- **Commits data only.** The job stages only `public/data/*.json`; it never touches application code.
+- **Commits data/state only.** The job stages `public/data`, `paper_state`, `paper_ledger`, and reviewed migration evidence; it never touches application code.
 - **Idempotent / no-op safe.** If a run produces no change, the `git diff --staged --quiet` guard commits nothing.
+- **Alerts without partial publication.** Native failed-workflow notifications cover updater/rebalance failure. `stale-data-alert.yml` separately fails on an old manifest, while the manifest continues to reference the last validated snapshot.
 
 ## Source files
 

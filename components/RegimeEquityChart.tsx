@@ -133,7 +133,11 @@ export function RegimeEquityChart({
 
   return (
     <div>
-      <div style={{ width: "100%", height }}>
+      <div
+        role="img"
+        aria-label={`Lifecycle equity from ${shortDate(first)} to ${shortDate(last)}, moving from ${money(points[0].v, currency)} to ${money(points.at(-1)!.v, currency)} across ${shownKinds.map((kind) => REGIME_STYLE[kind].name).join(", ")}.`}
+        style={{ width: "100%", height }}
+      >
         <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
           <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>

@@ -168,9 +168,9 @@ function FuncCall({ name, kids }: { name: string; kids: (FormulaNode | undefined
 function Gate({ children }: { children: ReactNode }) {
   return (
     <span className="inline">
-      <span className="text-ink-muted/70">[</span>
+      <span className="text-ink-muted">[</span>
       {children}
-      <span className="text-ink-muted/70">]</span>
+      <span className="text-ink-muted">]</span>
     </span>
   );
 }
@@ -700,7 +700,7 @@ export function FormulaView({
         </li>
         <li>
           <strong className="text-ink">Comparisons and logic</strong> act as 1 / 0 gates
-          (shown in <span className="text-ink-muted/70">[ ]</span> brackets) that switch parts
+          (shown in <span className="text-ink-muted">[ ]</span> brackets) that switch parts
           of the score on or off. The score&apos;s absolute value is meaningless; only the
           ordering across names selects the basket.
         </li>

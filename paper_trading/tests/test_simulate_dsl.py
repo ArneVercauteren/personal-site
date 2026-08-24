@@ -59,6 +59,61 @@ def test_simulate_is_deterministic(universe, long_prices):
     assert r1.trades == r2.trades
 
 
+def test_incremental_checkpoint_matches_one_shot_replay(universe, long_prices):
+    opens, closes = prices.long_to_wide(long_prices)
+    raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long_prices)
+    spec = _spec(universe, _roc_topn())
+    spec["rebalance_cadence_days"] = 42
+    spec["rebalance_cadence_unit"] = "trading_days"
+    cutoff = closes.loc["2024-06-01":].index[35]
+    first_long = long_prices[long_prices["date"] <= cutoff]
+    first = portfolio.simulate(
+        spec, opens.loc[:cutoff], closes.loc[:cutoff], prices_long=first_long,
+        dollar_volume=dollar_volume.loc[:cutoff], raw_closes=raw_closes.loc[:cutoff],
+    )
+    assert first.checkpoint is not None
+    continued = portfolio.simulate_incremental(
+        spec, first.checkpoint, first.equity_curve, opens, closes,
+        prices_long=long_prices, dollar_volume=dollar_volume, raw_closes=raw_closes,
+        active_universe=universe,
+    )
+    replay = portfolio.simulate(
+        spec, opens, closes, prices_long=long_prices,
+        dollar_volume=dollar_volume, raw_closes=raw_closes,
+    )
+    assert continued.equity_curve == replay.equity_curve
+    assert continued.positions == replay.positions
+    assert continued.checkpoint == replay.checkpoint
+
+
+def test_incremental_checkpoint_keeps_last_decision_universe_until_review(universe, long_prices):
+    opens, closes = prices.long_to_wide(long_prices)
+    spec = _spec(universe, _roc_topn())
+    spec["rebalance_cadence_days"] = 42
+    spec["rebalance_cadence_unit"] = "trading_days"
+    spec["_universe_snapshot_id"] = "universe-at-last-review"
+    cutoff = closes.loc["2024-06-01":].index[35]
+    first_long = long_prices[long_prices["date"] <= cutoff]
+    first = portfolio.simulate(
+        spec, opens.loc[:cutoff], closes.loc[:cutoff], prices_long=first_long,
+    )
+    assert first.checkpoint is not None
+    assert first.checkpoint["sessions_until_review"] > 1
+
+    refreshed_spec = dict(spec, _universe_snapshot_id="newly-refreshed-universe")
+    next_day = closes.index[closes.index > cutoff][0]
+    continued = portfolio.simulate_incremental(
+        refreshed_spec, first.checkpoint, first.equity_curve,
+        opens.loc[:next_day], closes.loc[:next_day],
+        prices_long=long_prices[long_prices["date"] <= next_day],
+        active_universe=universe,
+    )
+
+    assert continued.checkpoint is not None
+    assert continued.checkpoint["universe_snapshot_id"] == "universe-at-last-review"
+    assert not any(event["event_type"] == "rebalance_reviewed" for event in continued.ledger_events)
+
+
 def test_backfill_start_extends_curve_and_splits_stats(universe, long_prices):
     """`backfill_start` starts the curve before the live date and splits stats."""
     opens, closes = prices.long_to_wide(long_prices)

@@ -6,6 +6,7 @@ export const site = {
     "A personal site for my work — astralanx, a system for evolving trading strategies, and the simulated portfolio it runs — alongside some essays, music, and art.",
   // Public contact email.
   email: "arne.ffmeta@gmail.com",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   // Birth date (ISO, YYYY-MM-DD). Age is derived from this and the build-time
   // date — see `age()` in lib/format.ts. TODO: set this to your real birth date.
   birthDate: "2007-05-09",

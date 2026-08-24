@@ -13,6 +13,7 @@ from paper_trading import prices
 from paper_trading.costs import (
     CostModel,
     rebalance_cost_fraction,
+    sliced_execution_cost,
     volatility_cost_multiplier,
 )
 from paper_trading import portfolio
@@ -127,6 +128,30 @@ def test_vol_mult_scales_commission_slippage_but_not_impact():
     # impact NOT scaled: dw=1, trade_value=100_000, adv=1e7 → 0.5*sqrt(0.01)=0.05
     assert res["volume_impact_fraction"] == pytest.approx(0.05)
     assert res["total_fraction"] == pytest.approx(0.054)
+
+
+def test_sliced_execution_matches_darwin_equations():
+    cfg = _cfg(
+        volume_impact_coef=0.5,
+        execution_max_days=3,
+        execution_participation_rate=0.01,
+        execution_delay_risk_coef=0.25,
+        execution_overflow_penalty_bps=500.0,
+    )
+    result = sliced_execution_cost(
+        trade_value=2_500_000.0,
+        adv_dollars=100_000_000.0,
+        daily_volatility=0.02,
+        cfg=cfg,
+    )
+    assert result["execution_days"] == 3
+    assert result["daily_participation_rate"] == pytest.approx(1 / 120)
+    assert result["impact_fraction"] == pytest.approx(0.5 * 0.02 * np.sqrt(1 / 120))
+    assert result["delay_risk_fraction"] == pytest.approx(0.25 * 0.02 * np.sqrt(2 / 252))
+    assert result["overflow_fraction"] == 0.0
+    assert result["total_cost_fraction"] == pytest.approx(
+        result["impact_fraction"] + result["delay_risk_fraction"]
+    )
 
 
 # --- volatility_cost_multiplier -------------------------------------------

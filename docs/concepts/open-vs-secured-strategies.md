@@ -52,6 +52,6 @@ underlying weight vector. You cannot reconstruct "AAPL 4.0%, MSFT 3.1%, ..." fro
 
 ## Source files
 
-- `lib/data.ts` — the `visibility` discriminator (when built).
-- `paper_trading/` — open-strategy engine (when built).
-- Private repo `personal-site-trading` — secured pipeline (when built).
+- `lib/data.ts` — the `visibility` discriminator.
+- `paper_trading/` — open-strategy engine.
+- Private repo `personal-site-trading` — secured pipeline.

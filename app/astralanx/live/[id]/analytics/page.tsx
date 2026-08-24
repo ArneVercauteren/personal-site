@@ -12,9 +12,10 @@ import { DivergingBarChart, type DivergingDatum } from "@/components/DivergingBa
 import { CompositionDonut, type CompositionSlice } from "@/components/charts/CompositionDonut";
 import { PicksHistory } from "@/components/PicksHistory";
 import {
-  loadBenchmarks,
-  loadPortfolio,
-  loadStrategyMeta,
+  loadSnapshotBenchmark,
+  loadStrategyAnalytics,
+  loadStrategyDetail,
+  loadStrategyIndex,
   type Benchmark,
   type CapacityMethod,
   type EquityPoint,
@@ -25,7 +26,7 @@ import {
 import { money, pct, signedPct, shortDate } from "@/lib/format";
 
 export function generateStaticParams() {
-  return loadPortfolio()
+  return loadStrategyIndex()
     .strategies.filter((s) => s.visibility === "open")
     .map((s) => ({ id: s.id }));
 }
@@ -36,8 +37,11 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const s = loadPortfolio().strategies.find((x) => x.id === id);
-  return s ? { title: `${s.name} · analytics` } : {};
+  const s = loadStrategyIndex().strategies.find((x) => x.id === id);
+  return s ? {
+    title: `${s.name} · analytics`,
+    alternates: { canonical: `/astralanx/live/${s.id}/analytics` },
+  } : {};
 }
 
 // The run that carries the richest diagnostics — combined spans training + OOS,
@@ -231,10 +235,13 @@ export default async function StrategyAnalyticsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const strategy = loadPortfolio().strategies.find((s) => s.id === id);
-  const meta = loadStrategyMeta().strategies.find((m) => m.id === id);
-  const sp500 = loadBenchmarks().benchmarks.find((b) => b.id === "sp500");
-  if (!strategy || !meta) notFound();
+  const summary = loadStrategyIndex().strategies.find((s) => s.id === id);
+  if (!summary) notFound();
+  const detail = loadStrategyDetail(id);
+  const strategy = detail.strategy;
+  const analytics = loadStrategyAnalytics(id);
+  const meta = { ...detail.meta, ...analytics };
+  const sp500 = loadSnapshotBenchmark();
 
   const run = meta.performance ? pickRun(meta) : undefined;
   const d: OpenDiagnostics | undefined = run?.open_diagnostics;

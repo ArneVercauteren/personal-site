@@ -1,6 +1,7 @@
 # Subsystem — Darwin → site publish step (Tier 3)
 
-> **Status: stub.** The publish script isn't written yet. It lives in the **Darwin repo**, not this one. This page states what it will own and the contract it must honour.
+> **Status: built at the contract boundary.** Darwin's UI exports the scrubbed `site-spec`; this repository
+> requires a reviewed migration before that spec can affect accepted paper history.
 
 ## What this will own
 
@@ -191,15 +192,12 @@ site" is small:
 `StrategyDrawer` menu items. This keeps Darwin's UI as the single deploy surface and produces the
 *exact* spec the updater already runs — no second format to maintain.
 
-## To fill this in
-
-When `scripts/deploy_to_site.py` / the `fmt=site` endpoint are written (in Darwin), document here:
-how a king is marked "deployed", and the push mechanism (commit vs. artifact). Keep the
-authoritative implementation notes in the Darwin repo; this page records the *contract* from the
-website's side.
+The Darwin UI currently produces the site spec; placement and review in this repository are an explicit operator
+step. That deliberate handoff keeps Darwin unable to mutate an accepted paper ledger. See
+`docs/tasks/add-deployed-strategy.md` for migration and approval.
 
 ## Source files
 
-- Darwin repo: `scripts/deploy_to_site.py` (new, when built), `scripts/select_on_date_yf.py` + `src/backtest/select_on_date.py` (adapted for the rebalance eval).
+- Darwin repo: `ui/backend/exports/site.py`, the `site-spec` route, and the selection evaluator.
 - Private repo: `strategies/<king>.json` + metadata — the received, scrubbed secured exports.
 - This repo: `paper_trading/strategies/*.json` — open exports; `public/data/strategies.json` — published metadata.

@@ -63,5 +63,5 @@ side.
 
 ## Source files
 
-- Private repo `personal-site-trading`: `strategies/`, `weights/`, `ticker_sectors.json`, `.github/workflows/{rebalance,daily}.yml` (when built).
+- Private repo `personal-site-trading`: `strategies/`, `weights/`, `ticker_sectors.json`, `.github/workflows/{rebalance,daily}.yml`.
 - This repo: `paper_trading/` (the shared engine), `paper_trading/secured.py` (sanitizer + cadence helpers, built), `paper_trading/tests/test_secured.py` (the leak-boundary tests, built), `public/data/*.json` (the received sanitized snapshot).

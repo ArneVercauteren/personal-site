@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { Benchmark, EquityPoint } from "@/lib/data";
 import { RegimeEquityChart, type Regime } from "@/components/RegimeEquityChart";
 import { DrawdownChart } from "@/components/DrawdownChart";
-import { shortDate } from "@/lib/format";
+import { pct, shortDate } from "@/lib/format";
 
 // Interactive wrapper around the lifecycle equity + drawdown charts: preset
 // buttons jump to a phase (out-of-sample / live), and two date inputs set an
@@ -93,9 +93,10 @@ export function EquityExplorer({
     return out;
   }, [regimes, segmentCurves, first, last, liveSince]);
 
-  const [from, setFrom] = useState(first);
+  const initialLive = Boolean(liveSince && liveSince >= first && liveSince <= last);
+  const [from, setFrom] = useState(initialLive ? liveSince! : first);
   const [to, setTo] = useState(last);
-  const [active, setActive] = useState("full");
+  const [active, setActive] = useState(initialLive ? "live" : "full");
 
   const visible = useMemo(() => {
     const segment = active === "training" || active === "oos" ? segmentCurves?.[active] : undefined;
@@ -111,6 +112,15 @@ export function EquityExplorer({
 
   // Too narrow a window can leave < 2 points; the charts render nothing then.
   const tooNarrow = visible.length < 2;
+  const visibleReturn = visible.length > 1
+    ? visible[visible.length - 1].v / visible[0].v - 1
+    : 0;
+  let peak = -Infinity;
+  let worstDrawdown = 0;
+  for (const point of visible) {
+    peak = Math.max(peak, point.v);
+    if (peak > 0) worstDrawdown = Math.min(worstDrawdown, point.v / peak - 1);
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -166,6 +176,14 @@ export function EquityExplorer({
           </label>
         </div>
       </div>
+
+      {!tooNarrow ? (
+        <p className="text-xs text-ink-muted" role="status" aria-live="polite">
+          Showing {visible.length} observations from {shortDate(visible[0].d)} to{" "}
+          {shortDate(visible[visible.length - 1].d)}: {pct(visibleReturn)} total return and{" "}
+          {pct(worstDrawdown)} maximum drawdown in this view.
+        </p>
+      ) : null}
 
       {tooNarrow ? (
         <p className="panel p-6 text-center text-sm text-ink-muted">

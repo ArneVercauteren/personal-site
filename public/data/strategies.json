@@ -3,7 +3,7 @@
   "strategies": [
     {
       "id": "gen0194",
-      "name": "gen0194",
+      "name": "Adaptive Cross-Sectional Selection",
       "visibility": "open",
       "portfolio_size": 1000000.0,
       "base_currency": "USD",
@@ -26,7 +26,24 @@
         "vol_cost_mult_max": 3.0,
         "impact_book_cap": 36076014.22482418
       },
-      "blurb": "",
+      "blurb": "An adaptive, rules-based equity selection strategy evolved in Darwin and tracked here as an append-only paper portfolio.",
+      "thesis": "Combine several independent price, volume, trend, and mean-reversion signals to rank a broad liquid US equity universe, then hold the strongest candidates on a fixed review schedule.",
+      "expected_behavior": "The portfolio is concentrated and can differ materially from the index. It should participate when its selected signals persist, while periodic reviews let the basket adapt as leadership changes.",
+      "risks": [
+        "Concentration and factor crowding can create sharp drawdowns.",
+        "Signal relationships learned from historical data may decay out of sample.",
+        "Daily-bar paper fills, liquidity estimates, and market-impact assumptions can differ from executable prices."
+      ],
+      "failure_modes": [
+        "Sustained underperformance versus the benchmark across multiple review cycles.",
+        "Realized turnover or costs materially exceeding the published model.",
+        "A shrinking eligible universe or unstable selections caused by data-quality changes."
+      ],
+      "rebalance_cadence_unit": "trading_days",
+      "last_review_date": "2026-08-10",
+      "last_fill_date": "2026-08-11",
+      "next_review_date": "2026-10-08",
+      "sessions_until_review": 33,
       "performance": {
         "training": {
           "start": "2000-01-01",

@@ -28,11 +28,10 @@ export function DrawdownChart({
 }) {
   if (points.length < 2) return null;
 
-  let peak = -Infinity;
-  const series = points.map((p) => {
-    peak = Math.max(peak, p.v);
-    return { d: p.d, dd: peak > 0 ? p.v / peak - 1 : 0 };
-  });
+  const series = points.reduce<{ d: string; dd: number; peak: number }[]>((rows, point) => {
+    const peak = Math.max(rows.at(-1)?.peak ?? -Infinity, point.v);
+    return [...rows, { d: point.d, dd: peak > 0 ? point.v / peak - 1 : 0, peak }];
+  }, []);
 
   const minDd = Math.min(...series.map((s) => s.dd));
 
@@ -46,7 +45,11 @@ export function DrawdownChart({
       <h4 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-muted">
         Drawdown
       </h4>
-      <div style={{ width: "100%", height }}>
+      <div
+        role="img"
+        aria-label={`Drawdown chart from ${shortDate(points[0].d)} to ${shortDate(points.at(-1)!.d)}; worst drawdown ${pct(minDd)}.`}
+        style={{ width: "100%", height }}
+      >
         <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
           <AreaChart data={series} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>

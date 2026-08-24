@@ -14,6 +14,13 @@ def _write_spec(directory, strategy_id: str) -> None:
         "id": strategy_id,
         "name": strategy_id,
         "visibility": "open",
+        "deployed_on": "2026-01-02",
+        "portfolio_size": 100_000,
+        "base_currency": "USD",
+        "rebalance_cadence_days": 42,
+        "rebalance_cadence_unit": "trading_days",
+        "cost_model": {"commission_bps": 1.0, "slippage_bps": 5.0},
+        "formula": {"kind": "number", "value": 1.0},
     }
     (directory / f"{strategy_id}.json").write_text(json.dumps(payload), encoding="utf-8")
 

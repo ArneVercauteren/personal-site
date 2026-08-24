@@ -49,7 +49,11 @@ export function RollingSharpeChart({
   const max = Math.max(...values);
 
   return (
-    <div style={{ width: "100%", height }}>
+    <div
+      role="img"
+      aria-label={`Rolling Sharpe chart from ${shortDate(data[0].d)} to ${shortDate(data.at(-1)!.d)}; minimum ${min.toFixed(2)}, maximum ${max.toFixed(2)}.`}
+      style={{ width: "100%", height }}
+    >
       <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
         <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <defs>

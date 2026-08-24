@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astralanx.example/schemas/checkpoint-v1.json",
+  "title": "Paper strategy checkpoint",
+  "type": "object",
+  "required": ["schema_version", "strategy_id", "last_processed_session", "cash", "shares", "equity", "peak_equity", "portfolio_state", "deployment_hash", "formula_hash", "universe_snapshot_id", "price_snapshot_id", "cost_model_hash", "engine_version"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "strategy_id": {"type": "string"},
+    "last_processed_session": {"type": "string", "format": "date"},
+    "cash": {"type": "number"},
+    "shares": {"type": "object", "additionalProperties": {"type": "number"}},
+    "equity": {"type": "number", "exclusiveMinimum": 0},
+    "peak_equity": {"type": "number", "exclusiveMinimum": 0},
+    "portfolio_state": {"type": "object"},
+    "deployment_hash": {"type": "string"},
+    "formula_hash": {"type": "string"},
+    "universe_snapshot_id": {"type": "string"},
+    "price_snapshot_id": {"type": "string"},
+    "cost_model_hash": {"type": "string"},
+    "engine_version": {"type": "string"}
+  }
+}

@@ -1,25 +1,45 @@
-# Task — Add a deployed strategy to the dashboard
+# Task — Add an open deployed strategy
 
-> **Status: stub** until the [updater](../subsystems/paper-trading-updater.md) and [publish step](../subsystems/darwin-publish.md) exist. The intended recipe:
+Darwin exports one scrubbed site spec; this repository owns all subsequent paper accounting and publication.
+The boundary is JSON-only: do not copy Darwin caches, filesystem paths, credentials, or private strategy data.
 
-## Steps (planned)
+## Steps
 
-1. **In Darwin (Tier 3):** mark the king as deployed and run the publish script, which writes a scrubbed `paper_trading/strategies/<king>.json` into this repo. See [subsystems/darwin-publish.md](../subsystems/darwin-publish.md).
-2. **Verify the export is scrubbed** — DSL tree + portable metadata only, no internal paths or secrets. See [concepts/separation-from-darwin.md](../concepts/separation-from-darwin.md).
-3. **Run the updater locally:** `python -m paper_trading.update`. Confirm the new strategy appears in the regenerated `public/data/portfolio.json` (and `strategies.json`, `trades.json`) per the [data contract](../concepts/data-contract.md).
-4. **Check the dashboard** renders the new strategy (`npm run dev`), with the paper-only disclaimer intact.
-5. Commit the new strategy JSON + regenerated `public/data/*.json` together.
+1. Export the strategy through Darwin's `site-spec` action and place the reviewed JSON at
+   `paper_trading/strategies/<strategy-id>.json`. Keep `visibility` set to `open`; secured strategies belong in
+   the private updater repository.
+2. Run the Python tests. Strategy import rejects malformed schemas, internal paths, and fields outside the
+   public contract.
+3. Generate a migration candidate without changing accepted state:
+
+   ```bash
+   python -m paper_trading.migrate --strategy <strategy-id>
+   ```
+
+4. Review `paper_migration/<strategy-id>.candidate.json`: confirm the boundary curve, fill basket, holdings,
+   hashes, and any labelled vendor-price delta. Then approve explicitly:
+
+   ```bash
+   python -m paper_trading.migrate --strategy <strategy-id> --approve --reviewer "Your Name"
+   ```
+
+5. Run `python -m paper_trading.update --strategy <strategy-id>`. It advances only unseen sessions from the
+   accepted checkpoint and publishes a validated content-addressed snapshot; it never bootstraps or silently
+   rewrites an accepted mark.
+6. Run `python -m paper_trading.audit --strategy <strategy-id>`, `python -m paper_trading.validate_data`, and
+   the frontend checks in `docs/reference/build-and-dev.md`. Inspect the dashboard and strategy route before
+   committing the spec, migration evidence, ledger, checkpoint, and public snapshot together.
 
 ## Invariants
 
-- The strategy JSON must conform to the Tier-3 → Tier-2 input contract.
+- Formula, universe, OHLCV, cost-model, and engine hashes are recorded for every review.
+- Existing public history is preserved unless a separately reviewed correction event explains the change.
 - The site output must conform to the [data contract](../concepts/data-contract.md).
 - [Paper only](../concepts/paper-trading-only.md); disclaimer stays.
 
-## To fill this in
-
-Replace with concrete field names and the exact "mark as deployed" mechanism once the updater and publish step are built.
-
 ## Source files
 
-- `paper_trading/strategies/<king>.json`, `paper_trading/update.py`, `public/data/*.json` (when built).
+- `schemas/strategy-spec.schema.json` — input contract.
+- `paper_trading/migrate.py`, `paper_trading/update.py`, `paper_trading/audit.py` — lifecycle commands.
+- `paper_state/`, `paper_ledger/`, `paper_migration/` — accepted state and review evidence.
+- `public/data/manifest.json`, `public/data/snapshots/` — atomic public boundary.

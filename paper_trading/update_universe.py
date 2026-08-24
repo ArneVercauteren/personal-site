@@ -14,6 +14,7 @@ Env overrides (all optional):
 
 from __future__ import annotations
 
+import argparse
 import os
 
 from . import universe
@@ -33,7 +34,14 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--archive-current", action="store_true")
+    args = parser.parse_args(argv)
+    if args.archive_current:
+        path = universe.archive_current_universe()
+        print(f"archived {path.relative_to(universe.REPO_ROOT)}")
+        return
     payload = universe.build_universe(
         min_price=_env_float("UNIVERSE_MIN_PRICE", universe.DEFAULT_MIN_PRICE),
         min_adv=_env_float("UNIVERSE_MIN_ADV", universe.DEFAULT_MIN_ADV),

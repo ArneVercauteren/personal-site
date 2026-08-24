@@ -1,6 +1,6 @@
 # Subsystem — Site shell (Tier 1)
 
-> **Status: built (v1 shell).** The Next.js 15 App Router shell is scaffolded with the dark/technical theme. Content/dashboard internals still land per the build order.
+> **Status: built.** The Next.js 16 App Router shell uses the dark/technical theme and self-hosted fonts.
 
 ## What this owns
 

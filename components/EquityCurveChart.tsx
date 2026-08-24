@@ -27,12 +27,14 @@ export function EquityCurveChart({
   currency = "USD",
   height = 200,
   liveSince,
+  normalized = false,
 }: {
   points: EquityPoint[];
   benchmark?: Benchmark;
   currency?: string;
   height?: number;
   liveSince?: string;
+  normalized?: boolean;
 }) {
   const rawId = useId().replace(/:/g, "");
   const liveGradientId = `equity-live-${rawId}`;
@@ -48,10 +50,15 @@ export function EquityCurveChart({
   const pad = (max - min) * 0.08 || max * 0.02;
   // Compact y labels (e.g. "$147M") once values run into the millions, where a
   // full "$146,638,651" would overflow the narrow axis; full money below that.
-  const fmtY = (v: number) => (max >= 1_000_000 ? compactMoney(v, currency) : money(v, currency));
+  const fmtY = (v: number) => normalized
+    ? v.toFixed(0)
+    : (max >= 1_000_000 ? compactMoney(v, currency) : money(v, currency));
   // Adaptive x labels: wide spans collapse the date to the year so a multi-year
   // curve isn't labelled with ambiguous "Apr 01"-style month/day-looking ticks.
   const span = spanDays(points[0].d, points[points.length - 1].d);
+  const chartLabel = `Equity from ${shortDate(points[0].d)} to ${shortDate(points.at(-1)!.d)}; ${
+    normalized ? "normalized value" : "account equity"
+  } moved from ${fmtAccessible(points[0].v, normalized, currency)} to ${fmtAccessible(points.at(-1)!.v, normalized, currency)}.`;
 
   // Shared axis/grid/tooltip config (recharts needs these as direct children,
   // so we spread plain prop objects rather than wrap them in components).
@@ -89,8 +96,11 @@ export function EquityCurveChart({
     labelFormatter: (d: unknown) => shortDate(String(d)),
     formatter: (v: unknown, name: unknown) => {
       if (v == null) return [] as unknown as [string, string];
-      const label = name === "vBenchmark" ? (benchmark?.name ?? "S&P 500") : "Account equity";
-      return [money(Number(v), currency), label] as [string, string];
+      const label = name === "vBenchmark"
+        ? (benchmark?.name ?? "S&P 500")
+        : (normalized ? "Live value (start = 100)" : "Account equity");
+      const formatted = normalized ? Number(v).toFixed(2) : money(Number(v), currency);
+      return [formatted, label] as [string, string];
     },
   } as const;
   const BenchmarkLine = benchmarkVisible ? (
@@ -135,7 +145,7 @@ export function EquityCurveChart({
     const data = points.map((p, i) => ({ ...p, vBenchmark: overlay[i]?.vBenchmark ?? null }));
     return (
       <div>
-        <div style={{ width: "100%", height }}>
+        <div role="img" aria-label={chartLabel} style={{ width: "100%", height }}>
           <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
             <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
               <defs>
@@ -180,7 +190,7 @@ export function EquityCurveChart({
 
   return (
     <div>
-      <div style={{ width: "100%", height }}>
+      <div role="img" aria-label={chartLabel} style={{ width: "100%", height }}>
         <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
           <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
@@ -247,4 +257,8 @@ export function EquityCurveChart({
       </p>
     </div>
   );
+}
+
+function fmtAccessible(value: number, normalized: boolean, currency: string): string {
+  return normalized ? value.toFixed(2) : money(value, currency);
 }

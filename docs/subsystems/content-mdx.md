@@ -30,7 +30,7 @@ draft: true               # optional; excluded from listings + static params
 
 - Drafts (`draft: true`) are excluded from both the index and `generateStaticParams`.
 - Dark prose tokens live in `tailwind.config.ts` under `typography.invert`; keep them in step with [reference/design-system.md](../reference/design-system.md).
-- `params` is a `Promise` in Next 15 — `await` it in detail pages.
+- `params` is a `Promise` in the current App Router — `await` it in detail pages.
 
 ## Recipe
 

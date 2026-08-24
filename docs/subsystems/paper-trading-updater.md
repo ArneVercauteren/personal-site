@@ -16,7 +16,7 @@ from a private repo — see [secured-updater.md](secured-updater.md) and
 ## Module responsibilities
 
 - `paper_trading/update.py` — entry point (`python -m paper_trading.update`). Loads strategy
-  specs, runs the sim, and **merges** the results into `public/data/*.json` by id (see
+  specs, advances accepted checkpoints across unseen sessions, and **merges** the results into compatibility data by id (see
   "Merge, not overwrite" below). Run locally or by GitHub Actions. For local debugging, pass
   `--strategy <id>` (repeatable / comma-separated) or set `PAPER_TRADING_STRATEGY=<id>` to update
   only selected open entries.
@@ -42,12 +42,15 @@ from a private repo — see [secured-updater.md](secured-updater.md) and
   (`native_eval.c`) path-dependent feature semantics: drawdown, invested/cash/holdings, and the
   trailing turnover/volatility/hit-rate ring buffers (cap 64, sample-std, hit-rate).
 - `paper_trading/portfolio.py` — `simulate(strategy, opens, closes, prices_long=None)` dispatches
-  on the spec: a `formula` (DSL tree) → `_simulate_dsl` (real evaluator + engine-faithful state
-  threading); a `signal` block → `_simulate_signal` (momentum). Both rebalance on cadence (filled
-  at the **next** open), mark daily, and return curve/stats/positions/trades.
+  full audit/migration replays; `simulate_incremental(...)` restores cash, shares, pending fills,
+  cadence, and DSL ring buffers from the accepted checkpoint and evaluates only unseen sessions.
+- `paper_trading/ledger.py` — stable event ids, append-only JSONL, checkpoint validation,
+  reconciliation, and crash-recoverable two-file commits.
+- `paper_trading/migrate.py` / `audit.py` — explicit reviewed migration and read-only full replay.
+- `paper_trading/publish.py` — content-addressed route payloads; validates and writes the manifest last.
 - `paper_trading/strategies/<id>.json` — open strategy specs (a `formula` DSL tree *or* a `signal`
   block, plus §6.4 metadata and a `universe`). Open formulas only; secured kings never live here.
-- `paper_trading/requirements.txt` — yfinance, pandas, numpy. `requirements-dev.txt` adds pytest.
+- `paper_trading/requirements-lock.txt` — fully resolved CI/updater environment.
 
 ## DSL path — real king formulas + engine-faithful state
 
@@ -79,17 +82,20 @@ are NaN, handled).
    today]` via `prices.get_ohlcv`. DSL warmup is sized from the formula's longest feature window.
    Each successful Yahoo chunk is written to the local OHLCV cache immediately, before simulation
    starts, so an interrupted fetch phase can reuse completed chunks on the next run.
-2. Re-evaluate on each rebalance date → target holdings: the DSL tree via the vendored evaluator
-   (`signals.evaluate_formula`) or the momentum rule (`signals.evaluate`).
-3. Apply fills at the next bar's open, then charge the Darwin cost haircut for that rebalance
-   (`portfolio.simulate` + `costs.py`).
-4. Mark to market daily; stitch onto any Darwin curve prefix; recompute CAGR / Sharpe / max-DD.
+2. Load the accepted checkpoint and verify deployment, formula, cost, boundary-price, and engine hashes.
+   A rerun with no unseen session is an accounting no-op. A revised boundary price is rejected as a
+   correction proposal rather than silently rewriting history.
+3. For unseen sessions only, apply a pending target at the next open, charge costs, mark equity, and
+   decrement the observed-session cadence. Evaluate a new target only when that counter reaches zero.
+4. Append stable-id ledger events and atomically advance the checkpoint. Recompute display stats from
+   the immutable published prefix plus new marks.
    When `cost_model.impact_book_cap` is set, target weights are scaled so invested
    capital stays at or below the cap and excess equity remains cash, matching how
    Darwin generated the prefix.
 5. Merge the open entries into `public/data/{portfolio,strategies,trades}.json`.
 6. Refresh `public/data/benchmark.json` from the SPY-backed S&P 500 proxy through the same end date.
-7. (In CI) commit the JSON if it changed → Vercel redeploys.
+7. Validate and publish per-route payloads beneath a content-addressed directory; replace
+   `manifest.json` last. In CI, commit ledger, checkpoint, compatibility data, and snapshot together.
 
 ## Backfill continuation semantics
 
@@ -124,9 +130,12 @@ together.
 
 ## Cost model
 
-Darwin-faithful, in `paper_trading/costs.py` (ported from Darwin's `native_eval.c` cost block and
-`cost_models.py`). At each rebalance the simulator fills to target weights cost-free at the open,
-then applies a multiplicative **equity haircut**:
+Darwin-faithful, in `paper_trading/costs.py`. Legacy specs retain the original single-day square-root
+impact. Current Darwin exports opt into the sliced execution model with `execution_max_days`,
+participation, delay-risk, overflow-penalty, and lagged rolling ADV/volatility fields. That transition
+is prospective at the accepted migration boundary, so the published 2026-08-11 fill is unchanged.
+At each rebalance the simulator fills to target weights cost-free at the open, then applies a
+multiplicative equity haircut.
 
 ```
 turnover    = Σ |target_w − prev_w|
@@ -162,9 +171,10 @@ each other's data. The file-level `as_of` advances to the latest open bar date.
 
 ## Determinism
 
-Historical daily bars are fixed once published, so a given price history always yields the same
-curve, stats, and positions — the only non-determinism is the moving "today" edge of the data.
-Verified offline with `PAPER_TRADING_SYNTHETIC=1` (two runs produce byte-identical JSON).
+Historical ledger events and equity marks are fixed once accepted. A routine run never recomputes
+them. Price revisions or changed deployment hashes fail closed; a full replay lives in the separate
+read-only audit command. Synthetic split-run tests prove incremental continuation matches a one-shot
+replay for identical inputs.
 
 ## Invariants it respects
 
@@ -184,5 +194,5 @@ Verified offline with `PAPER_TRADING_SYNTHETIC=1` (two runs produce byte-identic
 
 - `paper_trading/update.py`, `paper_trading/benchmark.py`, `paper_trading/prices.py`, `paper_trading/signals.py`, `paper_trading/portfolio.py`, `paper_trading/portfolio_state.py`
 - `paper_trading/darwin_eval/` — vendored scrubbed DSL evaluator.
-- `paper_trading/strategies/open_momentum_v1.json` — the first open spec (momentum).
-- `paper_trading/requirements.txt`, `paper_trading/requirements-dev.txt`
+- `paper_trading/strategies/gen0194.json` — deployed open formula and portable provenance.
+- `paper_trading/requirements-lock.txt`

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astralanx.example/schemas/public-analytics-v1.json",
+  "title": "Public strategy analytics envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "as_of", "strategy_id"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "as_of": {"type": "string", "format": "date"},
+    "strategy_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "performance": {"type": ["object", "null"]},
+    "active_share": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+    "capacity": {"type": ["object", "null"]}
+  }
+}

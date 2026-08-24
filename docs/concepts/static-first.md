@@ -40,5 +40,5 @@ Until then: if a feature seems to need a server, first ask whether a pre-compute
 
 ## Source files
 
-- `.github/workflows/open-strategies-update.yml` — the public scheduled recompute (when built).
+- `.github/workflows/open-strategies-update.yml` — the public scheduled update.
 - `public/data/*.json` — the committed snapshots the site serves.

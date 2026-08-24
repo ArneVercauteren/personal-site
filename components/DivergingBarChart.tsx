@@ -58,7 +58,11 @@ export function DivergingBarChart({
   );
 
   return (
-    <div style={{ width: "100%", height }}>
+    <div
+      role="img"
+      aria-label={`Signed comparison: ${data.map((item) => `${item.label} ${formatValue(item.value)}`).join(", ")}.`}
+      style={{ width: "100%", height }}
+    >
       <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
         <BarChart
           layout="vertical"

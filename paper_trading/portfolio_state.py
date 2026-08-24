@@ -95,6 +95,23 @@ class PortfolioState:
         self.turnover_hist: deque[float] = deque(maxlen=HISTORY_CAP)
         self.period_return_hist: deque[float] = deque(maxlen=HISTORY_CAP)
 
+    def to_dict(self) -> dict:
+        """Portable checkpoint representation for incremental paper updates."""
+        return {
+            "peak_equity": self.peak_equity,
+            "turnover_hist": list(self.turnover_hist),
+            "period_return_hist": list(self.period_return_hist),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict) -> "PortfolioState":
+        state = cls(float(payload["peak_equity"]))
+        state.turnover_hist.extend(float(value) for value in payload.get("turnover_hist", []))
+        state.period_return_hist.extend(
+            float(value) for value in payload.get("period_return_hist", [])
+        )
+        return state
+
     # -- updates (called by the simulator) ---------------------------------
 
     def push_turnover(self, curr_w: dict[str, float], prev_w: dict[str, float]) -> float:

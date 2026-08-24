@@ -38,7 +38,11 @@ export function AnnualReturnsChart({
 
   return (
     <div>
-      <div style={{ width: "100%", height }}>
+      <div
+        role="img"
+        aria-label={`Annual returns from ${data[0].year} to ${data.at(-1)!.year}; best ${signedPct(Math.max(...data.map((item) => item.strategy)))}, worst ${signedPct(Math.min(...data.map((item) => item.strategy)))}.`}
+        style={{ width: "100%", height }}
+      >
         <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <CartesianGrid stroke={CHART.grid} strokeDasharray="2 4" vertical={false} />

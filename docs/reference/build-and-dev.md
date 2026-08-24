@@ -17,9 +17,11 @@ npm run lint                # eslint
 ## Tier 2 — the paper-trading updater (Python)
 
 ```powershell
-pip install -r paper_trading/requirements.txt   # first time
-python -m paper_trading.update                  # regenerate public/data/*.json locally
+pip install -r paper_trading/requirements-lock.txt  # deterministic CI/updater environment
+python -m paper_trading.validate_data               # verify the committed publication
+python -m paper_trading.update                      # process unseen sessions only
 python -m paper_trading.update --strategy gen0194  # update one open strategy
+python -m paper_trading.audit --strategy gen0194   # read-only full replay comparison
 ```
 
 Run this after changing anything in `paper_trading/`, then inspect the regenerated `public/data/*.json` before committing. Yahoo fetch chunks are cached locally in `.cache/paper_trading/ohlcv` so interrupted local runs can resume completed chunks; use `PAPER_TRADING_PRICE_CACHE=0` to bypass that cache. In production it runs in GitHub Actions on a cron and commits the JSON; see [subsystems/scheduled-job.md](../subsystems/scheduled-job.md).
@@ -37,14 +39,22 @@ Edit `plans_and_text_files/AI_AGENT_SHARED_INSTRUCTIONS.md`, then run the sync �
 
 Deployment is **push-to-deploy**: pushing to the default branch triggers a Vercel build of the site. The open updater (this repo) and the secured updater (private repo) each commit/push new `public/data/*.json` on their schedules, which triggers a redeploy. There is no manual deploy step in the static-first design. See [concepts/static-first.md](../concepts/static-first.md).
 
-## Status
+## First deployment of a strategy
 
-The Next.js app is scaffolded: `npm install`, `npm run dev`, `npm run build`, and `npm run lint` all work today (the build prerenders every route as static). The Python `paper_trading/` updater does not exist yet, so its commands are still the *target*. The sync-docs commands work today.
+The updater deliberately refuses to invent a checkpoint. Generate a migration candidate, review its
+exact curve/hash report, then approve it with a named reviewer:
+
+```powershell
+python -m paper_trading.migrate --strategy gen0194
+python -m paper_trading.migrate --strategy gen0194 --approve --reviewer "Your Name"
+```
+
+After approval, routine updates are idempotent and incremental.
 
 ## Source files
 
-- `package.json` — npm scripts (when built).
-- `paper_trading/requirements.txt`, `paper_trading/update.py` — updater entry (when built).
+- `package.json` — npm scripts.
+- `paper_trading/requirements-lock.txt`, `paper_trading/update.py` — updater environment and entry.
 - `scripts/sync_ai_docs.py` — AI-doc sync (exists).
-- `.github/workflows/open-strategies-update.yml` — public CI cron (when built).
-- Private repo `.github/workflows/{rebalance,daily}.yml` — secured crons (when built).
+- `.github/workflows/open-strategies-update.yml` — public CI cron.
+- Private repo `.github/workflows/{rebalance,daily}.yml` — secured crons.

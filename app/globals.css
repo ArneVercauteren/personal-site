@@ -4,6 +4,8 @@
 
 :root {
   color-scheme: dark;
+  --font-inter: "Inter Variable";
+  --font-mono: "JetBrains Mono Variable";
 }
 
 html {

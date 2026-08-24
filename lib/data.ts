@@ -1,4 +1,6 @@
 import "server-only";
+import { cache } from "react";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -167,6 +169,10 @@ export interface CostModel {
    *  scaled at capacity and excess account equity remains cash. Absent means
    *  uncapped. */
   impact_book_cap?: number;
+  execution_max_days?: number;
+  execution_participation_rate?: number;
+  execution_delay_risk_coef?: number;
+  execution_overflow_penalty_bps?: number;
   /** Crisis-aware vol cost scaling (defaults: enabled, k=0.75, 63/252d, max 3). */
   vol_scaled_cost_enable?: boolean;
   vol_cost_k?: number;
@@ -390,9 +396,14 @@ export interface StrategyMeta {
   portfolio_size: number;
   base_currency: string;
   rebalance_cadence_days: number;
+  rebalance_cadence_unit?: "calendar_days" | "trading_days";
   deployed_on: string;
   cost_model: CostModel;
   blurb: string;
+  thesis?: string;
+  expected_behavior?: string;
+  risks?: string[];
+  failure_modes?: string[];
   /**
    * Optional provenance from Astralanx (Tier 3), shown on the per-strategy detail
    * page. `performance` carries the three single-seed runs (training, OOS,
@@ -405,6 +416,10 @@ export interface StrategyMeta {
   active_share?: number;
   /** Capacity estimates (USD): liquidity-screen and stricter impact-consistent. */
   capacity?: { liquidity_usd?: number; impact_usd?: number };
+  last_review_date?: string;
+  last_fill_date?: string;
+  next_review_date?: string;
+  sessions_until_review?: number;
 }
 
 export interface StrategiesFile {
@@ -426,14 +441,214 @@ export interface TradesFile {
   trades: Trade[];
 }
 
+export interface SnapshotManifest {
+  schema_version: 1;
+  snapshot_id: string;
+  as_of: string;
+  generated_at: string;
+  files: Record<string, { sha256: string; bytes: number }>;
+}
+
+export interface LedgerEvent {
+  schema_version: 1;
+  event_id: string;
+  strategy_id: string;
+  event_type:
+    | "rebalance_reviewed"
+    | "targets_computed"
+    | "fills_applied"
+    | "costs_charged"
+    | "correction_proposed"
+    | "correction_accepted";
+  session: string;
+  engine_version: string;
+  payload: Record<string, unknown>;
+}
+
+export interface StrategySummary {
+  id: string;
+  name: string;
+  visibility: Visibility;
+  live_since?: string;
+  live_curve: EquityPoint[];
+  live_observations: number;
+  live_total_return: number;
+  current_drawdown: number;
+  stats_live?: Stats;
+  stats_backtest?: Stats;
+  invested_weight?: number | null;
+  recent_trades: Trade[];
+  provenance?: {
+    last_processed_session: string;
+    deployment_hash: string;
+    formula_hash: string;
+    universe_snapshot_id: string;
+    price_snapshot_id: string;
+    cost_model_hash: string;
+    engine_version: string;
+  };
+  blurb?: string;
+  portfolio_size?: number;
+  base_currency?: string;
+  rebalance_cadence_days?: number;
+  rebalance_cadence_unit?: "calendar_days" | "trading_days";
+  deployed_on?: string;
+  cost_model?: CostModel;
+  last_review_date?: string;
+  last_fill_date?: string;
+  next_review_date?: string;
+  sessions_until_review?: number;
+}
+
+export interface StrategyIndexFile {
+  schema_version: 1;
+  as_of: string;
+  base_currency: string;
+  strategies: StrategySummary[];
+}
+
 // ---------------------------------------------------------------------------
 // Loaders. Static-first: JSON is read from public/data at build time.
 // ---------------------------------------------------------------------------
 
-function readJson<T>(file: string): T {
+const readJson = cache(function readJson<T>(file: string): T {
   const p = path.join(process.cwd(), "public", "data", file);
   return JSON.parse(fs.readFileSync(p, "utf8")) as T;
+});
+
+function object(value: unknown, label: string): Record<string, unknown> {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  return value as Record<string, unknown>;
 }
+
+function isoDate(value: unknown, label: string): asserts value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${label} must be an ISO date`);
+  }
+}
+
+function finite(value: unknown, label: string): asserts value is number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${label} must be finite`);
+  }
+}
+
+function validateCurve(value: unknown, label: string): asserts value is EquityPoint[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  let previous = "";
+  value.forEach((raw, index) => {
+    const point = object(raw, `${label}[${index}]`);
+    isoDate(point.d, `${label}[${index}].d`);
+    finite(point.v, `${label}[${index}].v`);
+    if (point.v <= 0 || point.d <= previous) {
+      throw new Error(`${label} must have positive values and increasing dates`);
+    }
+    previous = point.d;
+  });
+}
+
+export const loadManifest = cache(function loadManifest(): SnapshotManifest {
+  const manifest = readJson<SnapshotManifest>("manifest.json");
+  object(manifest, "manifest");
+  if (manifest.schema_version !== 1 || !/^[a-f0-9]{64}$/.test(manifest.snapshot_id)) {
+    throw new Error("unsupported or invalid public-data manifest");
+  }
+  isoDate(manifest.as_of, "manifest.as_of");
+  object(manifest.files, "manifest.files");
+  return manifest;
+});
+
+const readSnapshotJson = cache(function readSnapshotJson<T>(relative: string): T {
+  if (relative.includes("..") || relative.startsWith("/")) {
+    throw new Error("invalid snapshot path");
+  }
+  const manifest = loadManifest();
+  const expected = manifest.files[relative];
+  if (!expected) throw new Error(`snapshot file is not in manifest: ${relative}`);
+  const fullPath = path.join(
+    process.cwd(), "public", "data", "snapshots", manifest.snapshot_id, relative,
+  );
+  const raw = fs.readFileSync(fullPath);
+  if (raw.byteLength !== expected.bytes) throw new Error(`snapshot size mismatch: ${relative}`);
+  const actualHash = createHash("sha256").update(raw).digest("hex");
+  if (actualHash !== expected.sha256) throw new Error(`snapshot hash mismatch: ${relative}`);
+  return JSON.parse(raw.toString("utf8")) as T;
+});
+
+export const loadStrategyIndex = cache(function loadStrategyIndex(): StrategyIndexFile {
+  const index = readSnapshotJson<StrategyIndexFile>("index.json");
+  if (index.schema_version !== 1 || !Array.isArray(index.strategies)) {
+    throw new Error("invalid strategy index");
+  }
+  isoDate(index.as_of, "index.as_of");
+  const ids = new Set<string>();
+  index.strategies.forEach((summary, i) => {
+    object(summary, `index.strategies[${i}]`);
+    if (typeof summary.id !== "string" || ids.has(summary.id)) {
+      throw new Error("strategy ids must be present and unique");
+    }
+    ids.add(summary.id);
+    validateCurve(summary.live_curve, `${summary.id}.live_curve`);
+    finite(summary.live_total_return, `${summary.id}.live_total_return`);
+    finite(summary.current_drawdown, `${summary.id}.current_drawdown`);
+  });
+  return index;
+});
+
+export const loadStrategyDetail = cache(function loadStrategyDetail(id: string): {
+  as_of: string;
+  strategy: Strategy;
+  meta: StrategyMeta;
+} {
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(id)) throw new Error("invalid strategy id");
+  const payload = readSnapshotJson<{
+    schema_version: 1;
+    as_of: string;
+    strategy: Strategy & { meta: StrategyMeta };
+  }>(`strategies/${id}/summary.json`);
+  object(payload.strategy, "strategy detail");
+  validateCurve(payload.strategy.equity_curve, `${id}.equity_curve`);
+  const meta = (payload.strategy as Strategy & { meta?: StrategyMeta }).meta;
+  if (!meta) throw new Error(`${id} has no strategy metadata`);
+  const { meta: _meta, ...strategy } = payload.strategy as Strategy & { meta: StrategyMeta };
+  return { as_of: payload.as_of, strategy: strategy as Strategy, meta };
+});
+
+export const loadStrategyAnalytics = cache(function loadStrategyAnalytics(id: string): {
+  performance?: StrategyPerformance;
+  active_share?: number;
+  capacity?: { liquidity_usd?: number; impact_usd?: number };
+} {
+  return readSnapshotJson(`strategies/${id}/analytics.json`);
+});
+
+export const loadStrategyRebalances = cache(function loadStrategyRebalances(id: string): LedgerEvent[] {
+  if (!/^[a-z0-9][a-z0-9_-]*$/.test(id)) throw new Error("invalid strategy id");
+  const payload = readSnapshotJson<{
+    schema_version: 1;
+    as_of: string;
+    strategy_id: string;
+    events: LedgerEvent[];
+  }>(`strategies/${id}/rebalances.json`);
+  if (payload.strategy_id !== id || !Array.isArray(payload.events)) {
+    throw new Error("invalid rebalance history");
+  }
+  payload.events.forEach((event) => {
+    isoDate(event.session, "rebalance event session");
+    if (!/^[a-f0-9]{24}$/.test(event.event_id)) throw new Error("invalid rebalance event id");
+  });
+  return payload.events;
+});
+
+export const loadSnapshotBenchmark = cache(function loadSnapshotBenchmark(id = "sp500"): Benchmark {
+  const payload = readSnapshotJson<Benchmark & { schema_version: 1; as_of: string }>(
+    `benchmarks/${id}.json`,
+  );
+  validateCurve(payload.equity_curve, `${id}.equity_curve`);
+  return payload;
+});
 
 export function loadPortfolio(): PortfolioFile {
   return readJson<PortfolioFile>("portfolio.json");

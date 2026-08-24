@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astralanx.example/schemas/public-summary-v1.json",
+  "title": "Public strategy summary",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["id", "name", "visibility", "live_curve", "live_observations", "live_total_return", "current_drawdown"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "name": {"type": "string", "minLength": 1},
+    "visibility": {"enum": ["open", "secured"]},
+    "live_curve": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["d", "v"],
+        "properties": {"d": {"type": "string", "format": "date"}, "v": {"type": "number", "exclusiveMinimum": 0}}
+      }
+    },
+    "live_observations": {"type": "integer", "minimum": 0},
+    "live_total_return": {"type": "number"},
+    "current_drawdown": {"type": "number", "maximum": 0}
+  }
+}

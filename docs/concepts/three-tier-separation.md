@@ -62,6 +62,6 @@ The separation is also what makes the [static-first](static-first.md) design pos
 
 ## Source files
 
-- `paper_trading/` — Tier 2 (when built).
-- `public/data/*.json` — the Tier 2 → Tier 1 boundary artifacts.
-- The Darwin repo's `scripts/publish_deployed_kings.py` — the Tier 3 → site boundary (when built).
+- `paper_trading/`, `paper_state/`, `paper_ledger/` — Tier 2 engine and immutable accounting.
+- `public/data/manifest.json` plus `public/data/snapshots/` — the Tier 2 → Tier 1 boundary artifacts.
+- Darwin's `site-spec` export — the scrubbed Tier 3 → site strategy-spec boundary.

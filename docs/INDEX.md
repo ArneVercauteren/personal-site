@@ -35,7 +35,7 @@ The full design rationale lives in [plans_and_text_files/PERSONAL_WEBSITE_PLAN.m
 | The scheduled GitHub Actions job | [subsystems/scheduled-job.md](subsystems/scheduled-job.md) → [concepts/static-first.md](concepts/static-first.md) |
 | The Darwin → site publish step (Tier 3) | [subsystems/darwin-publish.md](subsystems/darwin-publish.md) → [concepts/separation-from-darwin.md](concepts/separation-from-darwin.md) |
 | Anything that could touch secrets / keys / weights | [concepts/separation-from-darwin.md](concepts/separation-from-darwin.md), [concepts/open-vs-secured-strategies.md](concepts/open-vs-secured-strategies.md), [concepts/public-site-is-read-only.md](concepts/public-site-is-read-only.md) |
-| Build / deploy commands | [reference/build-and-dev.md](reference/build-and-dev.md) |
+| Build / deploy commands | [reference/build-and-dev.md](reference/build-and-dev.md) → [playbook/deployment-runbook.md](playbook/deployment-runbook.md) |
 | Where files live on disk | [reference/file-layout.md](reference/file-layout.md) |
 | Env vars / CI secrets | [reference/env-vars.md](reference/env-vars.md) |
 
@@ -62,10 +62,12 @@ The full design rationale lives in [plans_and_text_files/PERSONAL_WEBSITE_PLAN.m
 - [playbook/doc-maintenance.md](playbook/doc-maintenance.md) — when your change invalidates a doc claim, update the doc in the same change.
 - [playbook/test-maintenance.md](playbook/test-maintenance.md) — when your change shifts a contract a test pins, update the test in the same change. Never silence with `.skip`/`xfail`.
 - [playbook/ai-workflow.md](playbook/ai-workflow.md) — workflow for an AI making changes: locate the tier, respect the contract, keep secrets out, build.
+- [playbook/deployment-runbook.md](playbook/deployment-runbook.md) — migration approval, scheduled publication, alerts, and recovery.
 
 ## Status
 
-This is a young repo. Pages under `subsystems/` and `tasks/` are **stubs** until the matching code exists — each stub states what it will own. When you build a feature, fill its stub in the same change and remove the stub marker.
+The site, paper updater, immutable ledger, versioned publication, and scheduled workflows are built.
+Some optional content routes remain intentionally sparse; their subsystem pages state that explicitly.
 
 ## How to find a specific source-code claim
 

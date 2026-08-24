@@ -39,6 +39,7 @@ import numpy as np
 import pandas as pd
 
 from . import prices
+from .contracts import content_hash
 
 __all__ = [
     "DEFAULT_UNIVERSE_PATH",
@@ -48,6 +49,9 @@ __all__ = [
     "build_universe",
     "load_universe",
     "resolve_universe",
+    "resolve_universe_snapshot_id",
+    "load_universe_snapshot",
+    "archive_current_universe",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -402,6 +406,12 @@ def build_universe(
         "skipped": len(skip),
         "tickers": tickers,
     }
+    snapshot_id = content_hash(payload)
+    payload["snapshot_id"] = snapshot_id
+    snapshot_dir = path.parent / "universe_snapshots"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_path = snapshot_dir / f"{today.isoformat()}-{snapshot_id[:16]}.json"
+    snapshot_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     print(f"wrote {path.relative_to(REPO_ROOT)} — {len(tickers)} tickers "
           f"({len(failed)} new dead symbols recorded; {len(skip)} skipped total)")
@@ -441,3 +451,52 @@ def resolve_universe(spec: dict, path: Path | None = None) -> list[str]:
     if isinstance(explicit, list) and explicit:
         return [normalize_ticker(t) for t in explicit]
     return load_universe(path)
+
+
+def resolve_universe_snapshot_id(spec: dict, path: Path | None = None) -> str:
+    """Stable id of the exact membership supplied to a strategy review."""
+    explicit = spec.get("universe")
+    if isinstance(explicit, list) and explicit:
+        return content_hash(sorted(normalize_ticker(ticker) for ticker in explicit))
+    payload = json.loads((path or DEFAULT_UNIVERSE_PATH).read_text(encoding="utf-8"))
+    return str(payload.get("snapshot_id") or content_hash({
+        key: value for key, value in payload.items() if key != "snapshot_id"
+    }))
+
+
+def load_universe_snapshot(snapshot_id: str, spec: dict | None = None) -> list[str]:
+    """Resolve an immutable universe id to the exact historical membership."""
+    explicit = (spec or {}).get("universe")
+    if isinstance(explicit, list) and explicit:
+        members = sorted(normalize_ticker(ticker) for ticker in explicit)
+        if content_hash(members) == snapshot_id:
+            return members
+
+    candidates = [DEFAULT_UNIVERSE_PATH]
+    candidates.extend(sorted((DEFAULT_UNIVERSE_PATH.parent / "universe_snapshots").glob("*.json")))
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        payload = json.loads(candidate.read_text(encoding="utf-8"))
+        observed = str(payload.get("snapshot_id") or content_hash({
+            key: value for key, value in payload.items() if key != "snapshot_id"
+        }))
+        if observed == snapshot_id:
+            return list(payload.get("tickers", []))
+    raise ValueError(f"universe snapshot {snapshot_id} is not archived")
+
+
+def archive_current_universe(path: Path | None = None) -> Path:
+    """Materialize the current pointer as its immutable date/hash snapshot."""
+    current = path or DEFAULT_UNIVERSE_PATH
+    payload = json.loads(current.read_text(encoding="utf-8"))
+    snapshot_id = str(payload.get("snapshot_id") or content_hash(payload))
+    payload["snapshot_id"] = snapshot_id
+    target = current.parent / "universe_snapshots" / (
+        f"{payload['as_of']}-{snapshot_id[:16]}.json"
+    )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists() and json.loads(target.read_text(encoding="utf-8")) != payload:
+        raise ValueError(f"universe snapshot collision at {target}")
+    target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return target

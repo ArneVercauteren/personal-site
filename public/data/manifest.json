@@ -1,0 +1,40 @@
+{
+  "as_of": "2026-08-21",
+  "files": {
+    "benchmarks/sp500.json": {
+      "bytes": 288443,
+      "sha256": "1689472155649afbe7b8f098771960b3b303ddaec16072f525f6626811cd40e2"
+    },
+    "index.json": {
+      "bytes": 6233,
+      "sha256": "510e212f26938ff275fea4b1baa003f2ae5ce491b7c91c4090d462d153f67e22"
+    },
+    "strategies/gen0194/analytics.json": {
+      "bytes": 1364443,
+      "sha256": "32ef65d60150f9b639092d125f35c829a6e6ac8d7276e6e9fe67178a72c35a28"
+    },
+    "strategies/gen0194/live.json": {
+      "bytes": 8509,
+      "sha256": "8318a8f2c88aa06ef2a268ed31a765d60c93c0bd93d0ae8727721b1c92e7cade"
+    },
+    "strategies/gen0194/provenance.json": {
+      "bytes": 584,
+      "sha256": "935b260d458eec2062bf7b7a0413e3b39ae96b06c3b7e03372b2c1d618389952"
+    },
+    "strategies/gen0194/rebalances.json": {
+      "bytes": 14154,
+      "sha256": "8e435c7c785007590837129d663375c2264693d9fe246811a23dc4484c831460"
+    },
+    "strategies/gen0194/research-full.json": {
+      "bytes": 1595714,
+      "sha256": "40a5b0a1fc0657f781e8b561a157f74a3f981f4e36ffcb4e76bbdc6af3a50115"
+    },
+    "strategies/gen0194/summary.json": {
+      "bytes": 37051,
+      "sha256": "ee3f0a9a8081f3482f3428e09635e24a4e4c4bb2347871e0bf7df9e033c0b78f"
+    }
+  },
+  "generated_at": "2026-08-21T00:00:00Z",
+  "schema_version": 1,
+  "snapshot_id": "6c3c82773189fc25d7bbe18a380b364618f2090569c6364a57599e1ab5a912fb"
+}

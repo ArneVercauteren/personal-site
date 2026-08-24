@@ -43,6 +43,6 @@ Home  ·  About  ·  Darwin  ·  Live  ·  Writing  ·  Contact
 
 ## Source files
 
-- `app/**/page.tsx` — the routes above (when built).
-- `components/Nav.tsx` — the nav order (when built).
+- `app/**/page.tsx` — the routes above.
+- `components/Nav.tsx` — the nav order.
 - `plans_and_text_files/PERSONAL_WEBSITE_PLAN.md` §4 — the authoritative IA.

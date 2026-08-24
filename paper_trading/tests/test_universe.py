@@ -7,6 +7,7 @@ import json
 import pytest
 
 from paper_trading import universe
+from paper_trading.contracts import content_hash
 
 NASDAQ_TXT = """Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares
 AAPL|Apple Inc. - Common Stock|Q|N|N|100|N|N
@@ -81,6 +82,24 @@ def test_resolve_universe_falls_back_to_shared(tmp_path):
 def test_resolve_universe_missing_shared_raises(tmp_path):
     with pytest.raises(FileNotFoundError, match="shared universe not found"):
         universe.resolve_universe({}, path=tmp_path / "nope.json")
+
+
+def test_load_universe_snapshot_resolves_archived_membership(tmp_path, monkeypatch):
+    current = tmp_path / "universe.json"
+    archive = tmp_path / "universe_snapshots"
+    archive.mkdir()
+    historical = {"as_of": "2026-01-02", "tickers": ["AAPL", "MSFT"]}
+    snapshot_id = content_hash(historical)
+    historical["snapshot_id"] = snapshot_id
+    (archive / f"2026-01-02-{snapshot_id[:16]}.json").write_text(
+        json.dumps(historical), encoding="utf-8",
+    )
+    current.write_text(json.dumps({"snapshot_id": "new", "tickers": ["NVDA"]}), encoding="utf-8")
+    monkeypatch.setattr(universe, "DEFAULT_UNIVERSE_PATH", current)
+
+    assert universe.load_universe_snapshot(snapshot_id) == ["AAPL", "MSFT"]
+    with pytest.raises(ValueError, match="is not archived"):
+        universe.load_universe_snapshot("missing")
 
 
 # --- skip-list (known-dead symbols, with TTL) -----------------------------

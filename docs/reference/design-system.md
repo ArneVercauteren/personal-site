@@ -47,6 +47,6 @@ Numbers are always monospace and tabular-aligned so columns line up like a termi
 
 ## Source files
 
-- `tailwind.config.ts`, global CSS — the real tokens (when built).
-- `components/` chart + table components — consume these tokens (when built).
+- `tailwind.config.ts`, global CSS — the real tokens.
+- `components/` chart + table components — consume these tokens.
 - `plans_and_text_files/PERSONAL_WEBSITE_PLAN.md` §5 — theme rationale.

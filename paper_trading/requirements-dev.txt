@@ -1,7 +1,7 @@
 # Dev/test dependencies for the paper-trading engine.
 # Install with: pip install -r paper_trading/requirements-dev.txt
 -r requirements.txt
-pytest>=8.0
+pytest==9.1.1
 
 # Parity tests (test_evaluator_parity.py) additionally need a local Darwin
 # checkout; point DARWIN_REPO at it to enable them. Without it they auto-skip.

@@ -37,7 +37,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
-__all__ = ["CostModel", "volatility_cost_multiplier", "rebalance_cost_fraction"]
+__all__ = [
+    "CostModel", "volatility_cost_multiplier", "rebalance_cost_fraction",
+    "sliced_execution_cost",
+]
 
 # Astralanx defaults — keep in sync with Astralanx's src/config/engine.py.
 DEFAULT_SPREAD_REF_PRICE = 50.0
@@ -72,6 +75,13 @@ class CostModel:
     # Legacy field name for the invested-cap ceiling. `portfolio.py` scales
     # target weights so excess account equity remains cash.
     impact_book_cap: float = 0.0
+    # Zero preserves legacy specs. Darwin's current exporter writes a positive
+    # value and opts into the sliced-execution model.
+    execution_max_days: int = 0
+    execution_participation_rate: float = 0.01
+    execution_delay_risk_coef: float = 0.25
+    execution_overflow_penalty_bps: float = 500.0
+    impact_lookback_days: int = 63
     vol_scaled_cost_enable: bool = True
     vol_cost_k: float = DEFAULT_VOL_COST_K
     vol_cost_realized_window: int = DEFAULT_VOL_COST_REALIZED_WINDOW
@@ -87,6 +97,11 @@ class CostModel:
             volume_impact_coef=float(cm.get("volume_impact_coef", DEFAULT_VOLUME_IMPACT_COEF)),
             impact_portfolio_size=float(cm.get("impact_portfolio_size", DEFAULT_IMPACT_PORTFOLIO_SIZE)),
             impact_book_cap=float(cm.get("impact_book_cap", 0.0)),
+            execution_max_days=int(cm.get("execution_max_days", 0)),
+            execution_participation_rate=float(cm.get("execution_participation_rate", 0.01)),
+            execution_delay_risk_coef=float(cm.get("execution_delay_risk_coef", 0.25)),
+            execution_overflow_penalty_bps=float(cm.get("execution_overflow_penalty_bps", 500.0)),
+            impact_lookback_days=int(cm.get("impact_lookback_days", 63)),
             vol_scaled_cost_enable=bool(cm.get("vol_scaled_cost_enable", True)),
             vol_cost_k=float(cm.get("vol_cost_k", DEFAULT_VOL_COST_K)),
             vol_cost_realized_window=int(cm.get("vol_cost_realized_window", DEFAULT_VOL_COST_REALIZED_WINDOW)),
@@ -140,6 +155,7 @@ def rebalance_cost_fraction(
     cfg: CostModel,
     vol_cost_mult: float = 1.0,
     impact_book: float | None = None,
+    review_daily_volatility: dict[str, float] | None = None,
 ) -> dict:
     """Total equity-haircut fraction for one rebalance, Astralanx-faithful.
 
@@ -191,7 +207,23 @@ def rebalance_cost_fraction(
                 continue
             adv = review_dollar_volume.get(t)
             if adv is not None and adv > 0.0 and np.isfinite(adv):
-                impact = cfg.volume_impact_coef * float(np.sqrt(dw * impact_portfolio_size / adv))
+                if cfg.execution_max_days > 0:
+                    sigma = 0.02
+                    if review_daily_volatility is not None:
+                        candidate = review_daily_volatility.get(t)
+                        if candidate is not None and candidate > 0.0 and np.isfinite(candidate):
+                            sigma = float(candidate)
+                    execution = sliced_execution_cost(
+                        trade_value=dw * impact_portfolio_size,
+                        adv_dollars=adv,
+                        daily_volatility=sigma,
+                        cfg=cfg,
+                    )
+                    impact = execution["total_cost_fraction"]
+                else:
+                    impact = cfg.volume_impact_coef * float(
+                        np.sqrt(dw * impact_portfolio_size / adv)
+                    )
                 volume_impact_fraction += dw * impact
             else:
                 volume_impact_fraction += dw * MISSING_ADV_PENALTY
@@ -203,4 +235,48 @@ def rebalance_cost_fraction(
         "commission_slippage_fraction": commission_slippage_fraction,
         "volume_impact_fraction": volume_impact_fraction,
         "total_fraction": total_fraction,
+    }
+
+
+def sliced_execution_cost(
+    *,
+    trade_value: float,
+    adv_dollars: float,
+    daily_volatility: float,
+    cfg: CostModel,
+) -> dict[str, float | int]:
+    """Mirror Darwin's ``_execution_cost_per_dollar`` sliced-order model."""
+    q = float(trade_value)
+    adv = float(adv_dollars)
+    sigma = float(daily_volatility)
+    if q <= 0.0 or adv <= 0.0 or sigma <= 0.0:
+        return {
+            "execution_days": 0, "daily_participation_rate": 0.0,
+            "impact_fraction": 0.0, "delay_risk_fraction": 0.0,
+            "overflow_fraction": 0.0, "overflow_penalty_fraction": 0.0,
+            "total_cost_fraction": 0.0,
+        }
+    days_cap = max(1, int(cfg.execution_max_days))
+    participation = float(np.clip(cfg.execution_participation_rate, 1e-9, 1.0))
+    daily_capacity = adv * participation
+    required_days = max(1, int(np.ceil(q / daily_capacity)))
+    execution_days = min(days_cap, required_days)
+    daily_slice = q / execution_days
+    impact = max(0.0, cfg.volume_impact_coef) * sigma * float(np.sqrt(daily_slice / adv))
+    delay = (
+        max(0.0, cfg.execution_delay_risk_coef)
+        * sigma
+        * float(np.sqrt(max(0, execution_days - 1) / 252.0))
+    )
+    executable = daily_capacity * days_cap
+    overflow = float(np.clip((q - executable) / q, 0.0, 1.0))
+    penalty = overflow * max(0.0, cfg.execution_overflow_penalty_bps) / 10000.0
+    return {
+        "execution_days": execution_days,
+        "daily_participation_rate": daily_slice / adv,
+        "impact_fraction": impact,
+        "delay_risk_fraction": delay,
+        "overflow_fraction": overflow,
+        "overflow_penalty_fraction": penalty,
+        "total_cost_fraction": impact + delay + penalty,
     }
