@@ -39,7 +39,10 @@ export function CompositionDonut({
       ) : null}
       <div className="flex items-center gap-5">
         <div style={{ width: size, height: size, flexShrink: 0 }}>
-          <ResponsiveContainer>
+          <ResponsiveContainer
+            minWidth={0}
+            initialDimension={{ width: size, height: size }}
+          >
             <PieChart>
               <Pie
                 data={sorted}

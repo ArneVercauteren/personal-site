@@ -130,7 +130,10 @@ function runPeriod(r: PerformanceRun): string {
 function Facts({ meta }: { meta: StrategyMeta }) {
   const facts: { label: string; value: string }[] = [
     { label: "Starting Capital", value: money(meta.portfolio_size, meta.base_currency) },
-    { label: "Rebalance", value: `${meta.rebalance_cadence_days}d` },
+    {
+      label: "Rebalance",
+      value: `${meta.rebalance_cadence_days} trading days`,
+    },
     {
       label: "Costs",
       value: `${meta.cost_model.commission_bps}/${meta.cost_model.slippage_bps} bps`,

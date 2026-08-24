@@ -100,19 +100,27 @@ marker is only the evidence boundary: dates before it are historical backfill / 
 dates on or after it are forward paper tracking of the already-running simulated account.
 
 The rebalance schedule should continue smoothly across the engine prefix, Yahoo backfill, and live
-tail. In the current public updater this means cadence is anchored at the Yahoo continuation start
-(the final `darwin_equity_curve` date when present, otherwise `backfill_start` / `deployed_on`) and
-then advanced by `rebalance_cadence_days`, with fills at the next open. A live date that falls
-between two scheduled rebalances therefore inherits the last backfilled basket until the next
-scheduled rebalance. Do not force a rebalance merely because the curve crosses `live_since`.
+tail. Cadence is anchored at the Yahoo continuation start (the final `darwin_equity_curve` date
+when present, otherwise `backfill_start` / `deployed_on`), with fills at the next open. New open
+strategies can set `rebalance_cadence_unit: "trading_days"`; the simulator then counts actual bars
+in the downloaded market-price index, naturally excluding weekends and exchange holidays. Missing
+unit metadata retains the legacy calendar-day-and-snap behavior for backward compatibility.
+
+`rebalance_transition_anchor` supports a forward-only cadence migration. Legacy calendar review
+dates are retained through that anchor, and subsequent reviews occur every
+`rebalance_cadence_days` market sessions. `gen0194` transitions after its 2026-08-10 review, so its
+published June and August rebalances remain unchanged and its next review is 2026-10-08. A live
+date that falls between reviews inherits the prior basket; do not force a rebalance merely because
+the curve crosses `live_since`.
 
 Between rebalances, holdings are buy-and-hold: share counts stay fixed, weights drift with prices,
 and the next rebalance receives those drifted actual weights as `prior_weights`. Do not manually
 adjust weights back to the last target because prices moved.
 
-`next_rebalance_date` is cadence metadata for the private secured rebalance workflow; the public
-open-strategy simulator currently does not consume it. If it becomes authoritative for open
-strategies, update this section and `portfolio._rebalance_dates` together.
+`next_rebalance_date` is cadence metadata for the private secured rebalance workflow; open strategy
+specs should omit it because the public simulator derives review dates from the price index. If it
+becomes authoritative for open strategies, update this section and `portfolio._rebalance_dates`
+together.
 
 ## Cost model
 
@@ -140,9 +148,10 @@ allocation; applying the cap again would understate trade dollars.
 
 ## Rebalance cadence
 
-Per strategy, via `rebalance_cadence_days` in its spec. `portfolio.simulate` snaps each
-scheduled calendar date to the next trading day. (The private secured pipeline drives cadence
-the same way via a daily cron — see [secured-updater.md](secured-updater.md).)
+Per strategy, via `rebalance_cadence_days` plus optional `rebalance_cadence_unit` in its spec.
+`trading_days` counts actual market bars; a missing unit preserves the legacy behavior of snapping
+scheduled calendar dates to the next bar. The private secured pipeline retains its existing
+calendar-date helper and is not changed by the open-strategy migration described above.
 
 ## Merge, not overwrite
 

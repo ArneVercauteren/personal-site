@@ -17,10 +17,13 @@ from paper_trading.publish_sanitize import (
     InternalPathLeakError,
     assert_no_internal_paths,
     looks_like_internal_path,
+    project_public_performance,
     scrub_internal_paths,
 )
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "public" / "data"
+STRATEGY_DIR = Path(__file__).resolve().parents[1] / "strategies"
+MAX_STRATEGIES_JSON_BYTES = 4 * 1024 * 1024
 
 
 @pytest.mark.parametrize(
@@ -81,6 +84,48 @@ def test_assert_no_internal_paths_raises_on_leak():
         assert_no_internal_paths({"sector_map_source": "C:\\Users\\x\\map.csv"})
 
 
+def test_project_public_performance_is_an_explicit_allowlist():
+    payload = {
+        "training": {
+            "start": "2020-01-01",
+            "end": "2021-01-01",
+            "stats": {"cagr": 0.1, "sharpe": 1.0, "max_dd": -0.2},
+            "equity_curve": [{"d": "2020-01-02", "v": 100.0}],
+            "advanced_stats": {"duplicate": True},
+            "annual_vs_bench": {"duplicate": True},
+            "open_diagnostics": {
+                "annual_returns": {"2020": 0.1},
+                "rolling_3y_sharpe_series": [{"date": "2020-01-02", "sharpe": 1.0}],
+                "picks_records": [{"date": "2020-01-02", "tickers": ["A"]}],
+                "artifacts": {"raw.csv": [{"ticker": "A"}]},
+                "holdings": [{"ticker": "A", "weight": 1.0}],
+                "sector_neutrality": {
+                    "sector_map_source": "C:\\Users\\x\\private.csv",
+                },
+            },
+        }
+    }
+
+    public = project_public_performance(payload)
+    run = public["training"]
+    diagnostics = run["open_diagnostics"]
+
+    assert "advanced_stats" not in run
+    assert "annual_vs_bench" not in run
+    assert "artifacts" not in diagnostics
+    assert "holdings" not in diagnostics
+    assert diagnostics["annual_returns"] == {"2020": 0.1}
+    assert diagnostics["picks_records"][0]["tickers"] == ["A"]
+    assert diagnostics["sector_neutrality"]["sector_map_source"] == SECTOR_MAP_LABEL
+
+
+def test_project_public_performance_rejects_wrong_shapes():
+    with pytest.raises(TypeError, match="performance must be an object"):
+        project_public_performance([])
+    with pytest.raises(TypeError, match="performance.training"):
+        project_public_performance({"training": []})
+
+
 @pytest.mark.parametrize(
     "name",
     [p.name for p in sorted(DATA_DIR.glob("*.json"))] if DATA_DIR.exists() else [],
@@ -89,3 +134,27 @@ def test_committed_public_json_has_no_internal_paths(name):
     """No JSON published under public/data may carry an absolute path."""
     payload = json.loads((DATA_DIR / name).read_text(encoding="utf-8"))
     assert_no_internal_paths(payload)
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted(STRATEGY_DIR.glob("*.json")),
+    ids=lambda path: path.name,
+)
+def test_committed_open_strategy_sources_have_no_internal_paths(path):
+    """The source spec is public too; scrub before it enters this repository."""
+    assert_no_internal_paths(json.loads(path.read_text(encoding="utf-8")))
+
+
+def test_committed_public_performance_matches_the_allowlist():
+    payload = json.loads((DATA_DIR / "strategies.json").read_text(encoding="utf-8"))
+    for strategy in payload.get("strategies", []):
+        performance = strategy.get("performance")
+        if performance is not None:
+            assert performance == project_public_performance(performance)
+
+
+def test_strategy_metadata_stays_within_the_migration_size_budget():
+    """Catch accidental republication of multi-megabyte raw diagnostics."""
+    size = (DATA_DIR / "strategies.json").stat().st_size
+    assert size <= MAX_STRATEGIES_JSON_BYTES

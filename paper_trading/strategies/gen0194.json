@@ -5,7 +5,6 @@
   "blurb": "",
   "deployed_on": "2026-06-15",
   "backfill_start": "2000-01-01",
-  "next_rebalance_date": "2026-07-27",
   "performance": {
     "training": {
       "start": "2000-01-01",
@@ -20948,7 +20947,7 @@
         "sector_neutrality": {
           "status": "ok",
           "methodology": "Estimated using current SEC SIC-derived sectors. Portfolio sector weights are compared with equal-weight eligible-universe sector weights on each rebalance.",
-          "sector_map_source": "C:\\Users\\arnev\\Projects\\Darwin\\data\\reference\\mappings\\sec_sector_map.csv",
+          "sector_map_source": "SEC SIC-derived",
           "rebalance_observations": 120,
           "average_sector_active_share": 0.39557055338643365,
           "median_sector_active_share": 0.4068425484733632,
@@ -119220,7 +119219,7 @@
         "sector_neutrality": {
           "status": "ok",
           "methodology": "Estimated using current SEC SIC-derived sectors. Portfolio sector weights are compared with equal-weight eligible-universe sector weights on each rebalance.",
-          "sector_map_source": "C:\\Users\\arnev\\Projects\\Darwin\\data\\reference\\mappings\\sec_sector_map.csv",
+          "sector_map_source": "SEC SIC-derived",
           "rebalance_observations": 36,
           "average_sector_active_share": 0.4013819279082475,
           "median_sector_active_share": 0.3860019712770474,
@@ -206053,7 +206052,7 @@
         "sector_neutrality": {
           "status": "ok",
           "methodology": "Estimated using current SEC SIC-derived sectors. Portfolio sector weights are compared with equal-weight eligible-universe sector weights on each rebalance.",
-          "sector_map_source": "C:\\Users\\arnev\\Projects\\Darwin\\data\\reference\\mappings\\sec_sector_map.csv",
+          "sector_map_source": "SEC SIC-derived",
           "rebalance_observations": 156,
           "average_sector_active_share": 0.3989487716196611,
           "median_sector_active_share": 0.4066072642964299,
@@ -337899,6 +337898,8 @@
   "portfolio_size": 1000000.0,
   "base_currency": "USD",
   "rebalance_cadence_days": 42,
+  "rebalance_cadence_unit": "trading_days",
+  "rebalance_transition_anchor": "2026-08-10",
   "cost_model": {
     "commission_bps": 5.0,
     "slippage_bps": 5.0,

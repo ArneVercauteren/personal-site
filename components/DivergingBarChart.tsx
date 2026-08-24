@@ -59,7 +59,7 @@ export function DivergingBarChart({
 
   return (
     <div style={{ width: "100%", height }}>
-      <ResponsiveContainer>
+      <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
         <BarChart
           layout="vertical"
           data={data}

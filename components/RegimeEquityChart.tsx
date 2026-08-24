@@ -134,7 +134,7 @@ export function RegimeEquityChart({
   return (
     <div>
       <div style={{ width: "100%", height }}>
-        <ResponsiveContainer>
+        <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
           <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">

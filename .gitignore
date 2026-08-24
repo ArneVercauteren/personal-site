@@ -12,6 +12,7 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.codex-cap-check.*.log
 
 # Python (Tier 2 updater)
 __pycache__/

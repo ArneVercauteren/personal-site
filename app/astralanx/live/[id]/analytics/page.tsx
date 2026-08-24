@@ -180,7 +180,7 @@ function computeTurnover(records: PickRecord[], cadenceDays?: number) {
     n += 1;
   }
   const twoWay = sumGross / n;
-  const perYear = cadenceDays && cadenceDays > 0 ? 365.25 / cadenceDays : null;
+  const perYear = cadenceDays && cadenceDays > 0 ? 252 / cadenceDays : null;
   return {
     twoWay,
     oneWay: twoWay / 2,
@@ -454,7 +454,7 @@ export default async function StrategyAnalyticsPage({
               <StatCell
                 label="Two-way / year"
                 value={pct(turnover.annualTwoWay, 0)}
-                help={`Per-rebalance two-way turnover annualized at the ${meta.rebalance_cadence_days}-day cadence (~${(365.25 / meta.rebalance_cadence_days).toFixed(1)} rebalances/yr).`}
+                help={`Per-rebalance two-way turnover annualized at the ${meta.rebalance_cadence_days}-trading-day cadence (~${(252 / meta.rebalance_cadence_days).toFixed(1)} rebalances/yr).`}
               />
             ) : null}
             {turnover.annualOneWay != null ? (

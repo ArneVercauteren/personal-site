@@ -27,7 +27,11 @@ import pandas as pd
 
 from . import benchmark, portfolio, prices, universe
 from .darwin_eval.select_on_date import collect_all_needed_features, required_history_days
-from .publish_sanitize import assert_no_internal_paths, scrub_internal_paths
+from .publish_sanitize import (
+    assert_no_internal_paths,
+    project_public_performance,
+    scrub_internal_paths,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 STRATEGY_DIR = Path(__file__).resolve().parent / "strategies"
@@ -216,14 +220,20 @@ def run(strategy_ids: set[str] | None = None) -> str:
         }
         # Optional Astralanx provenance for the detail page: the three single-seed
         # runs (training / OOS / combined) plus king-level liquidity measures.
-        # Passed through, but scrubbed first: the exporter's `open_diagnostics`
-        # embeds absolute Darwin-repo paths (e.g. `sector_map_source`) that must
-        # never reach the public CDN-served JSON. `scrub_internal_paths` redacts
-        # them and `assert_no_internal_paths` fails the updater if any remains.
+        # Performance is projected onto the site's explicit public contract;
+        # the exporter's raw artifacts and duplicate holdings are intentionally
+        # omitted. All retained diagnostics are scrubbed because fields such as
+        # `sector_map_source` can embed an absolute Darwin-repo path. The final
+        # guard fails the updater if any internal path remains.
         # See `docs/concepts/separation-from-darwin.md` and `publish_sanitize.py`.
         for key in ("performance", "active_share", "capacity"):
             if spec.get(key) is not None:
-                meta_entry[key] = assert_no_internal_paths(scrub_internal_paths(spec[key]))
+                if key == "performance":
+                    meta_entry[key] = project_public_performance(spec[key])
+                else:
+                    meta_entry[key] = assert_no_internal_paths(
+                        scrub_internal_paths(spec[key])
+                    )
         meta_entries.append(meta_entry)
 
         open_trades.extend(dict(strategy_id=spec["id"], **t) for t in result.trades)

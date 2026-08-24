@@ -18,7 +18,10 @@ Adapt existing tooling rather than writing from scratch:
 - **`scripts/deploy_to_site.py`** (new) — the one-shot deploy action:
   1. Scrub the chosen king to a portable formula JSON (no internal paths / secrets).
   2. Attach non-secret metadata: `portfolio_size`, `base_currency`, `rebalance_cadence_days`,
-     `visibility`, `cost_model`, `blurb` (see [data-contract.md](../concepts/data-contract.md)).
+     `rebalance_cadence_unit`, `visibility`, `cost_model`, `blurb` (see
+     [data-contract.md](../concepts/data-contract.md)). Open strategies exported from a
+     trading-session-based Darwin run must use `"trading_days"`; omitting the unit deliberately
+     selects the site's legacy calendar-day behavior.
   3. Push formula + metadata into the **private** repo's `strategies/` (secured) — or PR into
      the **public** repo's `paper_trading/strategies/` (open).
   4. Stamp the rebalance cadence: write `rebalance_cadence_days` + `next_rebalance_date` so the
@@ -67,6 +70,7 @@ A deployed strategy is one `*.json` file matching the strategy-spec the updater 
   "portfolio_size": 100000,
   "base_currency": "USD",
   "rebalance_cadence_days": 42,
+  "rebalance_cadence_unit": "trading_days",      // count actual market bars, not calendar days
   "cost_model": {                                 // the Darwin run's actual cost config (see below)
     "commission_bps": 5.0, "slippage_bps": 5.0,
     "spread_ref_price": 50.0, "volume_impact_coef": 0.5, "impact_portfolio_size": 1000000,

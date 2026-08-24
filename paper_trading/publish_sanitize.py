@@ -4,8 +4,9 @@ The Astralanx exporter (Tier 3, `docs/subsystems/darwin-publish.md`) attaches
 per-run `open_diagnostics` to each open strategy spec. Some of those provenance
 strings — notably `sector_neutrality.sector_map_source` — are **absolute paths
 inside the private Darwin repo**, e.g. ``C:\\Users\\<user>\\Projects\\Darwin\\...``.
-The open updater (`paper_trading/update.py`) copies the `performance` block
-straight through, so without scrubbing those paths land in the public,
+The open updater (`paper_trading/update.py`) projects the `performance` block
+onto the fields consumed by the site and scrubs all retained values. Without
+that boundary, exporter-only artifacts and paths could land in public,
 CDN-served JSON — leaking the OS username and internal Darwin layout. That
 violates the separation-from-Darwin / no-internal-paths invariant
 (`docs/concepts/separation-from-darwin.md`).
@@ -26,6 +27,7 @@ __all__ = [
     "InternalPathLeakError",
     "SECTOR_MAP_LABEL",
     "looks_like_internal_path",
+    "project_public_performance",
     "scrub_internal_paths",
     "assert_no_internal_paths",
 ]
@@ -37,6 +39,24 @@ __all__ = [
 SECTOR_MAP_LABEL = "SEC SIC-derived"
 
 _REDACTED = "[redacted internal path]"
+
+# The site renders only this subset of the exporter diagnostics.  Keeping an
+# explicit allowlist prevents large, duplicate raw artifacts from quietly
+# becoming part of the public contract just because Darwin added them to an
+# internal result object.  Nested metric objects remain extensible and are
+# still path-scrubbed recursively.
+_PERFORMANCE_SEGMENTS = ("training", "oos", "combined")
+_RUN_FIELDS = ("start", "end", "windows", "equity_curve", "stats", "open_diagnostics")
+_OPEN_DIAGNOSTIC_FIELDS = (
+    "annual_returns",
+    "max_drawdown",
+    "sector_neutrality",
+    "capacity_analysis",
+    "fama_french_regression",
+    "rolling_3y_sharpe",
+    "rolling_3y_sharpe_series",
+    "picks_records",
+)
 
 # Matches the start of an absolute filesystem path that should never appear in
 # public JSON: a Windows drive letter (``C:\`` / ``C:/``), a UNC share
@@ -81,6 +101,43 @@ def scrub_internal_paths(obj):
     if isinstance(obj, str) and looks_like_internal_path(obj):
         return _REDACTED
     return obj
+
+
+def project_public_performance(performance: dict) -> dict:
+    """Return the allowlisted performance payload consumed by the site.
+
+    Darwin's internal diagnostics can contain raw CSV-style ``artifacts``, a
+    duplicate daily ``holdings`` series, and other analysis blocks the site
+    neither types nor renders.  Publishing those fields inflated the static
+    metadata by several megabytes and made internal exporter additions public
+    by default.  This projection makes the boundary opt-in instead.
+    """
+    if not isinstance(performance, dict):
+        raise TypeError("performance must be an object")
+
+    public: dict = {}
+    for segment in _PERFORMANCE_SEGMENTS:
+        raw_run = performance.get(segment)
+        if raw_run is None:
+            continue
+        if not isinstance(raw_run, dict):
+            raise TypeError(f"performance.{segment} must be an object")
+
+        run = {field: raw_run[field] for field in _RUN_FIELDS if field in raw_run}
+        diagnostics = raw_run.get("open_diagnostics")
+        if diagnostics is not None:
+            if not isinstance(diagnostics, dict):
+                raise TypeError(
+                    f"performance.{segment}.open_diagnostics must be an object"
+                )
+            run["open_diagnostics"] = {
+                field: diagnostics[field]
+                for field in _OPEN_DIAGNOSTIC_FIELDS
+                if field in diagnostics
+            }
+        public[segment] = run
+
+    return assert_no_internal_paths(scrub_internal_paths(public))
 
 
 def assert_no_internal_paths(obj, *, _path: str = "$"):

@@ -39,7 +39,7 @@ export function AnnualReturnsChart({
   return (
     <div>
       <div style={{ width: "100%", height }}>
-        <ResponsiveContainer>
+        <ResponsiveContainer minWidth={0} initialDimension={{ width: 800, height }}>
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <CartesianGrid stroke={CHART.grid} strokeDasharray="2 4" vertical={false} />
           <XAxis

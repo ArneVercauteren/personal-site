@@ -122,8 +122,12 @@ def _stitch_curve(darwin_curve: list[dict], continuation: list[dict]) -> tuple[l
     return stitched, equity
 
 
-def _rebalance_dates(index: pd.DatetimeIndex, deployed_on: pd.Timestamp, cadence_days: int):
-    """Trading days on or after each scheduled rebalance, from `deployed_on`."""
+def _calendar_rebalance_dates(
+    index: pd.DatetimeIndex,
+    deployed_on: pd.Timestamp,
+    cadence_days: int,
+) -> list[pd.Timestamp]:
+    """Legacy schedule: add calendar days, then snap to the next price bar."""
     target = deployed_on
     last = index[-1]
     out: list[pd.Timestamp] = []
@@ -136,6 +140,78 @@ def _rebalance_dates(index: pd.DatetimeIndex, deployed_on: pd.Timestamp, cadence
                 out.append(d)
         target = target + pd.Timedelta(days=cadence_days)
     return out
+
+
+def _rebalance_dates(
+    index: pd.DatetimeIndex,
+    deployed_on: pd.Timestamp,
+    cadence_days: int,
+    *,
+    cadence_unit: str = "calendar_days",
+    transition_anchor: str | pd.Timestamp | None = None,
+) -> list[pd.Timestamp]:
+    """Return review dates on the supplied market-price index.
+
+    ``calendar_days`` preserves the original behavior: add ordinary calendar
+    days and snap weekends/holidays to the next available bar.
+
+    ``trading_days`` counts entries in ``index``.  A strategy may supply a
+    ``transition_anchor`` to preserve its already-published legacy schedule up
+    to and including that review date, then count trading sessions from it.
+    This makes cadence migrations forward-only instead of rewriting a live
+    paper track record.
+    """
+    if cadence_days <= 0:
+        raise ValueError("rebalance cadence must be positive")
+    if len(index) == 0:
+        return []
+    if cadence_unit not in {"calendar_days", "trading_days"}:
+        raise ValueError(
+            "rebalance_cadence_unit must be 'calendar_days' or 'trading_days'"
+        )
+    if cadence_unit == "calendar_days":
+        if transition_anchor is not None:
+            raise ValueError(
+                "rebalance_transition_anchor requires a trading_days cadence"
+            )
+        return _calendar_rebalance_dates(index, deployed_on, cadence_days)
+
+    start_pos = int(index.searchsorted(deployed_on, side="left"))
+    if start_pos >= len(index):
+        return []
+    if transition_anchor is None:
+        return list(index[start_pos::cadence_days])
+
+    anchor = pd.Timestamp(transition_anchor).normalize()
+    anchor_pos = int(index.searchsorted(anchor, side="left"))
+    if anchor_pos >= len(index) or index[anchor_pos].normalize() != anchor:
+        raise ValueError(
+            f"rebalance_transition_anchor {anchor.date()} is not in the price index"
+        )
+
+    legacy = _calendar_rebalance_dates(index, deployed_on, cadence_days)
+    if anchor not in legacy:
+        raise ValueError(
+            f"rebalance_transition_anchor {anchor.date()} is not a legacy review date"
+        )
+    preserved = [day for day in legacy if day <= anchor]
+    future = list(index[anchor_pos + cadence_days :: cadence_days])
+    return preserved + future
+
+
+def _strategy_rebalance_dates(
+    index: pd.DatetimeIndex,
+    sim_start: pd.Timestamp,
+    strategy: dict,
+) -> list[pd.Timestamp]:
+    """Resolve a strategy's backward-compatible cadence configuration."""
+    return _rebalance_dates(
+        index,
+        sim_start,
+        int(strategy["rebalance_cadence_days"]),
+        cadence_unit=strategy.get("rebalance_cadence_unit", "calendar_days"),
+        transition_anchor=strategy.get("rebalance_transition_anchor"),
+    )
 
 
 def _market_returns(closes: pd.DataFrame) -> pd.Series:
@@ -262,7 +338,6 @@ def _simulate_signal(
     impact_base = float(strategy["portfolio_size"])
     sim_start = pd.Timestamp(simulation_curve_start(strategy))
     live_since = pd.Timestamp(strategy["deployed_on"])
-    cadence = int(strategy["rebalance_cadence_days"])
     cfg = costs.CostModel.from_spec(strategy["cost_model"])
     signal = strategy["signal"]
     tickers = list(closes.columns)
@@ -274,7 +349,7 @@ def _simulate_signal(
             f"{strategy['id']}: no price bars on/after curve start {sim_start.date()}"
         )
 
-    rebal_dates = set(_rebalance_dates(sim_index, sim_start, cadence))
+    rebal_dates = set(_strategy_rebalance_dates(sim_index, sim_start, strategy))
 
     cash = capital
     shares = {t: 0.0 for t in tickers}
@@ -355,7 +430,6 @@ def _simulate_dsl(
     impact_base = float(strategy["portfolio_size"])
     sim_start = pd.Timestamp(simulation_curve_start(strategy))
     live_since = pd.Timestamp(strategy["deployed_on"])
-    cadence = int(strategy["rebalance_cadence_days"])
     cfg = costs.CostModel.from_spec(strategy["cost_model"])
     formula = strategy["formula"]
     universe = list(closes.columns)
@@ -367,7 +441,7 @@ def _simulate_dsl(
             f"{strategy['id']}: no price bars on/after curve start {sim_start.date()}"
         )
 
-    rebal_set = set(_rebalance_dates(sim_index, sim_start, cadence))
+    rebal_set = set(_strategy_rebalance_dates(sim_index, sim_start, strategy))
     needed_state = signals.formula_state_features(formula)
 
     state = ps.PortfolioState(capital)

@@ -98,7 +98,9 @@ export function StrategyCard({
           </div>
           <div>
             <dt className="text-ink-muted">Rebalance</dt>
-            <dd className="num text-ink">{meta.rebalance_cadence_days}d</dd>
+            <dd className="num text-ink">
+              {meta.rebalance_cadence_days} trading days
+            </dd>
           </div>
           <div>
             <dt className="text-ink-muted">Costs</dt>
