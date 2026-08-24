@@ -3,7 +3,7 @@
   "strategies": [
     {
       "id": "gen0194",
-      "name": "Adaptive Cross-Sectional Selection",
+      "name": "gen0194",
       "visibility": "open",
       "portfolio_size": 1000000.0,
       "base_currency": "USD",
@@ -26,7 +26,7 @@
         "vol_cost_mult_max": 3.0,
         "impact_book_cap": 36076014.22482418
       },
-      "blurb": "An adaptive, rules-based equity selection strategy evolved in Darwin and tracked here as an append-only paper portfolio.",
+      "blurb": "A rules-based equity selection strategy. This was the first strategy discovered by the engine, and it is tracked here as an append-only paper portfolio.",
       "thesis": "Combine several independent price, volume, trend, and mean-reversion signals to rank a broad liquid US equity universe, then hold the strongest candidates on a fixed review schedule.",
       "expected_behavior": "The portfolio is concentrated and can differ materially from the index. It should participate when its selected signals persist, while periodic reviews let the basket adapt as leadership changes.",
       "risks": [

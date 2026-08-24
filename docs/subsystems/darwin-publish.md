@@ -1,9 +1,9 @@
 # Subsystem — Darwin → site publish step (Tier 3)
 
-> **Status: receiver protocol v1 built.** This repository requires a hashed, versioned deployment bundle
-> and a matching non-skipping conformance vector before a spec can affect accepted paper history. Darwin's
-> exporter still needs to emit this v1 envelope and vector directly; `gen0194` carries a reviewed legacy
-> export build identifier until that exporter update lands.
+> **Status: receiver protocol and Darwin schema-v1 bundle/conformance exporter built.** This repository requires a hashed,
+> versioned deployment bundle and a matching non-skipping conformance vector before a spec can affect
+> accepted paper history. Darwin now emits and validates the v1 envelope and hash-bound vector; the
+> reviewed `gen0194` re-export/reconciliation remains.
 
 ## Receiver protocol v1
 
@@ -25,7 +25,7 @@ picks, weights, sliced costs, review sessions, and next-open fill sessions witho
 
 The single, one-way coupling between Darwin and this website: a script in the **Darwin** repo that selects which king strategies are "deployed to the live site", scrubs them to portable JSON, and pushes them into this repo's `paper_trading/strategies/`.
 
-## Planned shape (in the Darwin repo)
+## Darwin-side shape
 
 Adapt existing tooling rather than writing from scratch:
 
@@ -34,7 +34,7 @@ Adapt existing tooling rather than writing from scratch:
   yfinance (no feature store, no native engine, no secrets). This is the **rebalance
   evaluator** the secured pipeline reuses; it *is* "option A". `scripts/reconcile_portfolio_to_target.py`
   is a secondary reference for turning picks into weights.
-- **`scripts/deploy_to_site.py`** (new) — the one-shot deploy action:
+- **`scripts/deploy_to_site.py`** — the one-shot deploy action:
   1. Scrub the chosen king to a portable formula JSON (no internal paths / secrets).
   2. Attach non-secret metadata: `portfolio_size`, `base_currency`, `rebalance_cadence_days`,
      `rebalance_cadence_unit`, `visibility`, `cost_model`, `blurb` (see
@@ -73,7 +73,6 @@ above. `paper_trading/strategies/gen0194.json` is the complete committed example
   "deployed_on": "2026-06-02",                    // LIVE-since marker (forward paper-trading begins)
   "backfill_start": "2018-01-02",                 // optional: curve start for a one-time backfill
                                                   //   (earlier than deployed_on; the sim runs from here)
-  "next_rebalance_date": "2026-07-14",            // deployed_on + cadence (secured only needs this)
   "performance": {                                // optional: three single-seed runs (see below)
     "training": {"start": "2018-01-02", "end": "2022-12-30",
                  "windows": [{"start": "2018-01-02", "end": "2020-12-31", "label": "Regime 1"}],
@@ -91,6 +90,7 @@ above. `paper_trading/strategies/gen0194.json` is the complete committed example
   "base_currency": "USD",
   "rebalance_cadence_days": 42,
   "rebalance_cadence_unit": "trading_days",      // count actual market bars, not calendar days
+  "rebalance_transition_anchor": "2026-06-02",   // exact review-session anchor
   "cost_model": {                                 // the Darwin run's actual cost config (see below)
     "commission_bps": 5.0, "slippage_bps": 5.0,
     "spread_ref_price": 50.0, "volume_impact_coef": 0.5, "impact_portfolio_size": 1000000,
@@ -194,23 +194,26 @@ site" is small:
 1. **Backend (FastAPI):** `GET /api/strategies/{id}/site-spec` in **`ui/backend/routes/exports.py`**,
    backed by **`ui/backend/exports/site.py`**. It loads the king (`adapters.get_strategy`), uses the
    strategy's round-trippable `raw_json` tree, reads the engine's cost config + `rebalance_days`
-   metadata, and returns the spec above as a JSON download. Query params: `visibility=open|secured`,
+   metadata, and returns the spec above as a JSON download. Query params: required `training_cutoff`,
+   optional `oos_start`, `oos_end`, and `cadence_anchor`, plus `visibility=open|secured`,
    `universe` (comma-separated), `portfolio_size`, `commission_bps`, `slippage_bps`, `blurb`,
    `formula_ref`. Both variants include `formula`; secured just omits the public `formula_ref`.
 2. **Frontend:** two `ExportItem`s under a "Deploy to site" group in `StrategyDrawer.tsx`'s
    `ExportMenu` — "Open strategy (public repo)" and "Secured strategy (private repo)" — each a
-   direct download from the endpoint with the matching `visibility`.
+   direct download from the endpoint with the matching `visibility`. The UI asks for the training
+   cutoff and optional cadence anchor before downloading.
 3. **Where it lands:** the downloaded file is dropped into the **public** repo's
    `paper_trading/strategies/` (open) or the **private** repo's `strategies/` (secured). A later
-   `scripts/deploy_to_site.py` can automate that placement; the button gives the correct file today.
+   `scripts/deploy_to_site.py` automates that placement; the button gives the correct file today.
    `universe` is normally left empty — it resolves to the shared self-refreshing universe
    ([universe.md](universe.md)) so a king deployed once stays current; set a list only to pin one.
    `portfolio_size` is the deploy-time book size the operator sets in the file.
 
-**Status: legacy exporter built; protocol-v1 exporter pending** (Darwin repo) —
-`ui/backend/exports/site.py`, the `site-spec` route, and the two `StrategyDrawer` menu items produce
-the strategy body. They must be extended to add the v1 envelope and deterministic vectors before a
-new export passes this repository's receiver gate.
+**Status: protocol-v1 bundle/conformance exporter built** — Darwin's
+`ui/backend/exports/site.py`, `site-spec` route, and CLI emit a fail-closed envelope matching
+`schemas/deployment-bundle.schema.json`. The CLI also runs Darwin's real selector and sliced-cost
+helper over deterministic fixtures, writes `conformance_vectors/<id>-v1.json`, and binds it to the
+bundle hash. The UI JSON download is a preview; use the CLI for a complete accepted handoff.
 
 The Darwin UI currently produces the site spec; placement and review in this repository are an explicit operator
 step. That deliberate handoff keeps Darwin unable to mutate an accepted paper ledger. See

@@ -308,7 +308,7 @@ export default async function StrategyDetailPage({
         <Facts meta={meta ?? defaultMeta(strategy.id, strategy.name)} />
       </div>
 
-      {meta.thesis || meta.expected_behavior || meta.risks?.length || meta.failure_modes?.length ? (
+      {meta.thesis || meta.expected_behavior || meta.risks?.length ? (
         <Section eyebrow="Plain English" title="Thesis, behaviour & risks">
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-4 text-sm text-ink-muted">
@@ -323,14 +323,6 @@ export default async function StrategyDetailPage({
                   <h3 className="text-sm font-semibold text-ink">Risks</h3>
                   <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-muted">
                     {meta.risks.map((risk) => <li key={risk}>{risk}</li>)}
-                  </ul>
-                </div>
-              ) : null}
-              {meta.failure_modes?.length ? (
-                <div>
-                  <h3 className="text-sm font-semibold text-ink">What failure looks like</h3>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-ink-muted">
-                    {meta.failure_modes.map((failure) => <li key={failure}>{failure}</li>)}
                   </ul>
                 </div>
               ) : null}

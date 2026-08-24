@@ -5,15 +5,24 @@ const root = process.cwd();
 const read = (relative) => readFileSync(join(root, ".next", "server", "app", relative), "utf8");
 const dashboard = read("astralanx/live.html");
 const detail = read("astralanx/live/gen0194.html");
+const strategySpec = JSON.parse(
+  readFileSync(join(root, "paper_trading", "strategies", "gen0194.json"), "utf8"),
+);
 
 const requiredDashboard = [
   "Paper-trading dashboard",
   "Snapshot as of",
   "Live return",
   "Current DD",
-  "Adaptive Cross-Sectional Selection",
+  strategySpec.name,
+  strategySpec.blurb,
 ];
 const requiredDetail = [
+  strategySpec.name,
+  strategySpec.blurb,
+  strategySpec.thesis,
+  strategySpec.expected_behavior,
+  ...strategySpec.risks,
   "Forward paper-trading",
   "Thesis, behaviour &amp; risks",
   "Rebalance timeline",
@@ -27,7 +36,7 @@ for (const value of requiredDashboard) {
 for (const value of requiredDetail) {
   if (!detail.includes(value)) throw new Error(`strategy smoke check missing: ${value}`);
 }
-if (detail.includes("<h1") && detail.includes(">gen0194</h1>")) {
-  throw new Error("machine strategy id leaked into the primary page title");
+for (const value of ["What failure looks like", ...strategySpec.failure_modes]) {
+  if (detail.includes(value)) throw new Error(`strategy smoke check found removed content: ${value}`);
 }
 console.log("static accessibility/content smoke checks passed");

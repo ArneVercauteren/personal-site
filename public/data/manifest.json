@@ -6,8 +6,8 @@
       "sha256": "1689472155649afbe7b8f098771960b3b303ddaec16072f525f6626811cd40e2"
     },
     "index.json": {
-      "bytes": 6233,
-      "sha256": "510e212f26938ff275fea4b1baa003f2ae5ce491b7c91c4090d462d153f67e22"
+      "bytes": 6238,
+      "sha256": "caa30587791db7d6709c836498eeb616c82917e57afdcb10a178a58087e4e9f6"
     },
     "strategies/gen0194/analytics.json": {
       "bytes": 1364443,
@@ -30,11 +30,11 @@
       "sha256": "40a5b0a1fc0657f781e8b561a157f74a3f981f4e36ffcb4e76bbdc6af3a50115"
     },
     "strategies/gen0194/summary.json": {
-      "bytes": 37051,
-      "sha256": "ee3f0a9a8081f3482f3428e09635e24a4e4c4bb2347871e0bf7df9e033c0b78f"
+      "bytes": 37029,
+      "sha256": "75930d83f8c275b0e3cce0946de627c1fbc59864f6b5bf4d900033ffc1b84cd1"
     }
   },
   "generated_at": "2026-08-21T00:00:00Z",
   "schema_version": 1,
-  "snapshot_id": "6c3c82773189fc25d7bbe18a380b364618f2090569c6364a57599e1ab5a912fb"
+  "snapshot_id": "cad65567bfd535ecb170efb85e91f1fdd9b670a358370fb565585eaaa51f9d81"
 }

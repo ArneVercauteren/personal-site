@@ -12,7 +12,7 @@
     "schema_version": {"const": 1},
     "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
     "name": {"type": "string", "minLength": 1},
-    "visibility": {"const": "open"},
+    "visibility": {"enum": ["open", "secured"]},
     "deployed_on": {"type": "string", "format": "date"},
     "portfolio_size": {"type": "number", "exclusiveMinimum": 0},
     "base_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
