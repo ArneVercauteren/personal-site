@@ -10,7 +10,7 @@ import pandas as pd
 
 from . import portfolio, prices
 from .contracts import ContractError
-from .costs import CostModel, sliced_execution_cost
+from .costs import CostModel, rebalance_cost_fraction, sliced_execution_cost
 from .darwin_eval.select_on_date import select_tickers_on_date
 from .deployment import DEPLOYMENT_SCHEMA_VERSION, validate_deployment_bundle
 
@@ -54,13 +54,19 @@ def _validate_selection(vector: dict, spec: dict) -> None:
 
 
 def _validate_cost(vector: dict, spec: dict) -> None:
-    actual = sliced_execution_cost(cfg=CostModel.from_spec(spec["cost_model"]), **vector["inputs"])
-    for key, expected in vector["expected"].items():
+    cfg = CostModel.from_spec(spec["cost_model"])
+    sliced = vector["sliced_execution"]
+    actual = sliced_execution_cost(cfg=cfg, **sliced["inputs"])
+    for key, expected in sliced["expected"].items():
         if key == "execution_days":
             if actual[key] != expected:
                 raise ContractError("conformance execution-day count changed")
         else:
             _close(actual[key], expected, f"cost.{key}")
+    rebalance = vector["rebalance"]
+    actual_rebalance = rebalance_cost_fraction(cfg=cfg, **rebalance["inputs"])
+    for key, expected in rebalance["expected"].items():
+        _close(actual_rebalance[key], expected, f"rebalance_cost.{key}")
 
 
 def _validate_schedule(vector: dict, spec: dict) -> None:

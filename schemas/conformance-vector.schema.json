@@ -13,7 +13,7 @@
       "type": "object",
       "required": ["generator", "target_session", "eligibility", "expected"]
     },
-    "cost": {"type": "object", "required": ["inputs", "expected"]},
+    "cost": {"type": "object", "required": ["sliced_execution", "rebalance"]},
     "schedule": {"type": "object", "required": ["generator", "expected"]}
   }
 }
