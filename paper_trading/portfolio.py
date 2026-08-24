@@ -340,6 +340,75 @@ def _price_snapshot_id(day: pd.Timestamp, row, tickers: list[str]) -> str:
     return content_hash({"session": day.strftime("%Y-%m-%d"), "closes": prices})
 
 
+class BoundaryPriceUnavailable(ValueError):
+    """A held position lacks the accepted boundary price; a later retry may recover it."""
+
+
+class BoundaryPriceRevision(ValueError):
+    """Prices affecting accepted boundary accounting changed and need review."""
+
+    def __init__(self, message: str, details: dict):
+        super().__init__(message)
+        self.details = details
+
+
+def _held_checkpoint_tickers(checkpoint: dict) -> list[str]:
+    return sorted(
+        ticker
+        for ticker, quantity in checkpoint.get("shares", {}).items()
+        if abs(float(quantity)) > 1e-12
+    )
+
+
+def _verify_checkpoint_prices(checkpoint: dict, row, tolerance: float = 0.02) -> None:
+    """Verify only prices that can affect the accepted account boundary.
+
+    Legacy checkpoints hashed the entire research universe. If that broad hash
+    changes, accept the transition only when every held price is present and the
+    held book still reconciles exactly to accepted equity. New checkpoints hash
+    held positions directly, so any mismatch is a genuine accounting revision.
+    """
+
+    held = _held_checkpoint_tickers(checkpoint)
+    missing = [ticker for ticker in held if _finite_price(row, ticker) is None]
+    if missing:
+        raise BoundaryPriceUnavailable(
+            "missing accepted-boundary prices for held positions: " + ", ".join(missing)
+        )
+
+    snapshot_tickers = list(checkpoint.get("price_tickers") or held)
+    observed = _price_snapshot_id(
+        pd.Timestamp(checkpoint["last_processed_session"]), row, snapshot_tickers,
+    )
+    if observed == checkpoint["price_snapshot_id"]:
+        return
+
+    if checkpoint.get("price_snapshot_scope") != "held_positions_v1":
+        marked = float(checkpoint["cash"]) + _position_value(
+            checkpoint["shares"], row, held,
+        )
+        if abs(marked - float(checkpoint["equity"])) <= tolerance:
+            return
+    else:
+        marked = float(checkpoint["cash"]) + _position_value(
+            checkpoint["shares"], row, held,
+        )
+
+    raise BoundaryPriceRevision(
+        "held-position prices no longer reconcile to the accepted boundary",
+        {
+            "kind": "price_revision",
+            "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
+            "observed_price_snapshot_id": observed,
+            "accepted_equity": float(checkpoint["equity"]),
+            "observed_equity": marked,
+            "price_snapshot_scope": checkpoint.get(
+                "price_snapshot_scope", "legacy_universe_v1"
+            ),
+        },
+    )
+
+
 def _review_price_snapshot_id(
     day: pd.Timestamp,
     close_row,
@@ -387,10 +456,11 @@ def _checkpoint(
     last_review: str | None,
     sessions_until_review: int | None,
     universe: list[str],
-    price_snapshot_id: str,
+    price_row,
     universe_snapshot_id: str | None = None,
 ) -> dict:
     formula = strategy.get("formula") or strategy.get("signal") or {}
+    held_tickers = sorted(_nonzero_shares(shares))
     return {
         "schema_version": CONTRACT_VERSION,
         "strategy_id": strategy["id"],
@@ -423,8 +493,9 @@ def _checkpoint(
             or strategy.get("_universe_snapshot_id")
             or content_hash(sorted(universe))
         ),
-        "price_snapshot_id": price_snapshot_id,
-        "price_tickers": sorted(universe),
+        "price_snapshot_id": _price_snapshot_id(day, price_row, held_tickers),
+        "price_snapshot_scope": "held_positions_v1",
+        "price_tickers": held_tickers,
         "cost_model_hash": content_hash(strategy["cost_model"]),
         "engine_version": ENGINE_VERSION,
     }
@@ -511,13 +582,7 @@ def simulate_incremental(
     last = pd.Timestamp(checkpoint["last_processed_session"])
     if last not in closes.index:
         raise ValueError(f"{strategy['id']}: checkpoint session {last.date()} is absent from prices")
-    price_tickers = list(checkpoint.get("price_tickers") or closes.columns)
-    observed_hash = _price_snapshot_id(last, closes.loc[last], price_tickers)
-    if observed_hash != checkpoint["price_snapshot_id"]:
-        raise ValueError(
-            f"{strategy['id']}: price revision at accepted session {last.date()}; "
-            "create a correction proposal"
-        )
+    _verify_checkpoint_prices(checkpoint, closes.loc[last])
 
     existing = list(prior_curve)
     if not existing or existing[-1]["d"] != last.strftime("%Y-%m-%d"):
@@ -643,7 +708,9 @@ def simulate_incremental(
             {
                 "equity": round(equity_close, 8), "cash": round(cash, 8),
                 "shares": _nonzero_shares(shares),
-                "price_snapshot_id": _price_snapshot_id(day, closes.loc[day], tickers),
+                "price_snapshot_id": _price_snapshot_id(
+                    day, closes.loc[day], sorted(_nonzero_shares(shares)),
+                ),
             },
         ))
 
@@ -661,7 +728,7 @@ def simulate_incremental(
             pending_cost=pending_cost, equity_at_prev_rebal=equity_at_prev_rebal,
             last_review=last_review, sessions_until_review=remaining,
             universe=tickers,
-            price_snapshot_id=_price_snapshot_id(final_day, closes.loc[final_day], tickers),
+            price_row=closes.loc[final_day],
             universe_snapshot_id=decision_universe_snapshot_id,
         )
     positions = _latest_positions(shares, closes.loc[final_day], final_equity, tickers)
@@ -802,7 +869,9 @@ def _simulate_signal(
                 {
                     "equity": round(equity_close, 8),
                     "cash": round(cash, 8), "shares": _nonzero_shares(shares),
-                    "price_snapshot_id": _price_snapshot_id(day, closes.loc[day], tickers),
+                    "price_snapshot_id": _price_snapshot_id(
+                        day, closes.loc[day], sorted(_nonzero_shares(shares)),
+                    ),
                 },
             ))
 
@@ -829,7 +898,7 @@ def _simulate_signal(
             strategy.get("rebalance_cadence_unit", "calendar_days"),
         ),
         universe=tickers,
-        price_snapshot_id=_price_snapshot_id(final_day, closes.loc[final_day], tickers),
+        price_row=closes.loc[final_day],
     )
     return SimResult(
         equity_curve=curve,
@@ -989,7 +1058,9 @@ def _simulate_dsl(
                 {
                     "equity": round(equity_close, 8),
                     "cash": round(cash, 8), "shares": _nonzero_shares(shares),
-                    "price_snapshot_id": _price_snapshot_id(day, closes.loc[day], universe),
+                    "price_snapshot_id": _price_snapshot_id(
+                        day, closes.loc[day], sorted(_nonzero_shares(shares)),
+                    ),
                 },
             ))
 
@@ -1016,7 +1087,7 @@ def _simulate_dsl(
             strategy.get("rebalance_cadence_unit", "calendar_days"),
         ),
         universe=universe,
-        price_snapshot_id=_price_snapshot_id(final_day, closes.loc[final_day], universe),
+        price_row=closes.loc[final_day],
     )
     return SimResult(
         equity_curve=curve,

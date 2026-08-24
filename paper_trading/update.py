@@ -225,18 +225,14 @@ def run(strategy_ids: set[str] | None = None) -> str:
             if previous is None:
                 raise ValueError(f"{spec['id']}: checkpoint exists but public history is missing")
             boundary = pd.Timestamp(checkpoint["last_processed_session"])
-            price_tickers = list(checkpoint.get("price_tickers") or closes.columns)
             if boundary in closes.index:
-                observed = portfolio._price_snapshot_id(
-                    boundary, closes.loc[boundary], price_tickers,
-                )
-                if observed != checkpoint["price_snapshot_id"]:
+                try:
+                    portfolio._verify_checkpoint_prices(checkpoint, closes.loc[boundary])
+                except portfolio.BoundaryPriceRevision as exc:
                     proposal = make_event(
                         spec["id"], "correction_proposed", boundary.strftime("%Y-%m-%d"),
                         {
-                            "kind": "price_revision",
-                            "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
-                            "observed_price_snapshot_id": observed,
+                            **exc.details,
                             "checkpoint_hash": content_hash(checkpoint),
                         },
                     )

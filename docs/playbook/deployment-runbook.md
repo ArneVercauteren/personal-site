@@ -25,7 +25,10 @@ freshness workflow fails when the last good manifest is more than four calendar 
 ## Corrections and recovery
 
 - Never edit a JSONL event or accepted checkpoint by hand.
-- A boundary price/hash mismatch stops the updater and requests a `correction_proposed` event.
+- Ordinary boundary hashes cover held positions; full-universe input hashes are retained on review
+  events. Missing held prices stop the run as retryable data failures. A held-position boundary
+  mismatch stops the updater and records a `correction_proposed` event; the failed CI job uploads
+  its ledger/checkpoint state as a 14-day review artifact without changing the branch.
 - An interrupted ledger/checkpoint commit is completed from `paper_state/.transactions/` on the next
   read. Public data is not published until state, compatibility files, hashes, and byte budgets pass.
 - To audit without writing, run `python -m paper_trading.audit --strategy <id>`.

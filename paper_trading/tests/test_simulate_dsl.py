@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+import pandas as pd
 import pytest
 
 from paper_trading import portfolio, prices, signals
@@ -72,6 +73,8 @@ def test_incremental_checkpoint_matches_one_shot_replay(universe, long_prices):
         dollar_volume=dollar_volume.loc[:cutoff], raw_closes=raw_closes.loc[:cutoff],
     )
     assert first.checkpoint is not None
+    assert first.checkpoint["price_snapshot_scope"] == "held_positions_v1"
+    assert first.checkpoint["price_tickers"] == sorted(first.checkpoint["shares"])
     continued = portfolio.simulate_incremental(
         spec, first.checkpoint, first.equity_curve, opens, closes,
         prices_long=long_prices, dollar_volume=dollar_volume, raw_closes=raw_closes,
@@ -84,6 +87,60 @@ def test_incremental_checkpoint_matches_one_shot_replay(universe, long_prices):
     assert continued.equity_curve == replay.equity_curve
     assert continued.positions == replay.positions
     assert continued.checkpoint == replay.checkpoint
+
+
+def test_legacy_universe_snapshot_allows_unheld_change_when_account_reconciles():
+    day = pd.Timestamp("2026-08-21")
+    accepted = pd.Series({"HELD": 10.0, "UNHELD": 20.0})
+    checkpoint = {
+        "last_processed_session": "2026-08-21",
+        "cash": 80.0,
+        "shares": {"HELD": 2.0},
+        "equity": 100.0,
+        "price_tickers": ["HELD", "UNHELD"],
+        "price_snapshot_id": portfolio._price_snapshot_id(
+            day, accepted, ["HELD", "UNHELD"],
+        ),
+    }
+
+    portfolio._verify_checkpoint_prices(
+        checkpoint, pd.Series({"HELD": 10.0, "UNHELD": 99.0}),
+    )
+
+
+def test_legacy_universe_snapshot_rejects_held_revision():
+    day = pd.Timestamp("2026-08-21")
+    accepted = pd.Series({"HELD": 10.0, "UNHELD": 20.0})
+    checkpoint = {
+        "last_processed_session": "2026-08-21",
+        "cash": 80.0,
+        "shares": {"HELD": 2.0},
+        "equity": 100.0,
+        "price_tickers": ["HELD", "UNHELD"],
+        "price_snapshot_id": portfolio._price_snapshot_id(
+            day, accepted, ["HELD", "UNHELD"],
+        ),
+    }
+
+    with pytest.raises(portfolio.BoundaryPriceRevision):
+        portfolio._verify_checkpoint_prices(
+            checkpoint, pd.Series({"HELD": 11.0, "UNHELD": 20.0}),
+        )
+
+
+def test_checkpoint_boundary_requires_every_held_price():
+    checkpoint = {
+        "last_processed_session": "2026-08-21",
+        "cash": 80.0,
+        "shares": {"HELD": 2.0},
+        "equity": 100.0,
+        "price_tickers": ["HELD"],
+        "price_snapshot_id": "0" * 64,
+        "price_snapshot_scope": "held_positions_v1",
+    }
+
+    with pytest.raises(portfolio.BoundaryPriceUnavailable, match="HELD"):
+        portfolio._verify_checkpoint_prices(checkpoint, pd.Series(dtype=float))
 
 
 def test_incremental_checkpoint_keeps_last_decision_universe_until_review(universe, long_prices):

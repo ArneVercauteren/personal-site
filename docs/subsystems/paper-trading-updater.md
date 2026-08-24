@@ -83,8 +83,11 @@ are NaN, handled).
    Each successful Yahoo chunk is written to the local OHLCV cache immediately, before simulation
    starts, so an interrupted fetch phase can reuse completed chunks on the next run.
 2. Load the accepted checkpoint and verify deployment, formula, cost, boundary-price, and engine hashes.
-   A rerun with no unseen session is an accounting no-op. A revised boundary price is rejected as a
-   correction proposal rather than silently rewriting history.
+   End-of-day boundary snapshots cover held positions only; full-universe causal inputs remain hashed
+   on rebalance events. Legacy universe-wide checkpoints may transition only when every held price is
+   present and cash plus marked holdings still reconciles to accepted equity. Missing held prices are
+   retryable data failures, while a revised held price is rejected as a correction proposal rather
+   than silently rewriting history.
 3. For unseen sessions only, apply a pending target at the next open, charge costs, mark equity, and
    decrement the observed-session cadence. Evaluate a new target only when that counter reaches zero.
 4. Append stable-id ledger events and atomically advance the checkpoint. Recompute display stats from
@@ -172,9 +175,10 @@ each other's data. The file-level `as_of` advances to the latest open bar date.
 ## Determinism
 
 Historical ledger events and equity marks are fixed once accepted. A routine run never recomputes
-them. Price revisions or changed deployment hashes fail closed; a full replay lives in the separate
-read-only audit command. Synthetic split-run tests prove incremental continuation matches a one-shot
-replay for identical inputs.
+them. Price revisions or changed deployment hashes fail closed; on CI failure, the runner uploads
+its ledger/checkpoint state as a short-lived review artifact without changing the branch. A full
+replay lives in the separate read-only audit command. Synthetic split-run tests
+prove incremental continuation matches a one-shot replay for identical inputs.
 
 ## Invariants it respects
 

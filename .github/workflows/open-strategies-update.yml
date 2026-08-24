@@ -36,12 +36,24 @@ jobs:
         run: pip install -r paper_trading/requirements-lock.txt
 
       - name: Regenerate open-strategy data
+        id: regenerate
         run: |
           for attempt in 1 2 3; do
             python -m paper_trading.update && break
             if [ "$attempt" = 3 ]; then exit 1; fi
             sleep $((attempt * 20))
           done
+
+      - name: Preserve failed updater state for review
+        if: steps.regenerate.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: paper-update-failure-${{ github.run_id }}
+          path: |
+            paper_ledger/
+            paper_state/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Validate generated state and publication
         run: |
