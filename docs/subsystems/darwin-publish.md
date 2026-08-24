@@ -2,8 +2,9 @@
 
 > **Status: receiver protocol and Darwin schema-v1 bundle/conformance exporter built.** This repository requires a hashed,
 > versioned deployment bundle and a matching non-skipping conformance vector before a spec can affect
-> accepted paper history. Darwin now emits and validates the v1 envelope and hash-bound vector; the
-> reviewed `gen0194` re-export/reconciliation remains.
+> accepted paper history. Darwin now emits and validates the v1 envelope and hash-bound vector;
+> `gen0194` has been re-exported from Darwin build `git-b11aef50` at its accepted capacity cap and
+> reconciled against the unchanged live checkpoint semantics.
 
 ## Receiver protocol v1
 
@@ -214,6 +215,11 @@ site" is small:
 `schemas/deployment-bundle.schema.json`. The CLI also runs Darwin's real selector and sliced-cost
 helper over deterministic fixtures, writes `conformance_vectors/<id>-v1.json`, and binds it to the
 bundle hash. The UI JSON download is a preview; use the CLI for a complete accepted handoff.
+
+For provenance-only re-exports, Darwin's `--impact-book-cap <accepted-cap>` option skips capacity
+rediscovery and reruns diagnostics under the already-approved execution ceiling. The `gen0194`
+re-export used `36076014.22482418`; formula, full cost model, cadence, and checkpoint hashes remained
+identical while the build ID and current-engine research diagnostics were refreshed.
 
 The Darwin UI currently produces the site spec; placement and review in this repository are an explicit operator
 step. That deliberate handoff keeps Darwin unable to mutate an accepted paper ledger. See

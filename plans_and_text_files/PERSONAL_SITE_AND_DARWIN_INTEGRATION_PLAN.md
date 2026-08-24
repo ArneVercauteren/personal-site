@@ -1,7 +1,7 @@
 # Personal site and Darwin integration plan
 
 **Created:** 2026-08-24  
-**Status:** in progress — ledger, publication, receiver protocol, and Darwin schema-v1 bundle/conformance exporter implemented; cross-repo re-export and reconciliation remain
+**Status:** in progress — ledger, publication, receiver protocol, Darwin schema-v1 bundle/conformance exporter, and reviewed `gen0194` re-export/reconciliation implemented
 
 **Scope:** public site, paper-trading record, Darwin deployment boundary, publication pipeline,
 product positioning, accessibility, testing, and documentation  
