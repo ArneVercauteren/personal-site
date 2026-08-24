@@ -8,8 +8,9 @@ The boundary is JSON-only: do not copy Darwin caches, filesystem paths, credenti
 1. Export the strategy through Darwin's `site-spec` action and place the reviewed JSON at
    `paper_trading/strategies/<strategy-id>.json`. Keep `visibility` set to `open`; secured strategies belong in
    the private updater repository.
-2. Run the Python tests. Strategy import rejects malformed schemas, internal paths, and fields outside the
-   public contract.
+2. Run `python -m paper_trading.conformance` and the Python tests. Strategy import rejects missing or
+   unsupported semantic versions, an incomplete cadence/cost contract, a mismatched bundle hash, internal
+   paths, and fields outside the public contract. Conformance is required and never skips when Darwin is absent.
 3. Generate a migration candidate without changing accepted state:
 
    ```bash
@@ -39,7 +40,9 @@ The boundary is JSON-only: do not copy Darwin caches, filesystem paths, credenti
 
 ## Source files
 
-- `schemas/strategy-spec.schema.json` — input contract.
+- `schemas/deployment-bundle.schema.json`, `schemas/conformance-vector.schema.json` — input contracts.
+- `paper_trading/deployment.py`, `paper_trading/conformance.py`, `paper_trading/conformance_vectors/` —
+  fail-closed receiver and required fixtures.
 - `paper_trading/migrate.py`, `paper_trading/update.py`, `paper_trading/audit.py` — lifecycle commands.
 - `paper_state/`, `paper_ledger/`, `paper_migration/` — accepted state and review evidence.
 - `public/data/manifest.json`, `public/data/snapshots/` — atomic public boundary.

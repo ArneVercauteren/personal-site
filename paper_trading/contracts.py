@@ -64,6 +64,8 @@ def _finite(value: Any, label: str, *, positive: bool = False) -> float:
 
 
 def validate_strategy_spec(spec: dict) -> dict:
+    from .deployment import validate_deployment_bundle
+
     required = {
         "id", "name", "visibility", "deployed_on", "portfolio_size",
         "base_currency", "rebalance_cadence_days", "cost_model",
@@ -96,6 +98,7 @@ def validate_strategy_spec(spec: dict) -> dict:
         _finite(costs.get(key), f"cost_model.{key}")
     if "formula" not in spec and "signal" not in spec:
         raise ContractError("strategy requires formula or signal")
+    validate_deployment_bundle(spec)
     return spec
 
 

@@ -1,7 +1,7 @@
 # Personal site and Darwin integration plan
 
 **Created:** 2026-08-24  
-**Status:** proposed — audit complete; revised phases have not started  
+**Status:** in progress — ledger, publication, and receiver-side protocol work implemented; Darwin exporter integration remains  
 **Scope:** public site, paper-trading record, Darwin deployment boundary, publication pipeline,
 product positioning, accessibility, testing, and documentation  
 **Relationship to the earlier plan:** preserves the invariants and most work in

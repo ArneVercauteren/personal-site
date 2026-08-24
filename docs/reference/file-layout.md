@@ -39,7 +39,8 @@ personal-site/                          (PUBLIC repo)
 │  └─ format.ts                        # %, $, date helpers
 ├─ paper_trading/                       Tier-2b ENGINE + OPEN strategies (not secret)
 │  ├─ requirements-lock.txt  update.py  prices.py  portfolio.py  signals.py
-│  ├─ contracts.py  ledger.py  migrate.py  audit.py  publish.py  validate_data.py
+│  ├─ contracts.py  deployment.py  conformance.py  ledger.py  migrate.py  audit.py  publish.py  validate_data.py
+│  ├─ conformance_vectors/              # required Darwin-independent deployment fixtures
 │  ├─ costs.py  secured.py             # Darwin cost model; secured sanitizer + leak guard
 │  ├─ universe.py  update_universe.py  ticker_sectors.json  # self-refreshing universe + sector map
 │  ├─ darwin_eval/                     # vendored Darwin DSL evaluator
@@ -69,7 +70,8 @@ personal-site-trading/                  (PRIVATE repo — Tier 2a, NOT this repo
 These are the cross-tier interfaces — treat them as contracts, not incidental files:
 
 - **`public/data/*.json`** — the Tier 2 → Tier 1 boundary. Shape defined by `lib/data.ts`, gated by `visibility`. Written by the open updater (this repo) and the secured updater (private repo). See [concepts/data-contract.md](../concepts/data-contract.md).
-- **`paper_trading/strategies/*.json`** (public) — OPEN strategy formulas only.
+- **`paper_trading/strategies/*.json`** (public) — versioned OPEN deployment bundles; formulas plus public-safe
+  provenance and hashes only. Matching fixtures live in `paper_trading/conformance_vectors/`.
 - **The private repo's `strategies/` + `weights/`** — secured formulas and weights. The Tier 3 → Tier 2a boundary (scrubbed king exports from Darwin) and the secret the public repo must never contain. See [concepts/separation-from-darwin.md](../concepts/separation-from-darwin.md) and [concepts/open-vs-secured-strategies.md](../concepts/open-vs-secured-strategies.md).
 
 ## Generated vs hand-edited

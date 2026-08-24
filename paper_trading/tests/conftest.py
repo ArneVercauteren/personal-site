@@ -30,17 +30,14 @@ def long_prices(universe):
 def darwin_select_fn():
     """Return Astralanx's own `select_tickers_on_date`, or None if unavailable.
 
-    Parity tests are skipped (not failed) when the Astralanx repo isn't present, so
-    CI in the public repo stays green.
+    Parity tests skip only when the optional checkout is absent. A checkout that
+    exists but cannot import is a broken local gate and must raise its real error.
     """
     repo = os.environ.get("DARWIN_REPO", _DARWIN_DEFAULT)
     if not Path(repo).exists():
         return None
     if repo not in sys.path:
         sys.path.insert(0, repo)
-    try:
-        from src.backtest.select_on_date import select_tickers_on_date
+    from src.backtest.select_on_date import select_tickers_on_date
 
-        return select_tickers_on_date
-    except Exception:
-        return None
+    return select_tickers_on_date

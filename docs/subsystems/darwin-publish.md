@@ -1,7 +1,25 @@
 # Subsystem — Darwin → site publish step (Tier 3)
 
-> **Status: built at the contract boundary.** Darwin's UI exports the scrubbed `site-spec`; this repository
-> requires a reviewed migration before that spec can affect accepted paper history.
+> **Status: receiver protocol v1 built.** This repository requires a hashed, versioned deployment bundle
+> and a matching non-skipping conformance vector before a spec can affect accepted paper history. Darwin's
+> exporter still needs to emit this v1 envelope and vector directly; `gen0194` carries a reviewed legacy
+> export build identifier until that exporter update lands.
+
+## Receiver protocol v1
+
+- Portable schemas: `schemas/deployment-bundle.schema.json` and
+  `schemas/conformance-vector.schema.json`.
+- Python fail-closed guard: `paper_trading/deployment.py`, called by strategy import before price fetching,
+  ledger changes, or publication.
+- TypeScript build guard: `lib/deployment.ts`, called while loading the static strategy index.
+- Required public-safe vectors: `paper_trading/conformance_vectors/*.json`, run by
+  `python -m paper_trading.conformance` and an explicit CI step.
+
+The envelope declares evaluator, cost-model, observed-session calendar, and eligibility-policy versions;
+formula and cost hashes; an engine build ID; training/OOS/deployment dates; data-source provenance; and the
+explicit `trading_sessions` / `next_session_open` cadence object. Unsupported or omitted semantics fail before
+the updater can change state. The vector is bound to the complete bundle hash and pins eligibility, scores,
+picks, weights, sliced costs, review sessions, and next-open fill sessions without importing Darwin.
 
 ## What this will own
 
@@ -20,14 +38,13 @@ Adapt existing tooling rather than writing from scratch:
   1. Scrub the chosen king to a portable formula JSON (no internal paths / secrets).
   2. Attach non-secret metadata: `portfolio_size`, `base_currency`, `rebalance_cadence_days`,
      `rebalance_cadence_unit`, `visibility`, `cost_model`, `blurb` (see
-     [data-contract.md](../concepts/data-contract.md)). Open strategies exported from a
-     trading-session-based Darwin run must use `"trading_days"`; omitting the unit deliberately
-     selects the site's legacy calendar-day behavior.
+     [data-contract.md](../concepts/data-contract.md)). Versioned deployments must use an explicit
+     `"trading_days"` unit and matching cadence object; omission is rejected.
   3. Push formula + metadata into the **private** repo's `strategies/` (secured) — or PR into
      the **public** repo's `paper_trading/strategies/` (open).
-  4. Stamp the rebalance cadence: write `rebalance_cadence_days` + `next_rebalance_date` so the
-     private repo's daily `rebalance.yml` rebalances this strategy when due (per-strategy
-     cadence, one shared workflow). See [secured-updater.md](secured-updater.md).
+  4. Stamp the cadence object with the interval, anchor review session, and
+     `execution: "next_session_open"`. The receiver computes schedule progress from observed sessions;
+     calendar-day addition must not be published as a trading-session schedule.
 
 ## The contract it must honour
 
@@ -39,11 +56,13 @@ Adapt existing tooling rather than writing from scratch:
 
 - It treats `paper_trading/strategies/*.json` as an input contract: a stable, documented JSON shape the [updater](paper-trading-updater.md) knows how to evaluate.
 
-## The export format (the exact JSON the site needs)
+## The export payload body
 
 A deployed strategy is one `*.json` file matching the strategy-spec the updater reads
 (`paper_trading/update.py` / the secured `update_secured.py`). Same shape for open and secured;
-`visibility` and *where it's pushed* differ. Exact shape:
+`visibility` and *where it's pushed* differ. The abbreviated example below shows the strategy body;
+protocol v1 additionally requires top-level `schema_version` and the `deployment` envelope documented
+above. `paper_trading/strategies/gen0194.json` is the complete committed example.
 
 ```json
 {
@@ -188,9 +207,10 @@ site" is small:
    ([universe.md](universe.md)) so a king deployed once stays current; set a list only to pin one.
    `portfolio_size` is the deploy-time book size the operator sets in the file.
 
-**Status: built** (Darwin repo) — `ui/backend/exports/site.py`, the `site-spec` route, and the two
-`StrategyDrawer` menu items. This keeps Darwin's UI as the single deploy surface and produces the
-*exact* spec the updater already runs — no second format to maintain.
+**Status: legacy exporter built; protocol-v1 exporter pending** (Darwin repo) —
+`ui/backend/exports/site.py`, the `site-spec` route, and the two `StrategyDrawer` menu items produce
+the strategy body. They must be extended to add the v1 envelope and deterministic vectors before a
+new export passes this repository's receiver gate.
 
 The Darwin UI currently produces the site spec; placement and review in this repository are an explicit operator
 step. That deliberate handoff keeps Darwin unable to mutate an accepted paper ledger. See

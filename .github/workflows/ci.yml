@@ -31,6 +31,9 @@ jobs:
       - name: Compile Python modules
         run: python -m compileall -q paper_trading
 
+      - name: Run required Darwin-independent conformance vectors
+        run: python -m paper_trading.conformance
+
       - name: Run paper-trading tests and data checks
         run: pytest paper_trading/tests -q
 

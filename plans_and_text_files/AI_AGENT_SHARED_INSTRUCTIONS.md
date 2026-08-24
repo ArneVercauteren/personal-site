@@ -28,7 +28,16 @@ These are the things easiest to break by accident. Full discussion in [docs/conc
 
 **If your change shifts a contract a test pins (the data-contract shape, a formatting helper, a snapshot fixture), update the test in the same change.** Never silence with `.skip`/`xfail`/`--ignore`. Full rule: [docs/playbook/test-maintenance.md]({{ROOT_PREFIX}}docs/playbook/test-maintenance.md).
 
-**Do not rewrite existing public-site wording unless the user explicitly asks for copy changes.** Treat existing phrasing in `app/`, `content/`, and visible component text as intentional. Fix only the requested wording, factual errors the user asked you to correct, or text that must change because the underlying behavior changed.
+## Protected content policy — preserve copy and strategy names
+
+This policy is non-negotiable and applies to every AI-authored change in this repository.
+
+1. **Never change existing user-facing wording unless the user explicitly requests the exact copy change in the current task.** Preserve wording exactly, including spelling, capitalization, punctuation, and whitespace where it affects display. Do not rewrite, rephrase, shorten, expand, summarize, translate, proofread, "improve," or normalize copy as part of a design, refactor, accessibility, SEO, data, or code-quality change.
+2. **User-facing wording includes every string a visitor can see or that describes site content.** This includes headings, paragraphs, navigation, buttons, links, labels, captions, tooltips, empty/error states, disclaimers, accessibility text, metadata, descriptions, MDX/content files, and text supplied through JSON or other data files. Do not add or remove user-facing copy unless the user explicitly asks for that content change.
+3. **Strategy names are immutable.** Never rename a strategy or alter its displayed name, spelling, capitalization, punctuation, spacing, or branding. This applies everywhere the name appears: strategy definitions, IDs or slugs derived from names, Python and TypeScript code, JSON, schemas, fixtures, tests, snapshots, routes, headings, cards, charts, metadata, and documentation. Refactors and generated-data refreshes must carry every existing strategy name through unchanged.
+4. **Do not infer copy approval from a broader request.** A request to redesign, modernize, refactor, fix, improve accessibility, improve SEO, regenerate data, or update dependencies does not authorize wording or strategy-name changes. Authorization must specifically identify the wording or strategy name to change. For a strategy rename, require the user to provide or confirm both the exact old name and exact new name before editing it.
+5. **When a technical change appears to require protected-content changes, stop and report the conflict.** Do not choose replacement wording or a replacement strategy name. Keep the protected content unchanged until the user gives explicit, specific instructions.
+6. **Check the final diff for violations.** Before completing any task, verify that no user-facing text or strategy name changed outside the exact copy edits the user explicitly requested.
 
 ## Workflow for AI making changes
 

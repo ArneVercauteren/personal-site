@@ -24,4 +24,6 @@ Only fix what your change broke. The suite's structure lets a reader (or CI) loc
 
 ## Status
 
-No test suite exists yet — this repo is being scaffolded. When the first tests land (the plan's build order reaches the data contract and the updater), this page gets concrete file names. Until then, treat the principles above as the standing agreement.
+The Python suite lives in `paper_trading/tests/`; required cross-repository receiver fixtures live in
+`paper_trading/conformance_vectors/` and run separately through `python -m paper_trading.conformance`.
+Frontend build/content/accessibility smoke checks live in `scripts/`. CI runs all of these gates.

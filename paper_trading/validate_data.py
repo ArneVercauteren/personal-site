@@ -8,6 +8,7 @@ from datetime import date
 from pathlib import Path
 
 from .contracts import CONTRACT_VERSION, ContractError, file_hash, validate_public_files
+from .conformance import validate_all as validate_conformance
 from .ledger import LedgerStore, reconcile_ledger_to_checkpoint
 from .publish_sanitize import assert_no_internal_paths
 
@@ -24,6 +25,7 @@ MAX_BYTES = {
 
 
 def validate(*, max_age_days: int | None = None) -> None:
+    validate_conformance()
     compatibility = {
         name: json.loads((DATA / name).read_text(encoding="utf-8"))
         for name in ("portfolio.json", "strategies.json", "trades.json", "benchmark.json")

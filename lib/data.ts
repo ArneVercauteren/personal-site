@@ -3,6 +3,7 @@ import { cache } from "react";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { validateCommittedDeploymentBundles } from "@/lib/deployment";
 
 // ---------------------------------------------------------------------------
 // THE DATA CONTRACT — single source of truth for public/data/*.json.
@@ -578,6 +579,7 @@ const readSnapshotJson = cache(function readSnapshotJson<T>(relative: string): T
 });
 
 export const loadStrategyIndex = cache(function loadStrategyIndex(): StrategyIndexFile {
+  validateCommittedDeploymentBundles();
   const index = readSnapshotJson<StrategyIndexFile>("index.json");
   if (index.schema_version !== 1 || !Array.isArray(index.strategies)) {
     throw new Error("invalid strategy index");

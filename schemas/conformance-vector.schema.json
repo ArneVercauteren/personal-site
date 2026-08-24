@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astralanx.example/schemas/conformance-vector-v1.json",
+  "title": "Darwin deployment conformance vector",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "strategy_id", "bundle_hash", "selection", "cost", "schedule"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "strategy_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "bundle_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "selection": {
+      "type": "object",
+      "required": ["generator", "target_session", "eligibility", "expected"]
+    },
+    "cost": {"type": "object", "required": ["inputs", "expected"]},
+    "schedule": {"type": "object", "required": ["generator", "expected"]}
+  }
+}

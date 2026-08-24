@@ -490,7 +490,7 @@ export default async function StrategyDetailPage({
       <Section eyebrow="Audit trail" title="Rebalance timeline">
         <p className="mb-4 max-w-prose text-sm text-ink-muted">
           Append-only review, target, next-open fill, and cost events. Short hashes identify
-          the point-in-time universe and price inputs used for each decision.
+          the point-in-time universe and price inputs used for each decision. Due to the fact that this was the first strategy, the first few review dates do not match the intended strategy cadence.
         </p>
         <RebalanceTimeline events={rebalanceEvents} />
       </Section>

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://astralanx.example/schemas/deployment-bundle-v1.json",
+  "title": "Darwin deployment bundle",
+  "type": "object",
+  "required": [
+    "schema_version", "id", "name", "visibility", "deployed_on", "portfolio_size",
+    "base_currency", "rebalance_cadence_days", "rebalance_cadence_unit",
+    "rebalance_transition_anchor", "cost_model", "formula", "deployment"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$"},
+    "name": {"type": "string", "minLength": 1},
+    "visibility": {"const": "open"},
+    "deployed_on": {"type": "string", "format": "date"},
+    "portfolio_size": {"type": "number", "exclusiveMinimum": 0},
+    "base_currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "rebalance_cadence_days": {"type": "integer", "minimum": 1},
+    "rebalance_cadence_unit": {"const": "trading_days"},
+    "rebalance_transition_anchor": {"type": "string", "format": "date"},
+    "formula": {"type": "object"},
+    "cost_model": {"$ref": "#/$defs/costModel"},
+    "deployment": {"$ref": "#/$defs/deployment"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "costModel": {
+      "type": "object",
+      "required": [
+        "commission_bps", "slippage_bps", "spread_ref_price", "volume_impact_coef",
+        "impact_portfolio_size", "execution_max_days", "execution_participation_rate",
+        "execution_delay_risk_coef", "execution_overflow_penalty_bps",
+        "vol_scaled_cost_enable", "vol_cost_k", "vol_cost_realized_window",
+        "vol_cost_long_window", "vol_cost_mult_max"
+      ],
+      "properties": {
+        "commission_bps": {"type": "number", "minimum": 0},
+        "slippage_bps": {"type": "number", "minimum": 0},
+        "spread_ref_price": {"type": "number", "minimum": 0},
+        "volume_impact_coef": {"type": "number", "minimum": 0},
+        "impact_portfolio_size": {"type": "number", "exclusiveMinimum": 0},
+        "execution_max_days": {"type": "integer", "minimum": 1},
+        "execution_participation_rate": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "execution_delay_risk_coef": {"type": "number", "minimum": 0},
+        "execution_overflow_penalty_bps": {"type": "number", "minimum": 0},
+        "impact_lookback_days": {"type": "integer", "minimum": 2},
+        "vol_scaled_cost_enable": {"type": "boolean"},
+        "vol_cost_k": {"type": "number", "minimum": 0},
+        "vol_cost_realized_window": {"type": "integer", "minimum": 5},
+        "vol_cost_long_window": {"type": "integer", "minimum": 20},
+        "vol_cost_mult_max": {"type": "number", "minimum": 1}
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "strategy_id", "display_name", "formula_hash", "cost_model_hash",
+        "engine_build_id", "evaluator_version", "cost_model_version", "calendar_version",
+        "eligibility_version", "training_cutoff", "oos_window", "deployment_session",
+        "generated_at", "data_sources", "cadence", "bundle_hash"
+      ],
+      "properties": {
+        "schema_version": {"const": 1},
+        "strategy_id": {"type": "string"},
+        "display_name": {"type": "string"},
+        "formula_hash": {"$ref": "#/$defs/sha256"},
+        "cost_model_hash": {"$ref": "#/$defs/sha256"},
+        "engine_build_id": {"type": "string", "minLength": 1},
+        "evaluator_version": {"const": "darwin-dsl-v1"},
+        "cost_model_version": {"const": "darwin-sliced-execution-v1"},
+        "calendar_version": {"const": "observed-us-sessions-v1"},
+        "eligibility_version": {"const": "causal-us-equities-v1"},
+        "training_cutoff": {"type": "string", "format": "date"},
+        "oos_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end"],
+          "properties": {
+            "start": {"type": "string", "format": "date"},
+            "end": {"type": "string", "format": "date"}
+          }
+        },
+        "deployment_session": {"type": "string", "format": "date"},
+        "generated_at": {"type": "string", "format": "date-time"},
+        "data_sources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["research", "forward_paper"],
+          "properties": {
+            "research": {"type": "string", "minLength": 1},
+            "forward_paper": {"type": "string", "minLength": 1}
+          }
+        },
+        "cadence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["unit", "interval", "anchor_review_session", "execution"],
+          "properties": {
+            "unit": {"const": "trading_sessions"},
+            "interval": {"type": "integer", "minimum": 1},
+            "anchor_review_session": {"type": "string", "format": "date"},
+            "execution": {"const": "next_session_open"}
+          }
+        },
+        "bundle_hash": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
