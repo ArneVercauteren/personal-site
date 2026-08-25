@@ -35,6 +35,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: |
+            paper_trading/requirements-lock.txt
 
       - name: Install dependencies
         run: pip install -r paper_trading/requirements-lock.txt

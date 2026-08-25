@@ -22,6 +22,10 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    # The price source sets no request timeouts, so a wedged fetch would
+    # otherwise burn the 6h default and block the next run behind the
+    # non-cancelling concurrency group.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -31,6 +35,8 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: |
+            paper_trading/requirements-lock.txt
 
       - name: Install dependencies
         run: pip install -r paper_trading/requirements-lock.txt
@@ -44,8 +50,17 @@ jobs:
             sleep $((attempt * 20))
           done
 
+      - name: Validate generated state and publication
+        id: validate
+        run: |
+          pytest paper_trading/tests -q
+          python -m paper_trading.validate_data --max-age-days 4
+
+      # Runs after validation so it also captures the state a failed validation
+      # produced. failure() is required: an `if:` with no status check function
+      # is implicitly ANDed with success(), which never holds here.
       - name: Preserve failed updater state for review
-        if: steps.regenerate.outcome == 'failure'
+        if: failure() && (steps.regenerate.outcome == 'failure' || steps.validate.outcome == 'failure')
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: paper-update-failure-${{ github.run_id }}
@@ -54,11 +69,6 @@ jobs:
             paper_state/
           if-no-files-found: error
           retention-days: 14
-
-      - name: Validate generated state and publication
-        run: |
-          pytest paper_trading/tests -q
-          python -m paper_trading.validate_data --max-age-days 4
 
       - name: Commit refreshed data (if changed)
         run: |
