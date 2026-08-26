@@ -64,6 +64,25 @@ def _live_points(strategy: dict) -> list[dict]:
     return [point for point in strategy["equity_curve"] if point["d"] >= live_since]
 
 
+def _chart_curve(strategy: dict, limit: int = MAX_CHART_POINTS) -> list[dict]:
+    """Thin the backtest history for charting but keep every live session.
+
+    Bucketing the whole curve uniformly would spend nearly all of the budget on
+    the decades of history and leave the live window with a handful of points,
+    so the live tail is carried at full resolution and only the run-up to it is
+    downsampled into the remaining budget.
+    """
+    live_since = strategy.get("live_since")
+    curve = strategy["equity_curve"]
+    if not live_since:
+        return downsample(curve, limit)
+    history = [point for point in curve if point["d"] < live_since]
+    live = [point for point in curve if point["d"] >= live_since]
+    if not history:
+        return downsample(live, limit)
+    return downsample(history, max(2, limit - len(live))) + live
+
+
 def _summary(strategy: dict, meta: dict | None, trades: list[dict]) -> dict:
     live = _live_points(strategy)
     start_value = float(live[0]["v"]) if live else 0.0
@@ -134,7 +153,7 @@ def build_snapshot_payloads(data_dir: Path) -> tuple[str, dict[str, dict]]:
         index_strategies.append(summary)
 
         detail = {key: value for key, value in strategy.items() if key != "equity_curve"}
-        detail["equity_curve"] = downsample(strategy["equity_curve"])
+        detail["equity_curve"] = _chart_curve(strategy)
         detail["meta"] = {
             key: value for key, value in (meta or {}).items() if key != "performance"
         }

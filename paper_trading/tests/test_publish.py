@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from paper_trading.publish import downsample, publish_snapshot
+from paper_trading.publish import _chart_curve, downsample, publish_snapshot
 
 
 def _write(path, payload):
@@ -17,6 +17,22 @@ def test_downsample_preserves_endpoints_and_extreme():
     assert sampled[-1] == points[-1]
     assert points[10] in sampled
     assert len(sampled) <= 10
+
+
+def test_chart_curve_keeps_every_live_session():
+    curve = [{"d": f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}", "v": float(i)} for i in range(600)]
+    live_since = curve[-40]["d"]
+    sampled = _chart_curve({"equity_curve": curve, "live_since": live_since}, limit=100)
+    live = [point for point in sampled if point["d"] >= live_since]
+    assert live == curve[-40:]
+    assert len(sampled) <= 100
+    assert sampled[0] == curve[0]
+
+
+def test_chart_curve_without_live_since_downsamples_whole_curve():
+    curve = [{"d": f"2026-{1 + i // 28:02d}-{1 + i % 28:02d}", "v": float(i)} for i in range(600)]
+    sampled = _chart_curve({"equity_curve": curve}, limit=100)
+    assert sampled == downsample(curve, 100)
 
 
 def test_publish_snapshot_writes_manifest_last_contract(tmp_path):
