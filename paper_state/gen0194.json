@@ -3,10 +3,10 @@
   "cost_model_hash": "82d2a8f88b6f9828d91a3d6cd1892952df6373b62f36d0e88b655ddff262c231",
   "deployment_hash": "80fd54804efd6d95c37493f4e054e8ea860b3140006c470353163fb5570d89a1",
   "engine_version": "paper-runtime-v1",
-  "equity": 102822926.36572754,
+  "equity": 102576533.3250804,
   "equity_at_previous_review": 102600603.08898835,
   "formula_hash": "1ff16787bc00dfceb72161273664dccee917b8c703293d4184dc1b501b214012",
-  "last_processed_session": "2026-08-25",
+  "last_processed_session": "2026-08-26",
   "last_review_session": "2026-08-10",
   "peak_equity": 112935203.23,
   "pending_cost_fraction": 0.0,
@@ -31,7 +31,7 @@
       0.09863029091697087
     ]
   },
-  "price_snapshot_id": "afb8cdcc324ef09770878696bd81d2b3dc7e43a46f33d4a69529b8b8e7a1ba6d",
+  "price_snapshot_id": "638ef78905163562ffa7c6cb64809ac0c7ef1cdfdf7afda607a3f93393027762",
   "price_snapshot_scope": "held_positions_v1",
   "price_tickers": [
     "AG",
@@ -91,7 +91,7 @@
     "WULF"
   ],
   "schema_version": 1,
-  "sessions_until_review": 31,
+  "sessions_until_review": 30,
   "shares": {
     "AG": 3250.116081559767,
     "AGNC": 125960.84770764904,
