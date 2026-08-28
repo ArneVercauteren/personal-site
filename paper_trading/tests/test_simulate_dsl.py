@@ -73,7 +73,7 @@ def test_incremental_checkpoint_matches_one_shot_replay(universe, long_prices):
         dollar_volume=dollar_volume.loc[:cutoff], raw_closes=raw_closes.loc[:cutoff],
     )
     assert first.checkpoint is not None
-    assert first.checkpoint["price_snapshot_scope"] == "held_positions_v1"
+    assert first.checkpoint["price_snapshot_scope"] == "held_positions_v2"
     assert first.checkpoint["price_tickers"] == sorted(first.checkpoint["shares"])
     continued = portfolio.simulate_incremental(
         spec, first.checkpoint, first.equity_curve, opens, closes,

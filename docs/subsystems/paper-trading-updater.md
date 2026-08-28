@@ -88,9 +88,19 @@ are NaN, handled).
    present and cash plus marked holdings still reconciles to accepted equity. Missing held prices are
    retryable data failures, while a revised held price is rejected as a correction proposal rather
    than silently rewriting history. That rejection exits 3 and is not retried; a reviewer clears it
-   with `migrate --accept-revision` (see the runbook). Note that `closes` is Yahoo's adjusted close,
-   so any corporate action on a held name after the boundary rewrites that session's price and
-   trips this guard — on this book that is a recurring event, not an exceptional one.
+   with `migrate --accept-revision` (see the runbook).
+
+   `closes` is Yahoo's **adjusted** close, which is not a fixed historical value: every corporate
+   action rewrites each adjusted close before its ex-date. Checkpoints therefore record the accepted
+   prices themselves (`price_snapshot`) plus a hash of the **raw** closes
+   (`raw_price_snapshot_id`), which dividends leave alone. When the adjusted basis moves and the raw
+   control does not, the cause is arithmetic: the updater re-bases held share counts by the inverse
+   factor, records a `basis_rebased` event, and continues. Cash, equity and every published point
+   are unchanged — re-basing is what marking on one consistent basis does implicitly, so this is
+   also what keeps incremental continuation equal to a one-shot replay. Marking forward *without*
+   it silently drops the distribution from the curve; on the current open book that would be
+   roughly 2%/yr. When the raw closes move too — a split, or a corrected print — the account really
+   has changed value and the run still fails closed for review.
 3. For unseen sessions only, apply a pending target at the next open, charge costs, mark equity, and
    decrement the observed-session cadence. Evaluate a new target only when that counter reaches zero.
 4. Append stable-id ledger events and atomically advance the checkpoint. Recompute display stats from
@@ -178,7 +188,9 @@ each other's data. The file-level `as_of` advances to the latest open bar date.
 ## Determinism
 
 Historical ledger events and equity marks are fixed once accepted. A routine run never recomputes
-them. Price revisions or changed deployment hashes fail closed; on CI failure, the runner uploads
+them. A corporate action that re-bases the adjusted series is reconciled automatically against the
+raw-close control and recorded as `basis_rebased`; it changes share counts only, never cash or an
+accepted mark. Price revisions or changed deployment hashes fail closed; on CI failure, the runner uploads
 its ledger/checkpoint state as a short-lived review artifact without changing the branch. A full
 replay lives in the separate read-only audit command. Synthetic split-run tests
 prove incremental continuation matches a one-shot replay for identical inputs.

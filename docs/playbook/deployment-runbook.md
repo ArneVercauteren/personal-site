@@ -30,6 +30,9 @@ freshness workflow fails when the last good manifest is more than four calendar 
   mismatch stops the updater and records a `correction_proposed` event; the failed CI job uploads
   its ledger/checkpoint state as a 14-day review artifact without changing the branch. It exits
   **3** — a status CI never retries, because the same inputs fail identically every time.
+- A dividend or other distribution on a held name is **not** a revision: the raw close is unchanged,
+  so the updater re-bases share counts, records `basis_rebased`, and continues without review. Only
+  a move in the raw closes — a split, or a corrected print — stops the run.
 - To clear a boundary price revision:
   1. `python -m paper_trading.migrate --strategy <id> --accept-revision` re-fetches the boundary
      prices, reports the mismatch and its equity delta, and writes nothing. The CI artifact is a

@@ -331,13 +331,47 @@ def _current_weights(
     return out
 
 
-def _price_snapshot_id(day: pd.Timestamp, row, tickers: list[str]) -> str:
+def _price_map(row, tickers: list[str]) -> dict[str, float]:
+    """Accepted prices at full precision.
+
+    Deliberately unrounded, unlike the snapshot hash below: these are divided
+    against the observed prices to recover a corporate action's factor, so a
+    ticker that did not move has to compare exactly equal. Rounding here put a
+    spurious factor on every held name and broke the re-based reconciliation.
+    """
     prices = {}
     for ticker in tickers:
         value = _finite_price(row, ticker)
         if value is not None:
-            prices[ticker] = round(value, 8)
-    return content_hash({"session": day.strftime("%Y-%m-%d"), "closes": prices})
+            prices[ticker] = value
+    return prices
+
+
+def _price_snapshot_id(day: pd.Timestamp, row, tickers: list[str]) -> str:
+    # Rounded so a vendor's last-digit jitter is not read as a revision.
+    closes = {
+        ticker: round(price, 8) for ticker, price in _price_map(row, tickers).items()
+    }
+    return content_hash({"session": day.strftime("%Y-%m-%d"), "closes": closes})
+
+
+# Below this, a factor is vendor float jitter rather than a corporate action.
+REBASE_EPSILON = 1e-12
+
+
+@dataclass(frozen=True)
+class BoundaryBasisRebase:
+    """A corporate action re-based the adjusted series; no accounting changed.
+
+    ``factors`` is observed/accepted per held ticker. Scaling share counts by
+    their inverse preserves the accepted boundary mark exactly, which is the
+    same thing a one-shot replay does implicitly by simulating the whole
+    history on one basis.
+    """
+
+    factors: dict[str, float]
+    price_snapshot_id: str
+    prices: dict[str, float]
 
 
 class BoundaryPriceUnavailable(ValueError):
@@ -360,13 +394,25 @@ def _held_checkpoint_tickers(checkpoint: dict) -> list[str]:
     )
 
 
-def _verify_checkpoint_prices(checkpoint: dict, row, tolerance: float = 0.02) -> None:
+def _verify_checkpoint_prices(
+    checkpoint: dict, row, raw_row=None, tolerance: float = 0.02,
+) -> "BoundaryBasisRebase | None":
     """Verify only prices that can affect the accepted account boundary.
 
-    Legacy checkpoints hashed the entire research universe. If that broad hash
-    changes, accept the transition only when every held price is present and the
-    held book still reconciles exactly to accepted equity. New checkpoints hash
-    held positions directly, so any mismatch is a genuine accounting revision.
+    Returns None when the boundary is unchanged, or a ``BoundaryBasisRebase``
+    when a corporate action re-based the adjusted series and the caller should
+    carry the checkpoint across it. Raises when a reviewer is needed.
+
+    Three outcomes, separated by the raw close as a control:
+
+    * adjusted hash matches — nothing happened.
+    * adjusted moved, raw did not — a distribution rewrote the adjusted history
+      behind the boundary. Arithmetic, not a revision; re-base and continue.
+    * raw moved — a split or a corrected print. The account genuinely changed
+      value, so fail closed.
+
+    Legacy checkpoints hashed the entire research universe and carry no accepted
+    prices, so they cannot be told apart and every mismatch stays a revision.
     """
 
     held = _held_checkpoint_tickers(checkpoint)
@@ -376,19 +422,30 @@ def _verify_checkpoint_prices(checkpoint: dict, row, tolerance: float = 0.02) ->
             "missing accepted-boundary prices for held positions: " + ", ".join(missing)
         )
 
+    day = pd.Timestamp(checkpoint["last_processed_session"])
     snapshot_tickers = list(checkpoint.get("price_tickers") or held)
-    observed = _price_snapshot_id(
-        pd.Timestamp(checkpoint["last_processed_session"]), row, snapshot_tickers,
-    )
+    observed = _price_snapshot_id(day, row, snapshot_tickers)
     if observed == checkpoint["price_snapshot_id"]:
-        return
+        return None
 
-    if checkpoint.get("price_snapshot_scope") != "held_positions_v1":
+    # A distribution rewrites every adjusted close before its ex-date while
+    # leaving the raw close untouched. When the accepted prices are on record
+    # and the raw control still matches, the move is arithmetic, not a revision,
+    # and rebasing the share count carries the accepted mark across unchanged.
+    accepted_prices = checkpoint.get("price_snapshot")
+    raw_snapshot_id = checkpoint.get("raw_price_snapshot_id")
+    if accepted_prices and raw_snapshot_id and raw_row is not None:
+        if _price_snapshot_id(day, raw_row, snapshot_tickers) == raw_snapshot_id:
+            return _basis_rebase(checkpoint, held, accepted_prices, row, observed)
+        # Raw closes moved too: a split, or a genuine correction to a print.
+        # Both change what the account is worth, so both need a reviewer.
+
+    if checkpoint.get("price_snapshot_scope") not in {"held_positions_v1", "held_positions_v2"}:
         marked = float(checkpoint["cash"]) + _position_value(
             checkpoint["shares"], row, held,
         )
         if abs(marked - float(checkpoint["equity"])) <= tolerance:
-            return
+            return None
     else:
         marked = float(checkpoint["cash"]) + _position_value(
             checkpoint["shares"], row, held,
@@ -396,21 +453,83 @@ def _verify_checkpoint_prices(checkpoint: dict, row, tolerance: float = 0.02) ->
 
     raise BoundaryPriceRevision(
         "held-position prices no longer reconcile to the accepted boundary",
-        {
-            "kind": "price_revision",
-            "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
-            "observed_price_snapshot_id": observed,
-            "accepted_equity": float(checkpoint["equity"]),
-            # Rounded so the proposal payload — and therefore its stable event id —
-            # is identical across runs. Summation order over the held book is not
-            # bit-stable, and raw floats made two identical revisions look like two
-            # distinct proposals.
-            "observed_equity": round(marked, 6),
-            "price_snapshot_scope": checkpoint.get(
-                "price_snapshot_scope", "legacy_universe_v1"
-            ),
-        },
+        _revision_details(checkpoint, observed, marked),
     )
+
+
+def _revision_details(checkpoint: dict, observed_id: str, marked: float) -> dict:
+    return {
+        "kind": "price_revision",
+        "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
+        "observed_price_snapshot_id": observed_id,
+        "accepted_equity": float(checkpoint["equity"]),
+        # Rounded so the proposal payload — and therefore its stable event id —
+        # is identical across runs. Summation order over the held book is not
+        # bit-stable, and raw floats made two identical revisions look like two
+        # distinct proposals.
+        "observed_equity": round(marked, 6),
+        "price_snapshot_scope": checkpoint.get(
+            "price_snapshot_scope", "legacy_universe_v1"
+        ),
+    }
+
+
+def _basis_rebase(
+    checkpoint: dict, held: list[str], accepted_prices: dict, row, observed_id: str,
+) -> BoundaryBasisRebase:
+    """Per-ticker observed/accepted ratios for a re-based adjusted series."""
+    factors: dict[str, float] = {}
+    prices: dict[str, float] = {}
+    for ticker in held:
+        accepted = float(accepted_prices.get(ticker, 0.0))
+        current = _finite_price(row, ticker)
+        if accepted <= 0.0 or current is None:
+            raise BoundaryPriceRevision(
+                "cannot re-base the boundary: no accepted price for " + ticker,
+                _revision_details(checkpoint, observed_id, float(checkpoint["equity"])),
+            )
+        factor = current / accepted
+        # Snap the untouched names to exactly 1 so they are neither rescaled nor
+        # reported as having moved.
+        factors[ticker] = 1.0 if abs(factor - 1.0) <= REBASE_EPSILON else factor
+        prices[ticker] = current
+    return BoundaryBasisRebase(factors, observed_id, prices)
+
+
+def rebase_checkpoint(
+    checkpoint: dict, rebase: BoundaryBasisRebase, tolerance: float = 0.02,
+) -> dict:
+    """Carry an accepted checkpoint onto a re-based adjusted price series.
+
+    Share counts absorb the corporate action so cash, equity and every prior
+    published point stay exactly as accepted. Marking forward without this is
+    what silently drops distributions from the curve.
+    """
+    # Untouched names keep their exact accepted quantity. Passing the whole book
+    # through _nonzero_shares would re-round every entry, which silently moved
+    # the smallest positions in the last bit.
+    shares = {
+        ticker: (
+            round(float(quantity) / rebase.factors[ticker], 12)
+            if rebase.factors.get(ticker, 1.0) != 1.0 else quantity
+        )
+        for ticker, quantity in checkpoint["shares"].items()
+    }
+    restated = {
+        **checkpoint,
+        "shares": shares,
+        "price_snapshot": rebase.prices,
+        "price_snapshot_id": rebase.price_snapshot_id,
+    }
+    marked = float(restated["cash"]) + _position_value(
+        restated["shares"], pd.Series(rebase.prices), sorted(rebase.prices),
+    )
+    if abs(marked - float(checkpoint["equity"])) > tolerance:
+        raise BoundaryPriceRevision(
+            "re-based book does not reconcile to the accepted boundary",
+            _revision_details(checkpoint, rebase.price_snapshot_id, marked),
+        )
+    return restated
 
 
 def _review_price_snapshot_id(
@@ -461,6 +580,7 @@ def _checkpoint(
     sessions_until_review: int | None,
     universe: list[str],
     price_row,
+    raw_price_row=None,
     universe_snapshot_id: str | None = None,
 ) -> dict:
     formula = strategy.get("formula") or strategy.get("signal") or {}
@@ -498,8 +618,18 @@ def _checkpoint(
             or content_hash(sorted(universe))
         ),
         "price_snapshot_id": _price_snapshot_id(day, price_row, held_tickers),
-        "price_snapshot_scope": "held_positions_v1",
+        "price_snapshot_scope": "held_positions_v2",
         "price_tickers": held_tickers,
+        # The accepted prices themselves, not just their hash. A hash can only
+        # say *that* the boundary moved; these say by how much, per ticker,
+        # which is what separates a corporate action from a bad print.
+        "price_snapshot": _price_map(price_row, held_tickers),
+        # Raw closes are immune to dividends, so they are the control: if the
+        # adjusted basis moved and this did not, the cause was a distribution.
+        "raw_price_snapshot_id": (
+            None if raw_price_row is None
+            else _price_snapshot_id(day, raw_price_row, held_tickers)
+        ),
         "cost_model_hash": content_hash(strategy["cost_model"]),
         "engine_version": ENGINE_VERSION,
     }
@@ -733,6 +863,10 @@ def simulate_incremental(
             last_review=last_review, sessions_until_review=remaining,
             universe=tickers,
             price_row=closes.loc[final_day],
+            raw_price_row=(
+                None if raw_closes is None or final_day not in raw_closes.index
+                else raw_closes.loc[final_day]
+            ),
             universe_snapshot_id=decision_universe_snapshot_id,
         )
     positions = _latest_positions(shares, closes.loc[final_day], final_equity, tickers)
@@ -903,6 +1037,10 @@ def _simulate_signal(
         ),
         universe=tickers,
         price_row=closes.loc[final_day],
+        raw_price_row=(
+            None if raw_closes is None or final_day not in raw_closes.index
+            else raw_closes.loc[final_day]
+        ),
     )
     return SimResult(
         equity_curve=curve,
@@ -1092,6 +1230,10 @@ def _simulate_dsl(
         ),
         universe=universe,
         price_row=closes.loc[final_day],
+        raw_price_row=(
+            None if raw_closes is None or final_day not in raw_closes.index
+            else raw_closes.loc[final_day]
+        ),
     )
     return SimResult(
         equity_curve=curve,

@@ -14,7 +14,7 @@ from .contracts import CONTRACT_VERSION, ENGINE_VERSION, ContractError, canonica
 EVENT_TYPES = {
     "strategy_deployed", "migration_checkpoint", "session_marked",
     "rebalance_reviewed", "targets_computed", "fills_applied", "costs_charged",
-    "correction_proposed", "correction_accepted",
+    "correction_proposed", "correction_accepted", "basis_rebased",
 }
 
 
@@ -213,7 +213,8 @@ class LedgerStore:
         # in place: it carries a reviewer and an immutable record of what changed.
         # Without one, a same-session checkpoint edit is a silent history rewrite.
         accepts_correction = any(
-            event["event_type"] == "correction_accepted" for event in appended
+            event["event_type"] in {"correction_accepted", "basis_rebased"}
+            for event in appended
         )
         if (
             previous_checkpoint is not None

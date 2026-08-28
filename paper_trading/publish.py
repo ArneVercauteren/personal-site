@@ -196,6 +196,7 @@ def build_snapshot_payloads(data_dir: Path) -> tuple[str, dict[str, dict]]:
                 if event.get("event_type") in {
                     "rebalance_reviewed", "targets_computed", "fills_applied",
                     "costs_charged", "correction_proposed", "correction_accepted",
+                    "basis_rebased",
                 }
             ],
         }

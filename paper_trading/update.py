@@ -197,6 +197,37 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def _rebase_boundary(
+    strategy_id: str, checkpoint: dict, boundary: pd.Timestamp,
+    rebase: portfolio.BoundaryBasisRebase,
+) -> dict:
+    """Carry the accepted checkpoint onto a re-based adjusted price series.
+
+    A distribution rewrites the adjusted history behind the boundary. Marking
+    forward across that shift without re-basing silently drops the distribution
+    from the curve, so this is accounting-relevant and gets its own event.
+    """
+    restated = portfolio.rebase_checkpoint(checkpoint, rebase)
+    moved = {
+        ticker: round(factor, 10)
+        for ticker, factor in sorted(rebase.factors.items())
+        if factor != 1.0  # _basis_rebase already snapped the untouched names
+    }
+    event = make_event(strategy_id, "basis_rebased", boundary.strftime("%Y-%m-%d"), {
+        "kind": "corporate_action_rebase",
+        "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
+        "observed_price_snapshot_id": rebase.price_snapshot_id,
+        "accepted_equity": round(float(checkpoint["equity"]), 6),
+        "factors": moved,
+    })
+    LEDGER_STORE.commit(strategy_id, [event], restated)
+    print(
+        f"{strategy_id}: re-based {len(moved)} held price(s) at {boundary.date()} "
+        "after a corporate action; accepted equity unchanged"
+    )
+    return restated
+
+
 def run(strategy_ids: set[str] | None = None) -> str:
     specs = load_strategy_specs(strategy_ids)
     if not specs:
@@ -240,8 +271,15 @@ def run(strategy_ids: set[str] | None = None) -> str:
                 raise ValueError(f"{spec['id']}: checkpoint exists but public history is missing")
             boundary = pd.Timestamp(checkpoint["last_processed_session"])
             if boundary in closes.index:
+                raw_row = (
+                    raw_closes.loc[boundary]
+                    if raw_closes is not None and boundary in raw_closes.index
+                    else None
+                )
                 try:
-                    portfolio._verify_checkpoint_prices(checkpoint, closes.loc[boundary])
+                    rebase = portfolio._verify_checkpoint_prices(
+                        checkpoint, closes.loc[boundary], raw_row=raw_row,
+                    )
                 except portfolio.BoundaryPriceRevision as exc:
                     proposal = make_event(
                         spec["id"], "correction_proposed", boundary.strftime("%Y-%m-%d"),
@@ -257,6 +295,8 @@ def run(strategy_ids: set[str] | None = None) -> str:
                         f"`python -m paper_trading.migrate --strategy {spec['id']} "
                         "--accept-revision`."
                     )
+                if rebase is not None:
+                    checkpoint = _rebase_boundary(spec["id"], checkpoint, boundary, rebase)
             result = portfolio.simulate_incremental(
                 spec, checkpoint, previous["equity_curve"], opens, closes,
                 prices_long=long if "formula" in spec else None,

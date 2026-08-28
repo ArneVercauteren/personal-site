@@ -9,7 +9,7 @@
     "schema_version": {"const": 1},
     "event_id": {"type": "string", "pattern": "^[a-f0-9]{24}$"},
     "strategy_id": {"type": "string"},
-    "event_type": {"enum": ["strategy_deployed", "migration_checkpoint", "session_marked", "rebalance_reviewed", "targets_computed", "fills_applied", "costs_charged", "correction_proposed", "correction_accepted"]},
+    "event_type": {"enum": ["strategy_deployed", "migration_checkpoint", "session_marked", "rebalance_reviewed", "targets_computed", "fills_applied", "costs_charged", "correction_proposed", "correction_accepted", "basis_rebased"]},
     "session": {"type": "string", "format": "date"},
     "engine_version": {"const": "paper-runtime-v1"},
     "payload": {"type": "object"}

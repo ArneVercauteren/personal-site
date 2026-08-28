@@ -243,29 +243,35 @@ def approve(strategy_id: str, reviewer: str) -> int:
     return count
 
 
-def _boundary_close_row(checkpoint: dict, held: list[str]):
-    """Adjusted closes for the held book at the accepted boundary session.
+def _boundary_price_rows(checkpoint: dict, held: list[str]):
+    """Adjusted and raw closes for the held book at the accepted boundary.
 
     Deliberately re-fetches rather than trusting anything cached: the whole
-    point is to observe what the vendor reports *now*.
+    point is to observe what the vendor reports *now*. Both bases are returned
+    because the raw close is what separates a distribution from a revision, and
+    this review has to reach the same verdict the updater will.
     """
     boundary = pd.Timestamp(checkpoint["last_processed_session"])
     start = (boundary - pd.Timedelta(days=REVISION_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
     end = pd.Timestamp.today().strftime("%Y-%m-%d")
-    _, closes = prices.get_price_history(sorted(held), start, end)
+    long = prices.get_ohlcv(sorted(held), start, end)
+    _, closes = prices.long_to_wide(long)
+    raw_closes, _ = prices.wide_raw_and_dollar_volume(long)
     if boundary not in closes.index:
         raise ValueError(
             f"no bar for the accepted boundary session {boundary.date()}; "
             "cannot verify the revision"
         )
-    return closes.loc[boundary]
+    raw_row = raw_closes.loc[boundary] if boundary in raw_closes.index else None
+    return closes.loc[boundary], raw_row
 
 
 def review_revision(strategy_id: str) -> dict | None:
     """Recompute the boundary mismatch from live prices. Writes nothing.
 
-    Returns the proposal payload the updater would record, or None when the
-    boundary reconciles and there is nothing to accept.
+    Returns the proposal payload the updater would record, a
+    ``corporate_action_rebase`` marker when the updater will handle the move on
+    its own, or None when the boundary reconciles.
     """
     store = LedgerStore(ROOT)
     checkpoint = store.load_checkpoint(strategy_id)
@@ -274,16 +280,42 @@ def review_revision(strategy_id: str) -> dict | None:
     held = portfolio._held_checkpoint_tickers(checkpoint)
     if not held:
         raise ValueError(f"{strategy_id}: checkpoint holds no positions")
-    row = _boundary_close_row(checkpoint, held)
+    row, raw_row = _boundary_price_rows(checkpoint, held)
     try:
-        portfolio._verify_checkpoint_prices(checkpoint, row)
+        rebase = portfolio._verify_checkpoint_prices(checkpoint, row, raw_row=raw_row)
     except portfolio.BoundaryPriceUnavailable as exc:
         # A missing price is a retryable data gap, not a revision. Accepting one
         # would stamp the checkpoint against an incomplete book.
         raise ValueError(f"{strategy_id}: {exc}; re-run when the vendor has the bar") from exc
     except portfolio.BoundaryPriceRevision as exc:
         return {**exc.details, "checkpoint_hash": content_hash(checkpoint)}
+    if rebase is not None:
+        # A distribution. The updater re-bases these itself, so there is nothing
+        # for a reviewer to accept.
+        return {
+            "kind": "corporate_action_rebase",
+            "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
+            "observed_price_snapshot_id": rebase.price_snapshot_id,
+            "factors": {
+                ticker: factor for ticker, factor in sorted(rebase.factors.items())
+                if factor != 1.0
+            },
+        }
     return None
+
+
+def _print_rebase_report(strategy_id: str, checkpoint: dict, payload: dict) -> None:
+    print(f"strategy         {strategy_id}")
+    print(f"boundary session {checkpoint['last_processed_session']}")
+    print("verdict          corporate action, not a revision")
+    print()
+    print("Held raw closes are unchanged, so the adjusted series was re-based by a")
+    print("distribution. The next updater run absorbs it into share counts and records")
+    print("a `basis_rebased` event; accepted equity does not move. Nothing to accept.")
+    print()
+    print("re-based prices:")
+    for ticker, factor in payload["factors"].items():
+        print(f"  {ticker:<8} x {factor:.8f}")
 
 
 def _print_revision_report(strategy_id: str, checkpoint: dict, payload: dict) -> None:
@@ -317,6 +349,9 @@ def accept_revision(strategy_id: str, reviewer: str) -> int:
     payload = review_revision(strategy_id)
     if payload is None:
         print(f"{strategy_id}: boundary reconciles; nothing to accept")
+        return 0
+    if payload["kind"] != "price_revision":
+        _print_rebase_report(strategy_id, checkpoint, payload)
         return 0
     _print_revision_report(strategy_id, checkpoint, payload)
 
@@ -375,6 +410,9 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{args.strategy}: boundary reconciles; nothing to accept")
             return
         checkpoint = LedgerStore(ROOT).load_checkpoint(args.strategy)
+        if payload["kind"] != "price_revision":
+            _print_rebase_report(args.strategy, checkpoint, payload)
+            return
         _print_revision_report(args.strategy, checkpoint, payload)
         print()
         print("review only; re-run with --reviewer \"<name>\" to accept")

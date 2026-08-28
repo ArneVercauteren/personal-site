@@ -11,6 +11,7 @@ from paper_trading.ledger import LedgerStore, make_event
 
 BOUNDARY = "2026-01-02"
 ACCEPTED = {"A": 10.0, "B": 20.0}
+RAW = {"A": 10.0, "B": 20.0}
 
 
 def _checkpoint():
@@ -42,11 +43,17 @@ def ledger(tmp_path, monkeypatch):
     return store
 
 
-def _serve(observed: dict, monkeypatch):
-    """Stand in for the vendor, returning `observed` on the boundary session."""
-    frame = pd.DataFrame([observed], index=[pd.Timestamp(BOUNDARY)])
+def _serve(observed: dict, monkeypatch, raw: dict | None = None):
+    """Stand in for the vendor at the boundary session.
+
+    `raw` defaults to the accepted raw closes, i.e. "no corporate action", so
+    the v1 checkpoint tests below exercise the revision path as before.
+    """
     monkeypatch.setattr(
-        migrate.prices, "get_price_history", lambda tickers, start, end: (frame, frame)
+        migrate, "_boundary_price_rows",
+        lambda checkpoint, held: (
+            pd.Series(observed), pd.Series(RAW if raw is None else raw),
+        ),
     )
 
 
@@ -147,3 +154,167 @@ def test_review_required_exits_with_the_non_retryable_status(monkeypatch):
     with pytest.raises(SystemExit) as excinfo:
         update.main([])
     assert excinfo.value.code == update.EXIT_REVIEW_REQUIRED
+
+
+# --- corporate-action re-basing -------------------------------------------------
+
+
+def _v2_checkpoint():
+    """A checkpoint carrying the accepted prices and the raw-close control."""
+    day = pd.Timestamp(BOUNDARY)
+    return {
+        **_checkpoint(),
+        "price_snapshot_scope": "held_positions_v2",
+        "price_snapshot": dict(ACCEPTED),
+        "raw_price_snapshot_id": portfolio._price_snapshot_id(
+            day, pd.Series(RAW), ["A", "B"]
+        ),
+    }
+
+
+def _verify(checkpoint, adj, raw):
+    return portfolio._verify_checkpoint_prices(
+        checkpoint, pd.Series(adj), raw_row=None if raw is None else pd.Series(raw)
+    )
+
+
+def test_dividend_rebases_instead_of_failing():
+    """A distribution moves the adjusted close but not the raw one."""
+    rebase = _verify(_v2_checkpoint(), {"A": 9.9, "B": 20.0}, RAW)
+
+    assert isinstance(rebase, portfolio.BoundaryBasisRebase)
+    assert rebase.factors["A"] == pytest.approx(0.99)
+    assert rebase.factors["B"] == pytest.approx(1.0)
+
+
+def test_rebase_preserves_the_accepted_mark_exactly():
+    checkpoint = _v2_checkpoint()
+    rebase = _verify(checkpoint, {"A": 9.9, "B": 20.0}, RAW)
+    restated = portfolio.rebase_checkpoint(checkpoint, rebase)
+
+    # The distribution is absorbed as extra shares, which is what marking the
+    # whole history on one adjusted basis does implicitly.
+    assert restated["shares"]["A"] == pytest.approx(2.0 / 0.99)
+    assert restated["shares"]["B"] == pytest.approx(3.0)
+    assert restated["cash"] == checkpoint["cash"]
+    assert restated["equity"] == checkpoint["equity"]
+
+    marked = restated["cash"] + sum(
+        restated["shares"][t] * p for t, p in {"A": 9.9, "B": 20.0}.items()
+    )
+    assert marked == pytest.approx(checkpoint["equity"])
+
+
+def test_rebased_checkpoint_verifies_clean_on_the_new_basis():
+    checkpoint = _v2_checkpoint()
+    rebase = _verify(checkpoint, {"A": 9.9, "B": 20.0}, RAW)
+    restated = portfolio.rebase_checkpoint(checkpoint, rebase)
+
+    assert _verify(restated, {"A": 9.9, "B": 20.0}, RAW) is None
+
+
+def test_marking_forward_without_rebasing_drops_the_distribution():
+    """Why the re-base exists, stated as an assertion."""
+    checkpoint = _v2_checkpoint()
+    naive = checkpoint["cash"] + sum(
+        checkpoint["shares"][t] * p for t, p in {"A": 9.9, "B": 20.0}.items()
+    )
+    assert naive == pytest.approx(99.8)  # 0.2 of value silently gone
+
+    rebase = _verify(checkpoint, {"A": 9.9, "B": 20.0}, RAW)
+    restated = portfolio.rebase_checkpoint(checkpoint, rebase)
+    rebased = restated["cash"] + sum(
+        restated["shares"][t] * p for t, p in {"A": 9.9, "B": 20.0}.items()
+    )
+    assert rebased == pytest.approx(100.0)
+
+
+def test_a_moved_raw_close_is_still_a_reviewable_revision():
+    """A split or a corrected print changes the raw close too."""
+    with pytest.raises(portfolio.BoundaryPriceRevision):
+        _verify(_v2_checkpoint(), {"A": 5.0, "B": 20.0}, {"A": 5.0, "B": 20.0})
+
+
+def test_rebasing_needs_the_raw_control():
+    """Without raw closes there is no way to tell an action from a bad print."""
+    with pytest.raises(portfolio.BoundaryPriceRevision):
+        _verify(_v2_checkpoint(), {"A": 9.9, "B": 20.0}, None)
+
+
+def test_legacy_checkpoint_without_accepted_prices_still_fails_closed():
+    legacy = _checkpoint()  # v1: hash only, no price_snapshot
+    with pytest.raises(portfolio.BoundaryPriceRevision):
+        _verify(legacy, {"A": 9.9, "B": 20.0}, RAW)
+
+
+def test_nvdy_shaped_rebase_recovers_the_dropped_dividend():
+    """The 2026-08-28 failure, to scale: $0.093 on 99,229.5657 shares."""
+    shares, close, dividend = 99229.5657687936, 12.4, 0.093
+    factor = (close - dividend) / close
+    accepted = {"NVDY": close}
+    checkpoint = {
+        **_checkpoint(),
+        "shares": {"NVDY": shares},
+        "cash": 66410575.0961701,
+        "equity": 66410575.0961701 + shares * close,
+        "price_snapshot_scope": "held_positions_v2",
+        "price_snapshot": accepted,
+        "price_tickers": ["NVDY"],
+        "price_snapshot_id": portfolio._price_snapshot_id(
+            pd.Timestamp(BOUNDARY), pd.Series(accepted), ["NVDY"]
+        ),
+        "raw_price_snapshot_id": portfolio._price_snapshot_id(
+            pd.Timestamp(BOUNDARY), pd.Series(accepted), ["NVDY"]
+        ),
+    }
+    observed = {"NVDY": close * factor}
+
+    dropped = checkpoint["equity"] - (checkpoint["cash"] + shares * observed["NVDY"])
+    assert dropped == pytest.approx(shares * dividend, rel=1e-9)
+
+    rebase = _verify(checkpoint, observed, accepted)
+    restated = portfolio.rebase_checkpoint(checkpoint, rebase)
+    marked = restated["cash"] + restated["shares"]["NVDY"] * observed["NVDY"]
+    assert marked == pytest.approx(checkpoint["equity"])
+
+
+@pytest.fixture
+def ledger_v2(tmp_path, monkeypatch):
+    monkeypatch.setattr(migrate, "ROOT", tmp_path)
+    store = LedgerStore(tmp_path)
+    mark = make_event("s", "session_marked", BOUNDARY, {"equity": 100.0})
+    store.commit("s", [mark], _v2_checkpoint())
+    return store
+
+
+def test_review_calls_a_distribution_a_rebase_not_a_revision(ledger_v2, monkeypatch):
+    _serve({"A": 9.9, "B": 20.0}, monkeypatch, raw=RAW)
+    payload = migrate.review_revision("s")
+
+    assert payload["kind"] == "corporate_action_rebase"
+    assert payload["factors"] == {"A": pytest.approx(0.99)}
+
+
+def test_accept_refuses_a_rebase_and_writes_nothing(ledger_v2, monkeypatch, capsys):
+    _serve({"A": 9.9, "B": 20.0}, monkeypatch, raw=RAW)
+
+    assert migrate.accept_revision("s", "a reviewer") == 0
+    assert "not a revision" in capsys.readouterr().out
+    assert len(ledger_v2.read_events("s")) == 1
+    assert ledger_v2.load_checkpoint("s") == _v2_checkpoint()
+
+
+def test_review_still_flags_a_moved_raw_close_for_a_human(ledger_v2, monkeypatch):
+    _serve({"A": 5.0, "B": 20.0}, monkeypatch, raw={"A": 5.0, "B": 20.0})
+    assert migrate.review_revision("s")["kind"] == "price_revision"
+
+
+def test_rebase_leaves_untouched_positions_bit_identical():
+    """Re-rounding the whole book moved the smallest positions in the last bit."""
+    checkpoint = {**_v2_checkpoint(), "shares": {"A": 2.0, "B": 3.000000000000001}}
+    rebase = _verify(checkpoint, {"A": 9.9, "B": 20.0}, RAW)
+    restated = portfolio.rebase_checkpoint(checkpoint, rebase)
+
+    assert rebase.factors["B"] == 1.0
+    assert restated["shares"]["B"] is checkpoint["shares"]["B"]
+    assert restated["shares"]["A"] != checkpoint["shares"]["A"]
