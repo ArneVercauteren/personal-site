@@ -1,8 +1,17 @@
-"""Create and approve a one-time live-ledger migration candidate.
+"""Reviewed mutations of an accepted live ledger.
 
-Generation is read-only with respect to the authoritative ledger. Approval is
-an explicit second command so the replay, public-history comparison, hashes,
-and checkpoint can be reviewed before the incremental updater trusts them.
+Two flows, both deliberately two-step — inspect first, write only when a
+reviewer is named — because everything here restates state the incremental
+updater otherwise treats as immutable:
+
+* migration candidates (`--approve`): a one-time replay of published history
+  into an accepted checkpoint.
+* boundary price revisions (`--accept-revision`): the updater refuses to
+  advance when a held position's accepted boundary price no longer matches the
+  vendor, and records a `correction_proposed` event instead. This is the only
+  way to clear that state without hand-editing the ledger.
+
+Generation and review are read-only with respect to the authoritative ledger.
 """
 
 from __future__ import annotations
@@ -20,6 +29,11 @@ from .ledger import LedgerStore, make_event, reconcile_checkpoint, validate_chec
 
 ROOT = Path(__file__).resolve().parents[1]
 CANDIDATE_DIR = ROOT / "paper_migration"
+
+# Calendar days of history fetched behind the boundary so a held ticker with a
+# gap on the boundary session still forward-fills the way the updater's much
+# longer fetch window does.
+REVISION_LOOKBACK_DAYS = 30
 
 
 def _candidate_path(strategy_id: str) -> Path:
@@ -229,13 +243,142 @@ def approve(strategy_id: str, reviewer: str) -> int:
     return count
 
 
+def _boundary_close_row(checkpoint: dict, held: list[str]):
+    """Adjusted closes for the held book at the accepted boundary session.
+
+    Deliberately re-fetches rather than trusting anything cached: the whole
+    point is to observe what the vendor reports *now*.
+    """
+    boundary = pd.Timestamp(checkpoint["last_processed_session"])
+    start = (boundary - pd.Timedelta(days=REVISION_LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+    end = pd.Timestamp.today().strftime("%Y-%m-%d")
+    _, closes = prices.get_price_history(sorted(held), start, end)
+    if boundary not in closes.index:
+        raise ValueError(
+            f"no bar for the accepted boundary session {boundary.date()}; "
+            "cannot verify the revision"
+        )
+    return closes.loc[boundary]
+
+
+def review_revision(strategy_id: str) -> dict | None:
+    """Recompute the boundary mismatch from live prices. Writes nothing.
+
+    Returns the proposal payload the updater would record, or None when the
+    boundary reconciles and there is nothing to accept.
+    """
+    store = LedgerStore(ROOT)
+    checkpoint = store.load_checkpoint(strategy_id)
+    if checkpoint is None:
+        raise ValueError(f"{strategy_id}: no accepted checkpoint to review")
+    held = portfolio._held_checkpoint_tickers(checkpoint)
+    if not held:
+        raise ValueError(f"{strategy_id}: checkpoint holds no positions")
+    row = _boundary_close_row(checkpoint, held)
+    try:
+        portfolio._verify_checkpoint_prices(checkpoint, row)
+    except portfolio.BoundaryPriceUnavailable as exc:
+        # A missing price is a retryable data gap, not a revision. Accepting one
+        # would stamp the checkpoint against an incomplete book.
+        raise ValueError(f"{strategy_id}: {exc}; re-run when the vendor has the bar") from exc
+    except portfolio.BoundaryPriceRevision as exc:
+        return {**exc.details, "checkpoint_hash": content_hash(checkpoint)}
+    return None
+
+
+def _print_revision_report(strategy_id: str, checkpoint: dict, payload: dict) -> None:
+    accepted = float(payload["accepted_equity"])
+    observed = float(payload["observed_equity"])
+    delta = observed - accepted
+    bps = (delta / accepted) * 10_000 if accepted else 0.0
+    held = portfolio._held_checkpoint_tickers(checkpoint)
+    print(f"strategy         {strategy_id}")
+    print(f"boundary session {checkpoint['last_processed_session']}")
+    print(f"held positions   {len(held)}")
+    print(f"scope            {payload['price_snapshot_scope']}")
+    print(f"accepted hash    {payload['expected_price_snapshot_id'][:16]}")
+    print(f"observed hash    {payload['observed_price_snapshot_id'][:16]}")
+    print(f"accepted equity  {accepted:,.2f}")
+    print(f"observed equity  {observed:,.2f}")
+    print(f"delta            {delta:,.2f} ({bps:+.2f} bps)")
+    print()
+    print(
+        "Accepting re-stamps the boundary price basis only. Cash, shares, and the\n"
+        "accepted equity mark are left exactly as published, so this delta lands as\n"
+        "a one-session step in the forward curve rather than a rewrite of history."
+    )
+
+
+def accept_revision(strategy_id: str, reviewer: str) -> int:
+    if not reviewer.strip():
+        raise ValueError("--reviewer is required to accept a revision")
+    store = LedgerStore(ROOT)
+    checkpoint = store.load_checkpoint(strategy_id)
+    payload = review_revision(strategy_id)
+    if payload is None:
+        print(f"{strategy_id}: boundary reconciles; nothing to accept")
+        return 0
+    _print_revision_report(strategy_id, checkpoint, payload)
+
+    boundary = checkpoint["last_processed_session"]
+    # Rebuilt rather than read back: a CI failure uploads its ledger as an
+    # artifact and discards the branch write, so the proposal usually never
+    # reached the repo. Identical content yields the updater's event id, so a
+    # proposal that did land is deduplicated by the store.
+    proposal = make_event(strategy_id, "correction_proposed", boundary, payload)
+    approval = make_event(strategy_id, "correction_accepted", boundary, {
+        "kind": "price_revision",
+        "reviewer": reviewer.strip(),
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        "proposal_event_id": proposal["event_id"],
+        "checkpoint_hash": payload["checkpoint_hash"],
+        "expected_price_snapshot_id": payload["expected_price_snapshot_id"],
+        "accepted_price_snapshot_id": payload["observed_price_snapshot_id"],
+        "accepted_equity": payload["accepted_equity"],
+        "observed_equity": payload["observed_equity"],
+    })
+    # Only the price basis moves. price_tickers is left alone because the
+    # observed hash was computed over exactly that ticker list.
+    restated = {**checkpoint, "price_snapshot_id": payload["observed_price_snapshot_id"]}
+    validate_checkpoint(restated)
+    count = store.commit(strategy_id, [proposal, approval], restated)
+    print()
+    print(f"accepted {strategy_id}: {count} immutable events; boundary basis re-stamped")
+    return count
+
+
 def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="Generate or approve a paper-ledger migration")
+    parser = argparse.ArgumentParser(
+        description="Generate or approve a paper-ledger migration, or accept a "
+                    "boundary price revision",
+    )
     parser.add_argument("--strategy", required=True)
     parser.add_argument("--approve", action="store_true")
+    parser.add_argument(
+        "--accept-revision",
+        action="store_true",
+        help=(
+            "Review the boundary price revision blocking the updater. Reports "
+            "the mismatch and writes nothing unless --reviewer is given."
+        ),
+    )
     parser.add_argument("--reviewer")
     args = parser.parse_args(argv)
-    if args.approve:
+    if args.approve and args.accept_revision:
+        parser.error("--approve and --accept-revision are separate reviews; run one at a time")
+    if args.accept_revision:
+        if args.reviewer:
+            accept_revision(args.strategy, args.reviewer)
+            return
+        payload = review_revision(args.strategy)
+        if payload is None:
+            print(f"{args.strategy}: boundary reconciles; nothing to accept")
+            return
+        checkpoint = LedgerStore(ROOT).load_checkpoint(args.strategy)
+        _print_revision_report(args.strategy, checkpoint, payload)
+        print()
+        print("review only; re-run with --reviewer \"<name>\" to accept")
+    elif args.approve:
         approve(args.strategy, args.reviewer or "")
     else:
         generate(args.strategy)

@@ -28,7 +28,20 @@ freshness workflow fails when the last good manifest is more than four calendar 
 - Ordinary boundary hashes cover held positions; full-universe input hashes are retained on review
   events. Missing held prices stop the run as retryable data failures. A held-position boundary
   mismatch stops the updater and records a `correction_proposed` event; the failed CI job uploads
-  its ledger/checkpoint state as a 14-day review artifact without changing the branch.
+  its ledger/checkpoint state as a 14-day review artifact without changing the branch. It exits
+  **3** — a status CI never retries, because the same inputs fail identically every time.
+- To clear a boundary price revision:
+  1. `python -m paper_trading.migrate --strategy <id> --accept-revision` re-fetches the boundary
+     prices, reports the mismatch and its equity delta, and writes nothing. The CI artifact is a
+     convenience for reading the proposal — this command reproduces it from live prices, so a
+     lapsed artifact does not block recovery.
+  2. Confirm the delta is explained. An ex-dividend or split on a held name between the boundary and
+     the run rewrites Yahoo's adjusted close for that session, which is benign; an unexplained delta
+     is not, and should be investigated instead of accepted.
+  3. `... --accept-revision --reviewer "Name"` re-stamps `price_snapshot_id` to the observed basis
+     and records an immutable `correction_accepted` event. Cash, shares, and the accepted equity
+     mark are left untouched, so the delta appears as a one-session step in the forward curve
+     rather than a rewrite of published history. The reviewer name is published in `rebalances.json`.
 - An interrupted ledger/checkpoint commit is completed from `paper_state/.transactions/` on the next
   read. Public data is not published until state, compatibility files, hashes, and byte budgets pass.
 - To audit without writing, run `python -m paper_trading.audit --strategy <id>`.

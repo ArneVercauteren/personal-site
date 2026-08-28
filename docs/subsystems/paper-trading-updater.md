@@ -87,7 +87,10 @@ are NaN, handled).
    on rebalance events. Legacy universe-wide checkpoints may transition only when every held price is
    present and cash plus marked holdings still reconciles to accepted equity. Missing held prices are
    retryable data failures, while a revised held price is rejected as a correction proposal rather
-   than silently rewriting history.
+   than silently rewriting history. That rejection exits 3 and is not retried; a reviewer clears it
+   with `migrate --accept-revision` (see the runbook). Note that `closes` is Yahoo's adjusted close,
+   so any corporate action on a held name after the boundary rewrites that session's price and
+   trips this guard — on this book that is a recurring event, not an exceptional one.
 3. For unseen sessions only, apply a pending target at the next open, charge costs, mark equity, and
    decrement the observed-session cadence. Evaluate a new target only when that counter reaches zero.
 4. Append stable-id ledger events and atomically advance the checkpoint. Recompute display stats from

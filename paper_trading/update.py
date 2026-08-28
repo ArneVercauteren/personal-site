@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 
@@ -44,6 +45,19 @@ LEDGER_STORE = LedgerStore(REPO_ROOT)
 
 # Extra history before the Yahoo-backed simulation start so the first signal has its full lookback.
 WARMUP_DAYS = 400
+
+# Exit status for a failure a retry can never clear. Transient data failures keep
+# the usual 1 so CI still retries them; this one means a human has to accept or
+# reject a boundary correction before the updater can advance.
+EXIT_REVIEW_REQUIRED = 3
+
+
+class BoundaryReviewRequired(ValueError):
+    """A correction proposal is on the ledger and needs a reviewer, not a retry.
+
+    Subclasses ValueError because that is what this path raised before the exit
+    code existed, so existing callers that catch ValueError are unaffected.
+    """
 
 
 def _split_strategy_ids(values: list[str] | None = None) -> set[str] | None:
@@ -237,9 +251,11 @@ def run(strategy_ids: set[str] | None = None) -> str:
                         },
                     )
                     LEDGER_STORE.commit(spec["id"], [proposal], checkpoint)
-                    raise ValueError(
+                    raise BoundaryReviewRequired(
                         f"{spec['id']}: price revision recorded as correction proposal; "
-                        "accepted history was not changed"
+                        "accepted history was not changed. Review with "
+                        f"`python -m paper_trading.migrate --strategy {spec['id']} "
+                        "--accept-revision`."
                     )
             result = portfolio.simulate_incremental(
                 spec, checkpoint, previous["equity_curve"], opens, closes,
@@ -391,7 +407,13 @@ def main(argv: list[str] | None = None) -> str:
     )
     args = parser.parse_args(argv)
     strategy_ids = _split_strategy_ids(args.strategy)
-    as_of = run(strategy_ids)
+    try:
+        as_of = run(strategy_ids)
+    except BoundaryReviewRequired as exc:
+        # Distinct status so the scheduled job stops instead of burning two more
+        # attempts on a failure that is identical every time.
+        print(f"boundary review required: {exc}", file=sys.stderr)
+        raise SystemExit(EXIT_REVIEW_REQUIRED)
     print(f"done; as_of={as_of} (synthetic={prices.use_synthetic()})")
     return as_of
 
