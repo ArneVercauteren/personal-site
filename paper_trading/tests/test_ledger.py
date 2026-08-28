@@ -84,3 +84,35 @@ def test_interrupted_two_file_commit_recovers_before_read(tmp_path):
     assert store.load_checkpoint("s") == _checkpoint()
     assert store.read_events("s") == [event]
     assert not transaction.exists()
+
+
+def test_accepted_correction_may_restate_checkpoint_in_place(tmp_path):
+    """The sanctioned escape from the same-session freeze.
+
+    A boundary price revision restates the accepted checkpoint's price basis
+    without advancing the session; the reviewer's `correction_accepted` event is
+    what makes that legitimate rather than a silent history rewrite.
+    """
+    store = LedgerStore(tmp_path)
+    mark = make_event("s", "session_marked", "2026-01-02", {"equity": 100.0})
+    store.commit("s", [mark], _checkpoint())
+
+    restated = copy.deepcopy(_checkpoint())
+    restated["price_snapshot_id"] = "p2"
+    approval = make_event("s", "correction_accepted", "2026-01-02", {
+        "kind": "price_revision", "reviewer": "someone",
+    })
+    assert store.commit("s", [approval], restated) == 1
+    assert store.load_checkpoint("s")["price_snapshot_id"] == "p2"
+
+
+def test_proposal_alone_does_not_unlock_a_checkpoint_restatement(tmp_path):
+    store = LedgerStore(tmp_path)
+    mark = make_event("s", "session_marked", "2026-01-02", {"equity": 100.0})
+    store.commit("s", [mark], _checkpoint())
+
+    restated = copy.deepcopy(_checkpoint())
+    restated["price_snapshot_id"] = "p2"
+    proposal = make_event("s", "correction_proposed", "2026-01-02", {"kind": "price_revision"})
+    with pytest.raises(ContractError, match="without a new market session"):
+        store.commit("s", [proposal], restated)

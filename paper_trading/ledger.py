@@ -209,10 +209,17 @@ class LedgerStore:
         for left, right in zip(combined, combined[1:]):
             if right["session"] < left["session"]:
                 raise ContractError("new event would make ledger non-monotonic")
+        # An accepted correction is the one sanctioned way to restate a checkpoint
+        # in place: it carries a reviewer and an immutable record of what changed.
+        # Without one, a same-session checkpoint edit is a silent history rewrite.
+        accepts_correction = any(
+            event["event_type"] == "correction_accepted" for event in appended
+        )
         if (
             previous_checkpoint is not None
             and previous_checkpoint["last_processed_session"] == checkpoint["last_processed_session"]
             and canonical_json(previous_checkpoint) != canonical_json(checkpoint)
+            and not accepts_correction
         ):
             raise ContractError(
                 "checkpoint changed without a new market session; record a correction proposal"

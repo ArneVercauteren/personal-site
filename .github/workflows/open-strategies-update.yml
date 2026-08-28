@@ -41,12 +41,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r paper_trading/requirements-lock.txt
 
+      # Exit 3 means the updater recorded a correction proposal: the same inputs
+      # produce the same failure every time, so retrying only burns minutes and
+      # appends duplicate proposals. Retry the transient statuses only.
       - name: Regenerate open-strategy data
         id: regenerate
         run: |
           for attempt in 1 2 3; do
-            python -m paper_trading.update && break
-            if [ "$attempt" = 3 ]; then exit 1; fi
+            set +e
+            python -m paper_trading.update
+            status=$?
+            set -e
+            if [ "$status" -eq 0 ]; then break; fi
+            if [ "$status" -eq 3 ]; then
+              echo "::error::Boundary price revision needs review; not retrying."
+              echo "Accept with: python -m paper_trading.migrate --strategy <id> --accept-revision --reviewer <name>"
+              exit "$status"
+            fi
+            if [ "$attempt" = 3 ]; then exit "$status"; fi
             sleep $((attempt * 20))
           done
 

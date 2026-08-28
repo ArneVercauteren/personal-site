@@ -401,7 +401,11 @@ def _verify_checkpoint_prices(checkpoint: dict, row, tolerance: float = 0.02) ->
             "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
             "observed_price_snapshot_id": observed,
             "accepted_equity": float(checkpoint["equity"]),
-            "observed_equity": marked,
+            # Rounded so the proposal payload — and therefore its stable event id —
+            # is identical across runs. Summation order over the held book is not
+            # bit-stable, and raw floats made two identical revisions look like two
+            # distinct proposals.
+            "observed_equity": round(marked, 6),
             "price_snapshot_scope": checkpoint.get(
                 "price_snapshot_scope", "legacy_universe_v1"
             ),
