@@ -73,6 +73,31 @@ def validate_checkpoint(checkpoint: dict) -> None:
         raise ContractError("checkpoint equity values must be positive")
     if not isinstance(checkpoint["shares"], dict):
         raise ContractError("checkpoint shares must be an object")
+    if checkpoint.get("price_snapshot_scope") == "held_positions_v3":
+        tickers = checkpoint.get("price_tickers")
+        adjusted = checkpoint.get("price_snapshot")
+        raw = checkpoint.get("raw_price_snapshot")
+        if (
+            not isinstance(tickers, list)
+            or not isinstance(adjusted, dict)
+            or not isinstance(raw, dict)
+        ):
+            raise ContractError("v3 checkpoint requires adjusted and raw per-ticker snapshots")
+        if set(tickers) != set(adjusted) or set(tickers) != set(raw):
+            raise ContractError("v3 checkpoint price maps must cover exactly price_tickers")
+        session = checkpoint["last_processed_session"]
+        adjusted_id = content_hash({
+            "session": session,
+            "closes": {ticker: round(float(adjusted[ticker]), 8) for ticker in tickers},
+        })
+        raw_id = content_hash({
+            "session": session,
+            "closes": {ticker: round(float(raw[ticker]), 8) for ticker in tickers},
+        })
+        if checkpoint["price_snapshot_id"] != adjusted_id:
+            raise ContractError("v3 adjusted price map does not match price_snapshot_id")
+        if checkpoint.get("raw_price_snapshot_id") != raw_id:
+            raise ContractError("v3 raw price map does not match raw_price_snapshot_id")
 
 
 def reconcile_checkpoint(checkpoint: dict, close_prices: dict[str, float], tolerance: float = 0.02) -> None:

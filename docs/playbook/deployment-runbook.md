@@ -30,21 +30,30 @@ freshness workflow fails when the last good manifest is more than four calendar 
   mismatch stops the updater and records a `correction_proposed` event; the failed CI job uploads
   its ledger/checkpoint state as a 14-day review artifact without changing the branch. It exits
   **3** — a status CI never retries, because the same inputs fail identically every time.
-- A dividend or other distribution on a held name is **not** a revision: the raw close is unchanged,
-  so the updater re-bases share counts, records `basis_rebased`, and continues without review. Only
-  a move in the raw closes — a split, or a corrected print — stops the run.
+- A dividend or other distribution on a held name is **not** a revision: that ticker's raw close is
+  unchanged, so the updater re-bases its share count, records `basis_rebased`, and continues without
+  review. Classification is per ticker: an unrelated raw correction can stop for review without
+  hiding safe distribution rebases elsewhere in the book. A raw-only change is also reviewable,
+  even when adjusted equity has not moved, because leaving a stale raw baseline would misclassify a
+  later distribution.
 - To clear a boundary price revision:
   1. `python -m paper_trading.migrate --strategy <id> --accept-revision` re-fetches the boundary
-     prices, reports the mismatch and its equity delta, and writes nothing. The CI artifact is a
+     prices, reports each affected ticker's old/new adjusted and raw values, its equity impact, and
+     any distribution rebases that can be applied safely. It writes nothing. The CI artifact is a
      convenience for reading the proposal — this command reproduces it from live prices, so a
      lapsed artifact does not block recovery.
-  2. Confirm the delta is explained. An ex-dividend or split on a held name between the boundary and
-     the run rewrites Yahoo's adjusted close for that session, which is benign; an unexplained delta
-     is not, and should be investigated instead of accepted.
-  3. `... --accept-revision --reviewer "Name"` re-stamps `price_snapshot_id` to the observed basis
-     and records an immutable `correction_accepted` event. Cash, shares, and the accepted equity
-     mark are left untouched, so the delta appears as a one-session step in the forward curve
-     rather than a rewrite of published history. The reviewer name is published in `rebalances.json`.
+  2. Confirm every reviewable change is explained. An ex-dividend adjustment with an unchanged raw
+     close is handled automatically. A split or corrected raw print remains reviewable; investigate
+     an unexplained change instead of accepting it.
+  3. `... --accept-revision --reviewer "Name"` atomically re-stamps the complete adjusted/raw maps
+     and both hashes, records an immutable `correction_accepted` event, and applies any independently
+     safe distribution rebases with a linked `basis_rebased` event. Shares change only for those
+     distributions; cash and accepted equity remain untouched. A reviewed correction's delta appears
+     as a one-session step in the forward curve rather than a rewrite of published history. The
+     reviewer name is published in `rebalances.json`.
+- Do not hand-upgrade a `held_positions_v2` checkpoint. Its aggregate raw hash cannot identify which
+  ticker changed. Review and accept the next mismatch normally; that acceptance captures complete
+  held-position adjusted/raw maps and upgrades the checkpoint to `held_positions_v3`.
 - An interrupted ledger/checkpoint commit is completed from `paper_state/.transactions/` on the next
   read. Public data is not published until state, compatibility files, hashes, and byte budgets pass.
 - To audit without writing, run `python -m paper_trading.audit --strategy <id>`.

@@ -217,6 +217,8 @@ def _rebase_boundary(
         "kind": "corporate_action_rebase",
         "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
         "observed_price_snapshot_id": rebase.price_snapshot_id,
+        "expected_raw_price_snapshot_id": checkpoint.get("raw_price_snapshot_id"),
+        "observed_raw_price_snapshot_id": rebase.raw_price_snapshot_id,
         "accepted_equity": round(float(checkpoint["equity"]), 6),
         "factors": moved,
     })

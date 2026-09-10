@@ -360,18 +360,24 @@ REBASE_EPSILON = 1e-12
 
 
 @dataclass(frozen=True)
-class BoundaryBasisRebase:
-    """A corporate action re-based the adjusted series; no accounting changed.
+class BoundaryChangePlan:
+    """Per-ticker boundary classification and the complete observed basis.
 
-    ``factors`` is observed/accepted per held ticker. Scaling share counts by
-    their inverse preserves the accepted boundary mark exactly, which is the
-    same thing a one-shot replay does implicitly by simulating the whole
-    history on one basis.
+    ``factors`` contains safe distribution rebases; ``revisions`` contains raw
+    changes that need approval. The full adjusted/raw maps let acceptance write
+    one internally consistent checkpoint even when both kinds happen together.
     """
 
     factors: dict[str, float]
     price_snapshot_id: str
     prices: dict[str, float]
+    raw_price_snapshot_id: str | None = None
+    raw_prices: dict[str, float] | None = None
+    revisions: dict[str, dict] = field(default_factory=dict)
+
+
+# Compatibility name for callers that only handle distribution-only plans.
+BoundaryBasisRebase = BoundaryChangePlan
 
 
 class BoundaryPriceUnavailable(ValueError):
@@ -381,9 +387,13 @@ class BoundaryPriceUnavailable(ValueError):
 class BoundaryPriceRevision(ValueError):
     """Prices affecting accepted boundary accounting changed and need review."""
 
-    def __init__(self, message: str, details: dict):
+    def __init__(
+        self, message: str, details: dict,
+        change_plan: BoundaryChangePlan | None = None,
+    ):
         super().__init__(message)
         self.details = details
+        self.change_plan = change_plan
 
 
 def _held_checkpoint_tickers(checkpoint: dict) -> list[str]:
@@ -396,14 +406,14 @@ def _held_checkpoint_tickers(checkpoint: dict) -> list[str]:
 
 def _verify_checkpoint_prices(
     checkpoint: dict, row, raw_row=None, tolerance: float = 0.02,
-) -> "BoundaryBasisRebase | None":
+) -> "BoundaryChangePlan | None":
     """Verify only prices that can affect the accepted account boundary.
 
     Returns None when the boundary is unchanged, or a ``BoundaryBasisRebase``
     when a corporate action re-based the adjusted series and the caller should
     carry the checkpoint across it. Raises when a reviewer is needed.
 
-    Three outcomes, separated by the raw close as a control:
+    Three outcomes, separated per ticker by the raw close as a control:
 
     * adjusted hash matches — nothing happened.
     * adjusted moved, raw did not — a distribution rewrote the adjusted history
@@ -411,8 +421,10 @@ def _verify_checkpoint_prices(
     * raw moved — a split or a corrected print. The account genuinely changed
       value, so fail closed.
 
-    Legacy checkpoints hashed the entire research universe and carry no accepted
-    prices, so they cannot be told apart and every mismatch stays a revision.
+    ``held_positions_v3`` checkpoints retain both accepted adjusted and raw
+    prices. This lets an unrelated corrected print remain reviewable without
+    preventing a distribution on another ticker from being identified. Legacy
+    checkpoints without the raw map keep the aggregate, fail-closed behavior.
     """
 
     held = _held_checkpoint_tickers(checkpoint)
@@ -425,18 +437,57 @@ def _verify_checkpoint_prices(
     day = pd.Timestamp(checkpoint["last_processed_session"])
     snapshot_tickers = list(checkpoint.get("price_tickers") or held)
     observed = _price_snapshot_id(day, row, snapshot_tickers)
-    if observed == checkpoint["price_snapshot_id"]:
-        return None
-
-    # A distribution rewrites every adjusted close before its ex-date while
-    # leaving the raw close untouched. When the accepted prices are on record
-    # and the raw control still matches, the move is arithmetic, not a revision,
-    # and rebasing the share count carries the accepted mark across unchanged.
     accepted_prices = checkpoint.get("price_snapshot")
+    accepted_raw_prices = checkpoint.get("raw_price_snapshot")
     raw_snapshot_id = checkpoint.get("raw_price_snapshot_id")
+    adjusted_matches = observed == checkpoint["price_snapshot_id"]
+    if adjusted_matches:
+        # A raw-only vendor correction does not change today's mark, but it must
+        # still be reviewed and restamped or it will poison classification of a
+        # later dividend on another symbol.
+        if accepted_raw_prices and raw_row is not None:
+            observed_raw_id = _price_snapshot_id(day, raw_row, snapshot_tickers)
+            if observed_raw_id != raw_snapshot_id:
+                plan = _classify_boundary_changes(
+                    checkpoint, held, accepted_prices, accepted_raw_prices,
+                    row, raw_row, observed,
+                )
+                raise BoundaryPriceRevision(
+                    "held-position raw prices changed and need review",
+                    _revision_details(
+                        checkpoint, observed, float(checkpoint["equity"]), plan
+                    ),
+                    plan,
+                )
+        return None
+    if accepted_raw_prices and raw_row is None:
+        raise BoundaryPriceUnavailable(
+            "raw accepted-boundary prices are unavailable for per-ticker classification"
+        )
+    if accepted_prices and accepted_raw_prices and raw_row is not None:
+        plan = _classify_boundary_changes(
+            checkpoint, held, accepted_prices, accepted_raw_prices, row, raw_row,
+            observed,
+        )
+        if plan.revisions:
+            marked = float(checkpoint["cash"]) + _position_value(
+                checkpoint["shares"], row, held,
+            )
+            raise BoundaryPriceRevision(
+                "held-position raw prices changed and need review",
+                _revision_details(checkpoint, observed, marked, plan),
+                plan,
+            )
+        return plan
+
+    # v2 compatibility: the aggregate raw hash can prove that every raw close
+    # is unchanged, but cannot identify which ticker moved after a mismatch.
+    # A successful rebase or reviewed acceptance upgrades the checkpoint to v3.
     if accepted_prices and raw_snapshot_id and raw_row is not None:
         if _price_snapshot_id(day, raw_row, snapshot_tickers) == raw_snapshot_id:
-            return _basis_rebase(checkpoint, held, accepted_prices, row, observed)
+            return _basis_rebase(
+                checkpoint, held, accepted_prices, row, observed, raw_row=raw_row,
+            )
         # Raw closes moved too: a split, or a genuine correction to a print.
         # Both change what the account is worth, so both need a reviewer.
 
@@ -451,14 +502,48 @@ def _verify_checkpoint_prices(
             checkpoint["shares"], row, held,
         )
 
+    details = _revision_details(checkpoint, observed, marked)
+    if accepted_prices and raw_row is not None:
+        observed_prices = _price_map(row, held)
+        observed_raw_prices = _price_map(raw_row, held)
+        details.update({
+            "automatic_rebases": {},
+            "revisions": {
+                ticker: {
+                    "accepted_adjusted": float(accepted_prices[ticker]),
+                    "observed_adjusted": float(observed_prices[ticker]),
+                    "accepted_raw": None,
+                    "observed_raw": float(observed_raw_prices[ticker]),
+                    "equity_impact": round(
+                        float(checkpoint["shares"][ticker])
+                        * (float(observed_prices[ticker])
+                           - float(accepted_prices[ticker])),
+                        6,
+                    ),
+                }
+                for ticker in held
+                if abs(
+                    float(observed_prices[ticker]) - float(accepted_prices[ticker])
+                ) > REBASE_EPSILON
+            },
+            "observed_price_snapshot": observed_prices,
+            "observed_raw_price_snapshot": observed_raw_prices,
+            "observed_raw_price_snapshot_id": _price_snapshot_id(
+                day, raw_row, held
+            ),
+            "legacy_raw_baseline": True,
+        })
     raise BoundaryPriceRevision(
         "held-position prices no longer reconcile to the accepted boundary",
-        _revision_details(checkpoint, observed, marked),
+        details,
     )
 
 
-def _revision_details(checkpoint: dict, observed_id: str, marked: float) -> dict:
-    return {
+def _revision_details(
+    checkpoint: dict, observed_id: str, marked: float,
+    plan: BoundaryChangePlan | None = None,
+) -> dict:
+    details = {
         "kind": "price_revision",
         "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
         "observed_price_snapshot_id": observed_id,
@@ -472,11 +557,105 @@ def _revision_details(checkpoint: dict, observed_id: str, marked: float) -> dict
             "price_snapshot_scope", "legacy_universe_v1"
         ),
     }
+    if plan is not None:
+        details.update({
+            "automatic_rebases": {
+                ticker: {
+                    "factor": round(float(factor), 12),
+                    "accepted_adjusted": float(checkpoint["price_snapshot"][ticker]),
+                    "observed_adjusted": float(plan.prices[ticker]),
+                    "accepted_raw": float(checkpoint["raw_price_snapshot"][ticker]),
+                    "observed_raw": float(plan.raw_prices[ticker]),
+                    "equity_impact_before_rebase": round(
+                        float(checkpoint["shares"][ticker])
+                        * (float(plan.prices[ticker])
+                           - float(checkpoint["price_snapshot"][ticker])),
+                        6,
+                    ),
+                }
+                for ticker, factor in sorted(plan.factors.items())
+                if factor != 1.0
+            },
+            "revisions": plan.revisions,
+            # Acceptance must restamp a complete, internally consistent basis.
+            # These maps are small (held names only) and make the immutable
+            # proposal independently auditable after the vendor changes again.
+            "observed_price_snapshot": plan.prices,
+            "observed_raw_price_snapshot": plan.raw_prices,
+            "observed_raw_price_snapshot_id": plan.raw_price_snapshot_id,
+        })
+    return details
+
+
+def _classify_boundary_changes(
+    checkpoint: dict,
+    held: list[str],
+    accepted_prices: dict,
+    accepted_raw_prices: dict,
+    row,
+    raw_row,
+    observed_id: str,
+) -> BoundaryChangePlan:
+    """Classify adjusted/raw boundary movements independently per ticker."""
+    day = pd.Timestamp(checkpoint["last_processed_session"])
+    missing_raw = [ticker for ticker in held if _finite_price(raw_row, ticker) is None]
+    if missing_raw:
+        raise BoundaryPriceUnavailable(
+            "missing accepted-boundary raw prices for held positions: "
+            + ", ".join(missing_raw)
+        )
+
+    factors: dict[str, float] = {}
+    revisions: dict[str, dict] = {}
+    prices = _price_map(row, held)
+    raw_prices = _price_map(raw_row, held)
+    for ticker in held:
+        accepted_value = accepted_prices.get(ticker)
+        accepted_raw_value = accepted_raw_prices.get(ticker)
+        accepted = 0.0 if accepted_value is None else float(accepted_value)
+        accepted_raw = 0.0 if accepted_raw_value is None else float(accepted_raw_value)
+        current = prices[ticker]
+        current_raw = raw_prices[ticker]
+        if accepted <= 0.0 or accepted_raw <= 0.0:
+            raise BoundaryPriceRevision(
+                "cannot classify the boundary: no accepted adjusted/raw price for " + ticker,
+                _revision_details(checkpoint, observed_id, float(checkpoint["equity"])),
+            )
+
+        adjusted_factor = current / accepted
+        raw_factor = current_raw / accepted_raw
+        adjusted_changed = abs(adjusted_factor - 1.0) > REBASE_EPSILON
+        raw_changed = abs(raw_factor - 1.0) > REBASE_EPSILON
+        if raw_changed:
+            revisions[ticker] = {
+                "accepted_adjusted": accepted,
+                "observed_adjusted": current,
+                "accepted_raw": accepted_raw,
+                "observed_raw": current_raw,
+                "adjusted_factor": round(adjusted_factor, 12),
+                "raw_factor": round(raw_factor, 12),
+                "equity_impact": round(
+                    float(checkpoint["shares"][ticker]) * (current - accepted), 6
+                ),
+            }
+            factors[ticker] = 1.0
+        else:
+            factors[ticker] = adjusted_factor if adjusted_changed else 1.0
+
+    return BoundaryChangePlan(
+        factors=factors,
+        price_snapshot_id=observed_id,
+        prices=prices,
+        raw_price_snapshot_id=_price_snapshot_id(day, raw_row, held),
+        raw_prices=raw_prices,
+        revisions=revisions,
+    )
 
 
 def _basis_rebase(
     checkpoint: dict, held: list[str], accepted_prices: dict, row, observed_id: str,
-) -> BoundaryBasisRebase:
+    raw_row=None,
+) -> BoundaryChangePlan:
     """Per-ticker observed/accepted ratios for a re-based adjusted series."""
     factors: dict[str, float] = {}
     prices: dict[str, float] = {}
@@ -493,11 +672,18 @@ def _basis_rebase(
         # reported as having moved.
         factors[ticker] = 1.0 if abs(factor - 1.0) <= REBASE_EPSILON else factor
         prices[ticker] = current
-    return BoundaryBasisRebase(factors, observed_id, prices)
+    day = pd.Timestamp(checkpoint["last_processed_session"])
+    return BoundaryChangePlan(
+        factors, observed_id, prices,
+        raw_price_snapshot_id=(
+            None if raw_row is None else _price_snapshot_id(day, raw_row, held)
+        ),
+        raw_prices=(None if raw_row is None else _price_map(raw_row, held)),
+    )
 
 
 def rebase_checkpoint(
-    checkpoint: dict, rebase: BoundaryBasisRebase, tolerance: float = 0.02,
+    checkpoint: dict, rebase: BoundaryChangePlan, tolerance: float = 0.02,
 ) -> dict:
     """Carry an accepted checkpoint onto a re-based adjusted price series.
 
@@ -521,6 +707,12 @@ def rebase_checkpoint(
         "price_snapshot": rebase.prices,
         "price_snapshot_id": rebase.price_snapshot_id,
     }
+    if rebase.raw_prices is not None and rebase.raw_price_snapshot_id is not None:
+        restated.update({
+            "price_snapshot_scope": "held_positions_v3",
+            "raw_price_snapshot": rebase.raw_prices,
+            "raw_price_snapshot_id": rebase.raw_price_snapshot_id,
+        })
     marked = float(restated["cash"]) + _position_value(
         restated["shares"], pd.Series(rebase.prices), sorted(rebase.prices),
     )
@@ -528,6 +720,53 @@ def rebase_checkpoint(
         raise BoundaryPriceRevision(
             "re-based book does not reconcile to the accepted boundary",
             _revision_details(checkpoint, rebase.price_snapshot_id, marked),
+        )
+    return restated
+
+
+def accept_boundary_revision(
+    checkpoint: dict, payload: dict, tolerance: float = 0.02,
+) -> dict:
+    """Apply a reviewed mixed revision/rebase plan without rewriting equity."""
+    prices = payload.get("observed_price_snapshot")
+    raw_prices = payload.get("observed_raw_price_snapshot")
+    if not isinstance(prices, dict) or not isinstance(raw_prices, dict):
+        raise ValueError("reviewed proposal lacks per-ticker observed price maps")
+
+    held = _held_checkpoint_tickers(checkpoint)
+    if any(ticker not in prices or ticker not in raw_prices for ticker in held):
+        raise ValueError("reviewed proposal does not cover every held position")
+    rebases = payload.get("automatic_rebases") or {}
+    shares = dict(checkpoint["shares"])
+    for ticker, change in rebases.items():
+        factor = float(change["factor"])
+        if ticker not in shares or factor <= 0.0:
+            raise ValueError(f"invalid automatic rebase for {ticker}")
+        shares[ticker] = round(float(shares[ticker]) / factor, 12)
+
+    restated = {
+        **checkpoint,
+        "shares": shares,
+        "price_snapshot_scope": "held_positions_v3",
+        "price_tickers": held,
+        "price_snapshot": {ticker: float(prices[ticker]) for ticker in held},
+        "raw_price_snapshot": {ticker: float(raw_prices[ticker]) for ticker in held},
+        "price_snapshot_id": payload["observed_price_snapshot_id"],
+        "raw_price_snapshot_id": payload["observed_raw_price_snapshot_id"],
+    }
+
+    marked = float(restated["cash"]) + _position_value(
+        restated["shares"], pd.Series(restated["price_snapshot"]), held,
+    )
+    revision_delta = sum(
+        float(change["equity_impact"])
+        for change in (payload.get("revisions") or {}).values()
+    )
+    expected_mark = float(checkpoint["equity"]) + revision_delta
+    if abs(marked - expected_mark) > tolerance:
+        raise ValueError(
+            "reviewed boundary plan does not reconcile: "
+            f"marked={marked:.6f}, expected={expected_mark:.6f}"
         )
     return restated
 
@@ -618,7 +857,9 @@ def _checkpoint(
             or content_hash(sorted(universe))
         ),
         "price_snapshot_id": _price_snapshot_id(day, price_row, held_tickers),
-        "price_snapshot_scope": "held_positions_v2",
+        "price_snapshot_scope": (
+            "held_positions_v3" if raw_price_row is not None else "held_positions_v2"
+        ),
         "price_tickers": held_tickers,
         # The accepted prices themselves, not just their hash. A hash can only
         # say *that* the boundary moved; these say by how much, per ticker,
@@ -629,6 +870,10 @@ def _checkpoint(
         "raw_price_snapshot_id": (
             None if raw_price_row is None
             else _price_snapshot_id(day, raw_price_row, held_tickers)
+        ),
+        "raw_price_snapshot": (
+            None if raw_price_row is None
+            else _price_map(raw_price_row, held_tickers)
         ),
         "cost_model_hash": content_hash(strategy["cost_model"]),
         "engine_version": ENGINE_VERSION,

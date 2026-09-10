@@ -91,16 +91,32 @@ are NaN, handled).
    with `migrate --accept-revision` (see the runbook).
 
    `closes` is Yahoo's **adjusted** close, which is not a fixed historical value: every corporate
-   action rewrites each adjusted close before its ex-date. Checkpoints therefore record the accepted
-   prices themselves (`price_snapshot`) plus a hash of the **raw** closes
-   (`raw_price_snapshot_id`), which dividends leave alone. When the adjusted basis moves and the raw
-   control does not, the cause is arithmetic: the updater re-bases held share counts by the inverse
-   factor, records a `basis_rebased` event, and continues. Cash, equity and every published point
-   are unchanged — re-basing is what marking on one consistent basis does implicitly, so this is
-   also what keeps incremental continuation equal to a one-shot replay. Marking forward *without*
-   it silently drops the distribution from the curve; on the current open book that would be
-   roughly 2%/yr. When the raw closes move too — a split, or a corrected print — the account really
-   has changed value and the run still fails closed for review.
+   action rewrites each adjusted close before its ex-date. A `held_positions_v3` checkpoint therefore
+   stores both accepted per-ticker maps (`price_snapshot` and `raw_price_snapshot`) and hashes of
+   those maps. The maps classify changes; the hashes protect their integrity.
+
+   Classification is per held ticker, not all-or-nothing across the book:
+
+   | Adjusted close | Raw close | Verdict |
+   | --- | --- | --- |
+   | unchanged | unchanged | no action |
+   | changed | unchanged | distribution; re-base that ticker automatically |
+   | changed or unchanged | changed | split/corrected print; require review for that ticker |
+   | missing | missing or unavailable | retryable provider failure |
+
+   This matters when changes are mixed. A corrected raw print in one holding must not prevent a
+   dividend on another holding from being recognized. The correction proposal therefore records
+   the old/new adjusted and raw prices and equity impact for each reviewable ticker, plus any safe
+   distribution factors. Acceptance applies both parts atomically: reviewed corrections re-stamp
+   their price basis without changing shares, while distribution-only names re-base shares by the
+   inverse adjustment factor. Cash, accepted equity and every published point remain unchanged.
+   The correction delta enters on the next forward mark; the distribution does not disappear from
+   performance.
+
+   `held_positions_v2` checkpoints contain an adjusted-price map but only one aggregate raw hash.
+   They remain fail-closed because a raw-hash mismatch cannot be attributed safely. Their next
+   successful rebase, forward checkpoint, or reviewed acceptance writes the v3 maps. A currently
+   blocked v2 checkpoint therefore needs one final review before receiving per-ticker behavior.
 3. For unseen sessions only, apply a pending target at the next open, charge costs, mark equity, and
    decrement the observed-session cadence. Evaluate a new target only when that counter reaches zero.
 4. Append stable-id ledger events and atomically advance the checkpoint. Recompute display stats from

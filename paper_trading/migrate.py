@@ -288,7 +288,44 @@ def review_revision(strategy_id: str) -> dict | None:
         # would stamp the checkpoint against an incomplete book.
         raise ValueError(f"{strategy_id}: {exc}; re-run when the vendor has the bar") from exc
     except portfolio.BoundaryPriceRevision as exc:
-        return {**exc.details, "checkpoint_hash": content_hash(checkpoint)}
+        payload = {**exc.details, "checkpoint_hash": content_hash(checkpoint)}
+        # Old checkpoints may have only a hash (or a universe-wide hash). The
+        # one reviewed acceptance is also their migration to the held-only v3
+        # maps, so capture the complete observed basis fetched for this review.
+        if "observed_price_snapshot" not in payload:
+            day = pd.Timestamp(checkpoint["last_processed_session"])
+            observed_prices = portfolio._price_map(row, held)
+            observed_raw_prices = portfolio._price_map(raw_row, held)
+            if len(observed_prices) != len(held) or len(observed_raw_prices) != len(held):
+                raise ValueError(
+                    f"{strategy_id}: legacy boundary review lacks a complete held-price basis"
+                )
+            payload.update({
+                "automatic_rebases": {},
+                "revisions": {
+                    "legacy_boundary": {
+                        "accepted_adjusted": None,
+                        "observed_adjusted": None,
+                        "accepted_raw": None,
+                        "observed_raw": None,
+                        "equity_impact": round(
+                            float(payload["observed_equity"])
+                            - float(payload["accepted_equity"]),
+                            6,
+                        ),
+                    },
+                },
+                "observed_price_snapshot": observed_prices,
+                "observed_raw_price_snapshot": observed_raw_prices,
+                "observed_price_snapshot_id": portfolio._price_snapshot_id(
+                    day, row, held
+                ),
+                "observed_raw_price_snapshot_id": portfolio._price_snapshot_id(
+                    day, raw_row, held
+                ),
+                "legacy_raw_baseline": True,
+            })
+        return payload
     if rebase is not None:
         # A distribution. The updater re-bases these itself, so there is nothing
         # for a reviewer to accept.
@@ -333,11 +370,35 @@ def _print_revision_report(strategy_id: str, checkpoint: dict, payload: dict) ->
     print(f"accepted equity  {accepted:,.2f}")
     print(f"observed equity  {observed:,.2f}")
     print(f"delta            {delta:,.2f} ({bps:+.2f} bps)")
+    revisions = payload.get("revisions") or {}
+    if revisions:
+        print()
+        print("raw-price revisions requiring approval:")
+        for ticker, change in sorted(revisions.items()):
+            accepted_raw = change.get("accepted_raw")
+            raw_text = (
+                "legacy baseline"
+                if accepted_raw is None else
+                f"raw {float(accepted_raw):.8f} -> {float(change['observed_raw']):.8f}"
+            )
+            print(
+                f"  {ticker:<8} {raw_text}; "
+                f"equity impact {float(change['equity_impact']):+,.2f}"
+            )
+    rebases = payload.get("automatic_rebases") or {}
+    if rebases:
+        print()
+        print("distribution rebases applied with the approval:")
+        for ticker, change in sorted(rebases.items()):
+            print(
+                f"  {ticker:<8} x {float(change['factor']):.8f}; "
+                "raw close unchanged"
+            )
     print()
     print(
-        "Accepting re-stamps the boundary price basis only. Cash, shares, and the\n"
-        "accepted equity mark are left exactly as published, so this delta lands as\n"
-        "a one-session step in the forward curve rather than a rewrite of history."
+        "Accepting re-stamps the complete adjusted/raw boundary basis. Shares change\n"
+        "only for the distribution rebases listed above; cash and accepted equity\n"
+        "stay published, so reviewed deltas enter on the next forward mark."
     )
 
 
@@ -371,12 +432,29 @@ def accept_revision(strategy_id: str, reviewer: str) -> int:
         "accepted_price_snapshot_id": payload["observed_price_snapshot_id"],
         "accepted_equity": payload["accepted_equity"],
         "observed_equity": payload["observed_equity"],
+        "reviewed_tickers": sorted((payload.get("revisions") or {}).keys()),
+        "automatic_rebases": sorted((payload.get("automatic_rebases") or {}).keys()),
     })
-    # Only the price basis moves. price_tickers is left alone because the
-    # observed hash was computed over exactly that ticker list.
-    restated = {**checkpoint, "price_snapshot_id": payload["observed_price_snapshot_id"]}
+    events = [proposal, approval]
+    rebases = payload.get("automatic_rebases") or {}
+    if rebases:
+        events.append(make_event(strategy_id, "basis_rebased", boundary, {
+            "kind": "corporate_action_rebase",
+            "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
+            "observed_price_snapshot_id": payload["observed_price_snapshot_id"],
+            "accepted_equity": round(float(checkpoint["equity"]), 6),
+            "factors": {
+                ticker: round(float(change["factor"]), 10)
+                for ticker, change in sorted(rebases.items())
+            },
+            "correction_proposal_event_id": proposal["event_id"],
+        }))
+    # The adjusted and raw maps move together. Distribution-only tickers also
+    # rebase their shares; reviewed raw corrections leave shares and accepted
+    # equity untouched, so their delta enters on the next forward session.
+    restated = portfolio.accept_boundary_revision(checkpoint, payload)
     validate_checkpoint(restated)
-    count = store.commit(strategy_id, [proposal, approval], restated)
+    count = store.commit(strategy_id, events, restated)
     print()
     print(f"accepted {strategy_id}: {count} immutable events; boundary basis re-stamped")
     return count
