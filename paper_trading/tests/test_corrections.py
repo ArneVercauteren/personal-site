@@ -6,8 +6,8 @@ import pandas as pd
 import pytest
 
 from paper_trading import migrate, portfolio, update
-from paper_trading.contracts import CONTRACT_VERSION, ENGINE_VERSION
-from paper_trading.ledger import LedgerStore, make_event
+from paper_trading.contracts import CONTRACT_VERSION, ENGINE_VERSION, ContractError
+from paper_trading.ledger import LedgerStore, make_event, validate_checkpoint
 
 BOUNDARY = "2026-01-02"
 ACCEPTED = {"A": 10.0, "B": 20.0}
@@ -172,6 +172,15 @@ def _v2_checkpoint():
     }
 
 
+def _v3_checkpoint():
+    """A checkpoint with authoritative adjusted and raw maps per ticker."""
+    return {
+        **_v2_checkpoint(),
+        "price_snapshot_scope": "held_positions_v3",
+        "raw_price_snapshot": dict(RAW),
+    }
+
+
 def _verify(checkpoint, adj, raw):
     return portfolio._verify_checkpoint_prices(
         checkpoint, pd.Series(adj), raw_row=None if raw is None else pd.Series(raw)
@@ -318,3 +327,95 @@ def test_rebase_leaves_untouched_positions_bit_identical():
     assert rebase.factors["B"] == 1.0
     assert restated["shares"]["B"] is checkpoint["shares"]["B"]
     assert restated["shares"]["A"] != checkpoint["shares"]["A"]
+
+
+def test_per_ticker_control_separates_a_dividend_from_an_unrelated_revision():
+    """A corrected raw print must not hide a safe distribution on another name."""
+    checkpoint = _v3_checkpoint()
+    observed_adj = {"A": 9.9, "B": 20.1}
+    observed_raw = {"A": 10.0, "B": 20.1}
+
+    with pytest.raises(portfolio.BoundaryPriceRevision) as excinfo:
+        _verify(checkpoint, observed_adj, observed_raw)
+
+    details = excinfo.value.details
+    assert set(details["automatic_rebases"]) == {"A"}
+    assert details["automatic_rebases"]["A"]["factor"] == pytest.approx(0.99)
+    assert set(details["revisions"]) == {"B"}
+    assert details["revisions"]["B"]["equity_impact"] == pytest.approx(0.3)
+
+
+def test_raw_only_revision_is_reviewed_before_it_can_poison_future_classification():
+    checkpoint = _v3_checkpoint()
+    with pytest.raises(portfolio.BoundaryPriceRevision) as excinfo:
+        _verify(checkpoint, ACCEPTED, {"A": 10.0, "B": 20.1})
+
+    assert set(excinfo.value.details["revisions"]) == {"B"}
+    assert excinfo.value.details["revisions"]["B"]["equity_impact"] == 0.0
+
+
+def test_v3_checkpoint_rejects_a_map_that_does_not_match_its_hash():
+    checkpoint = _v3_checkpoint()
+    checkpoint["raw_price_snapshot"] = {**RAW, "B": 20.1}
+
+    with pytest.raises(ContractError, match="raw price map"):
+        validate_checkpoint(checkpoint)
+
+
+def test_accepting_a_mixed_plan_updates_both_maps_and_rebases_only_the_dividend():
+    checkpoint = _v3_checkpoint()
+    observed_adj = {"A": 9.9, "B": 20.1}
+    observed_raw = {"A": 10.0, "B": 20.1}
+    with pytest.raises(portfolio.BoundaryPriceRevision) as excinfo:
+        _verify(checkpoint, observed_adj, observed_raw)
+    payload = {**excinfo.value.details, "checkpoint_hash": "checkpoint"}
+
+    restated = portfolio.accept_boundary_revision(checkpoint, payload)
+
+    assert restated["price_snapshot_scope"] == "held_positions_v3"
+    assert restated["price_snapshot"] == observed_adj
+    assert restated["raw_price_snapshot"] == observed_raw
+    assert restated["shares"]["A"] == pytest.approx(2.0 / 0.99)
+    assert restated["shares"]["B"] == checkpoint["shares"]["B"]
+    assert restated["cash"] == checkpoint["cash"]
+    assert restated["equity"] == checkpoint["equity"]
+    # The same basis now verifies, despite preserving the accepted mark. The
+    # reviewed B delta enters only when the next session is marked.
+    assert _verify(restated, observed_adj, observed_raw) is None
+
+
+def test_an_accepted_raw_correction_no_longer_poisons_a_later_dividend():
+    checkpoint = _v3_checkpoint()
+    first_adj = {"A": 9.9, "B": 20.1}
+    first_raw = {"A": 10.0, "B": 20.1}
+    with pytest.raises(portfolio.BoundaryPriceRevision) as excinfo:
+        _verify(checkpoint, first_adj, first_raw)
+    restated = portfolio.accept_boundary_revision(checkpoint, excinfo.value.details)
+
+    second_adj = {"A": 9.8, "B": 20.1}
+    rebase = _verify(restated, second_adj, first_raw)
+
+    assert isinstance(rebase, portfolio.BoundaryBasisRebase)
+    assert rebase.revisions == {}
+    assert rebase.factors["A"] == pytest.approx(9.8 / 9.9)
+    assert rebase.factors["B"] == 1.0
+
+
+def test_mixed_review_acceptance_records_tickers_and_a_rebase_event(tmp_path, monkeypatch):
+    monkeypatch.setattr(migrate, "ROOT", tmp_path)
+    store = LedgerStore(tmp_path)
+    mark = make_event("s", "session_marked", BOUNDARY, {"equity": 100.0})
+    store.commit("s", [mark], _v3_checkpoint())
+    _serve({"A": 9.9, "B": 20.1}, monkeypatch, raw={"A": 10.0, "B": 20.1})
+
+    migrate.accept_revision("s", "a reviewer")
+
+    after = store.load_checkpoint("s")
+    assert after["raw_price_snapshot"] == {"A": 10.0, "B": 20.1}
+    events = store.read_events("s")
+    assert [event["event_type"] for event in events] == [
+        "session_marked", "correction_proposed", "correction_accepted", "basis_rebased",
+    ]
+    approval = events[-2]["payload"]
+    assert approval["reviewed_tickers"] == ["B"]
+    assert approval["automatic_rebases"] == ["A"]
