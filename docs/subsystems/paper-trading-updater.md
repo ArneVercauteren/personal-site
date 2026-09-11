@@ -79,7 +79,10 @@ are NaN, handled).
    simulation start. If Darwin exported `darwin_equity_curve`, that authoritative training+OOS
    prefix is used directly and Yahoo starts at the prefix's final date; otherwise Yahoo starts at
    `backfill_start` or `deployed_on`. Daily bars are fetched over `[simulation_start − warmup,
-   today]` via `prices.get_ohlcv`. DSL warmup is sized from the formula's longest feature window.
+   latest safe session]` via `prices.get_ohlcv`. The updater never ingests the moving current-day
+   Yahoo bar before 17:00 New York time; before that cutoff it caps the fetch at the previous
+   weekday. This guard applies to local/manual runs as well as CI. Exchange holidays naturally
+   contribute no bar. DSL warmup is sized from the formula's longest feature window.
    Each successful Yahoo chunk is written to the local OHLCV cache immediately, before simulation
    starts, so an interrupted fetch phase can reuse completed chunks on the next run.
 2. Load the accepted checkpoint and verify deployment, formula, cost, boundary-price, and engine hashes.

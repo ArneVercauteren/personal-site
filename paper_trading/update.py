@@ -19,11 +19,13 @@ clobbering each other in the shared files — see
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, time, timedelta, timezone
 import json
 import os
 import sys
 import tempfile
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -51,6 +53,13 @@ WARMUP_DAYS = 400
 # reject a boundary correction before the updater can advance.
 EXIT_REVIEW_REQUIRED = 3
 
+# Yahoo exposes a moving daily bar while the regular US session is still open.
+# Wait until normal post-close finalization before treating that bar as an
+# immutable session boundary. The scheduled job runs at 18:30 New York time;
+# keeping the cutoff here as well protects manual and ad-hoc runs.
+MARKET_TIMEZONE = ZoneInfo("America/New_York")
+SESSION_FINALIZATION_TIME = time(17, 0)
+
 
 class BoundaryReviewRequired(ValueError):
     """A correction proposal is on the ledger and needs a reviewer, not a retry.
@@ -58,6 +67,26 @@ class BoundaryReviewRequired(ValueError):
     Subclasses ValueError because that is what this path raised before the exit
     code existed, so existing callers that catch ValueError are unaffected.
     """
+
+
+def _latest_safe_price_date(now: datetime | None = None) -> str:
+    """Return the latest calendar date whose US daily bar is safe to ingest.
+
+    Before 17:00 New York time, today's Yahoo bar may still be intraday or
+    undergoing post-close corrections, so cap the fetch at the previous
+    weekday. Weekends are skipped here for clearer logs; exchange holidays are
+    harmless because Yahoo simply returns no bar for them.
+    """
+    instant = now or datetime.now(timezone.utc)
+    if instant.tzinfo is None:
+        raise ValueError("session cutoff requires a timezone-aware datetime")
+    market_now = instant.astimezone(MARKET_TIMEZONE)
+    safe_date = market_now.date()
+    if market_now.time() < SESSION_FINALIZATION_TIME:
+        safe_date -= timedelta(days=1)
+    while safe_date.weekday() >= 5:
+        safe_date -= timedelta(days=1)
+    return safe_date.isoformat()
 
 
 def _split_strategy_ids(values: list[str] | None = None) -> set[str] | None:
@@ -252,7 +281,7 @@ def run(strategy_ids: set[str] | None = None) -> str:
     open_trades: list[dict] = []
     latest_date = ""
 
-    end = pd.Timestamp.today().strftime("%Y-%m-%d")
+    end = _latest_safe_price_date()
     # One deduplicated, rate-limited fetch for every ticker any spec needs; each
     # spec then slices its own tickers + window out of this shared frame.
     long_all = _fetch_all_prices(specs, end)

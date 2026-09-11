@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 
 import pytest
@@ -50,3 +51,25 @@ def test_split_strategy_ids_accepts_cli_and_env(monkeypatch):
         "env_a",
         "env_b",
     }
+
+
+@pytest.mark.parametrize(
+    ("now", "expected"),
+    [
+        # 16:59 and 17:00 in New York during daylight-saving time.
+        (datetime(2026, 9, 10, 20, 59, tzinfo=timezone.utc), "2026-09-09"),
+        (datetime(2026, 9, 10, 21, 0, tzinfo=timezone.utc), "2026-09-10"),
+        # A Monday run before finalization falls back past the weekend.
+        (datetime(2026, 9, 14, 18, 0, tzinfo=timezone.utc), "2026-09-11"),
+        # The same rule follows standard time without a hard-coded UTC hour.
+        (datetime(2026, 12, 10, 21, 59, tzinfo=timezone.utc), "2026-12-09"),
+        (datetime(2026, 12, 10, 22, 0, tzinfo=timezone.utc), "2026-12-10"),
+    ],
+)
+def test_latest_safe_price_date_waits_for_finalized_session(now, expected):
+    assert update._latest_safe_price_date(now) == expected
+
+
+def test_latest_safe_price_date_requires_timezone():
+    with pytest.raises(ValueError, match="timezone-aware"):
+        update._latest_safe_price_date(datetime(2026, 9, 10, 18, 0))
