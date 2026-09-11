@@ -10,7 +10,7 @@ The **secured** strategies have their *own* crons (`rebalance.yml`, `daily.yml`)
 
 ## Shape
 
-- **Triggers:** one weekday cron at `30 22 * * 1-5` (UTC, after the regular US session and normal data finalization), plus manual `workflow_dispatch`.
+- **Triggers:** one weekday cron at `30 22 * * 1-5` (UTC, after the regular US session and normal data finalization), plus manual `workflow_dispatch`. The updater independently caps its fetch at the latest finalized session (17:00 New York cutoff), so an early manual run cannot commit an intraday daily bar.
 - **Concurrency:** the shared `paper-data-writer-main` group with `cancel-in-progress: false`, also used by the universe writer. A pull/rebase immediately before push detects writers from other repositories.
 - **Permissions:** `contents: write` (the job pushes a data commit).
 - **Steps:** pinned checkout/setup-python actions → install `requirements-lock.txt` → retry the incremental updater up to three times → run the Python suite and public-data validator → stage compatibility data, manifest/snapshots, ledger, checkpoint, and migration evidence → rebase → commit/push only when changed.
