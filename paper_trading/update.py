@@ -235,8 +235,34 @@ def _rebase_boundary(
     A distribution rewrites the adjusted history behind the boundary. Marking
     forward across that shift without re-basing silently drops the distribution
     from the curve, so this is accounting-relevant and gets its own event.
+
+    A reviewed correction is different: accepting it deliberately preserves the
+    immutable historical equity while restamping the boundary's price basis.
+    That can leave cash + held shares at the accepted price snapshot different
+    from ``checkpoint["equity"]`` until the next session is marked. If another
+    distribution arrives before then, preserve that accepted *basis mark* during
+    the rebase rather than forcing the book back to historical equity.
     """
-    restated = portfolio.rebase_checkpoint(checkpoint, rebase)
+    rebase_input = checkpoint
+    accepted_prices = checkpoint.get("price_snapshot")
+    held = sorted(rebase.prices)
+    if isinstance(accepted_prices, dict) and all(
+        ticker in accepted_prices for ticker in held
+    ):
+        accepted_basis_mark = float(checkpoint["cash"]) + sum(
+            float(checkpoint["shares"].get(ticker, 0.0))
+            * float(accepted_prices[ticker])
+            for ticker in held
+        )
+        if abs(accepted_basis_mark - float(checkpoint["equity"])) > 0.02:
+            rebase_input = {**checkpoint, "equity": accepted_basis_mark}
+
+    restated = portfolio.rebase_checkpoint(rebase_input, rebase)
+    if rebase_input is not checkpoint:
+        # The temporary equity above is only the invariant the rebase preserves.
+        # Historical accounting remains immutable until a new session is marked.
+        restated["equity"] = checkpoint["equity"]
+
     moved = {
         ticker: round(factor, 10)
         for ticker, factor in sorted(rebase.factors.items())
