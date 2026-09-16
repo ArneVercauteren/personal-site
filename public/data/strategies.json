@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-09-15",
+  "as_of": "2026-09-16",
   "strategies": [
     {
       "id": "gen0194",
@@ -42,7 +42,7 @@
       "schema_version": 1,
       "rebalance_cadence_unit": "trading_days",
       "last_review_date": "2026-08-10",
-      "sessions_until_review": 17,
+      "sessions_until_review": 16,
       "last_fill_date": "2026-08-11",
       "next_review_date": null,
       "performance": {
