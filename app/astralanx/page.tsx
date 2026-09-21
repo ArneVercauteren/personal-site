@@ -11,16 +11,18 @@ export const metadata: Metadata = {
 };
 
 function Section({
+  id,
   eyebrow,
   title,
   children,
 }: {
+  id: string;
   eyebrow: string;
   title: string;
   children: ReactNode;
 }) {
   return (
-    <section className="mt-12 border-t border-hair pt-10">
+    <section id={id} className="mt-12 scroll-mt-24 border-t border-hair pt-10">
       <p className="mb-2 font-mono text-xs uppercase tracking-widest text-accent">
         {eyebrow}
       </p>
@@ -47,6 +49,15 @@ const stats: { value: string; label: string }[] = [
   { value: "~57K", label: "lines of Python" },
   { value: "~11K", label: "lines of native C" },
   { value: "~3,500", label: "names in the tradable universe" },
+];
+
+const contents = [
+  { id: "engine", label: "The engine" },
+  { id: "data", label: "Data source" },
+  { id: "universe", label: "Universe & filters" },
+  { id: "backtesting", label: "Backtesting" },
+  { id: "costs", label: "Costs" },
+  { id: "validation", label: "Validation" },
 ];
 
 function StatStrip() {
@@ -83,6 +94,16 @@ export default function AstralanxPage() {
 
       <StatStrip />
 
+      <nav aria-label="Contents" className="mt-10 border-y border-hair py-5">
+        <div className="flex flex-wrap gap-x-6 gap-y-3 text-sm">
+          {contents.map((item) => (
+            <a key={item.id} href={`#${item.id}`} className="text-ink-muted transition-colors hover:text-accent">
+              {item.label}
+            </a>
+          ))}
+        </div>
+      </nav>
+
       {/* The most prominent action: go see the strategies. */}
       <div className="mt-10 flex flex-wrap items-center gap-4">
         <Link
@@ -98,7 +119,7 @@ export default function AstralanxPage() {
         </span>
       </div>
 
-      <Section eyebrow="The engine" title="A genetic-programming search">
+      <Section id="engine" eyebrow="The engine" title="A genetic-programming search">
         <p>
           Astralanx is a highly performant genetic-programming engine.
           It generates large populations of candidate strategies, evaluates each
@@ -112,7 +133,7 @@ export default function AstralanxPage() {
         </p>
       </Section>
 
-      <Section eyebrow="Data source" title="Tiingo price data">
+      <Section id="data" eyebrow="Data source" title="Tiingo price data">
         <p>
           Every strategy is purely price-based and cross-sectional. There are no
           fundamentals, no macro inputs, no alternative data, and no
@@ -154,6 +175,7 @@ export default function AstralanxPage() {
       </Section>
 
       <Section
+        id="universe"
         eyebrow="Universe & filters"
         title="What is allowed into the backtest"
       >
@@ -218,7 +240,7 @@ export default function AstralanxPage() {
         </p>
       </Section>
 
-      <Section eyebrow="Backtesting" title="The backtesting model">
+      <Section id="backtesting" eyebrow="Backtesting" title="The backtesting model">
         <p>
           The backtest is designed to be realistic but simple, so the results are easy to reason
           about and hard to game.
@@ -253,7 +275,7 @@ export default function AstralanxPage() {
         </p>
       </Section>
 
-      <Section eyebrow="Costs" title="The cost model">
+      <Section id="costs" eyebrow="Costs" title="The cost model">
         <p>
           Ignoring trading costs overstates returns, so every fill is charged
           across several components rather than a flat fee. All of them are
@@ -295,7 +317,24 @@ export default function AstralanxPage() {
         </p>
       </Section>
 
+      <aside className="mt-12 border-y border-hair py-8">
+        <h2 className="text-xl font-semibold tracking-tight text-ink">Limitations</h2>
+        <div className="mt-4 max-w-prose space-y-4 leading-relaxed text-ink-muted">
+          <p>
+            Every strategy is purely price-based and cross-sectional. There are no
+            fundamentals, no macro inputs, no alternative data, and no
+            discretionary overrides — all signal is derived from each ticker&apos;s
+            own price and volume history, plus a single benchmark series.
+          </p>
+          <p>
+            Ignoring trading costs overstates returns, so every fill is charged
+            across several components rather than a flat fee.
+          </p>
+        </div>
+      </aside>
+
       <Section
+        id="validation"
         eyebrow="Validation"
         title="Out-of-sample testing & validity measures"
       >

@@ -14,7 +14,7 @@ export function BookCover({ isbn, title }: { isbn?: string; title: string }) {
   const showImage = normalizedIsbn && !failed;
 
   return (
-    <div className="aspect-[2/3] w-16 shrink-0 overflow-hidden rounded border border-hair bg-elevated">
+    <div className="aspect-[2/3] w-16 shrink-0 overflow-hidden rounded border border-hair bg-elevated sm:w-20">
       {showImage ? (
         // eslint-disable-next-line @next/next/no-img-element -- remote cover from Open Library CDN; avoids next.config remotePatterns + image optimization cost
         <img

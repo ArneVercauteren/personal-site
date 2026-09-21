@@ -53,7 +53,7 @@ export default function RootLayout({
           }}
         />
         <Nav />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-12">
+        <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-10 sm:px-6 sm:py-12">
           {children}
         </main>
         <Footer />

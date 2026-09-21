@@ -14,11 +14,7 @@ export default function ProjectsPage() {
         title="Portfolio"
         intro="Other software and non-software work."
       />
-      <ContentList
-        items={projects}
-        basePath="/projects"
-        empty="No projects yet."
-      />
+      <ContentList items={projects} basePath="/projects" empty="No projects yet." />
     </div>
   );
 }

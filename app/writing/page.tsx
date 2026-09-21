@@ -14,11 +14,7 @@ export default function WritingPage() {
         title="Essays"
         intro="Essays and notes on various topics."
       />
-      <ContentList
-        items={essays}
-        basePath="/writing"
-        empty="No essays yet."
-      />
+      <ContentList items={essays} basePath="/writing" empty="No essays yet." />
     </div>
   );
 }

@@ -8,15 +8,15 @@ export function PageHeader({
   intro?: string;
 }) {
   return (
-    <header className="mb-10 border-b border-hair pb-6">
+    <header className="mb-8 border-b border-hair pb-6 sm:mb-10">
       {eyebrow ? (
-        <p className="mb-2 font-mono text-xs uppercase tracking-widest text-accent">
+        <p className="mb-3 text-xs font-medium uppercase tracking-[0.16em] text-accent">
           {eyebrow}
         </p>
       ) : null}
-      <h1 className="text-3xl font-semibold tracking-tight text-ink">{title}</h1>
+      <h1 className="max-w-3xl text-3xl font-semibold tracking-[-0.035em] text-ink sm:text-4xl">{title}</h1>
       {intro ? (
-        <p className="mt-3 max-w-prose text-ink-muted">{intro}</p>
+        <p className="mt-4 max-w-2xl leading-relaxed text-ink-muted">{intro}</p>
       ) : null}
     </header>
   );

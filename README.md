@@ -47,7 +47,7 @@ python -m paper_trading.update         # advance accepted checkpoints only (Tier
 ## License
 
 - **Code** — [MIT](LICENSE). The application, scripts, and tooling are free to reuse.
-- **Content** — essays/writeups (`content/`) and any art/music are licensed under
+- **Content** — essays/writeups (`content/`) are licensed under
   [CC BY-NC-ND 4.0](LICENSE-content.md): share and cite with credit; no commercial
   use or distribution of adaptations without permission.
 

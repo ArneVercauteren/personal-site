@@ -63,16 +63,16 @@ export default function LivePage() {
         )}
       </section>
 
-      <section className="mt-12">
-        <div className="mb-4 border-b border-hair pb-3">
-          <h2 className="text-xl font-semibold tracking-tight text-ink">
-            Secured strategies
-          </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Performance and aggregate sector exposure only.
-          </p>
-        </div>
-        {secured.length > 0 ? (
+      {secured.length > 0 ? (
+        <section className="mt-12">
+          <div className="mb-4 border-b border-hair pb-3">
+            <h2 className="text-xl font-semibold tracking-tight text-ink">
+              Secured strategies
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Performance and aggregate sector exposure only.
+            </p>
+          </div>
           <div className="grid gap-5 lg:grid-cols-2">
             {secured.map((s) => (
               <StrategyCard
@@ -82,10 +82,8 @@ export default function LivePage() {
               />
             ))}
           </div>
-        ) : (
-          <p className="text-sm text-ink-muted">No secured strategies yet.</p>
-        )}
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -13,10 +13,13 @@ html {
 }
 
 body {
-  /* Tabular figures everywhere so columns of numbers line up like a terminal. */
-  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+:focus-visible {
+  outline: 2px solid #39d0d8;
+  outline-offset: 3px;
 }
 
 @layer components {
