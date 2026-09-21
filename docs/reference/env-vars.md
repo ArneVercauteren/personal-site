@@ -20,7 +20,7 @@ The static-first, read-only design means there is **very little** to configure, 
 
 | Name | Tier | Purpose | Secret? |
 |---|---|---|---|
-| `NEXT_PUBLIC_SITE_URL` | site build | Required for production builds. Canonical public origin for metadata, sitemap, and robots; localhost is used only in development. | no |
+| `NEXT_PUBLIC_SITE_URL` | site build | Canonical public origin for metadata, sitemap, and robots. Optional while there is no public domain; unset it falls back to `http://localhost:3000`. Set it before the site is deployed. | no |
 | `PAPER_TRADING_STRATEGY` / `PAPER_TRADING_STRATEGIES` | updater | Limit an incremental run to one or more ids | no |
 | `PAPER_TRADING_SYNTHETIC` | updater/tests | Use deterministic offline prices; never enabled by publication CI | no |
 | `PAPER_TRADING_PRICE_CACHE` / `PAPER_TRADING_PRICE_CACHE_DIR` | updater | Control the local OHLCV cache | no |
