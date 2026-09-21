@@ -1,40 +1,40 @@
 {
-  "as_of": "2026-09-18",
+  "as_of": "2026-09-21",
   "files": {
     "benchmarks/sp500.json": {
-      "bytes": 289107,
-      "sha256": "49df49752466ad27a089cab85394e5eede9668afa32e1bf1a3dcbc4f6cb94899"
+      "bytes": 289142,
+      "sha256": "1df7d978eb79d37d6a8f2ef83ec8243ab45c83f58c22b8a204d1ac1e47e889b5"
     },
     "index.json": {
-      "bytes": 8916,
-      "sha256": "1daf695763badbd902886a1a91d54d93dea9e20d456c780d8e8d5ed8ac7fe29a"
+      "bytes": 8964,
+      "sha256": "03c3a032e61baa5fda745e73856fa958489a984d4978d117bffb214bfbc4e4e5"
     },
     "strategies/gen0194/analytics.json": {
       "bytes": 1381227,
-      "sha256": "691103cc20e5c769f14079192d71adc1aeb71dbe1ac96b88107d754539a748ba"
+      "sha256": "6ed9998a1c3e7e7f328614d2a700b327c5dd40da6b75acea9c1d9975895c7fd8"
     },
     "strategies/gen0194/live.json": {
-      "bytes": 14825,
-      "sha256": "49080c916ce40549be8b4eb8b7078963af00687283d54ba78619c16f87bb7ed1"
+      "bytes": 14856,
+      "sha256": "7371d618e4d6a8faf96b72be1395c28c8f7f7f9bc1ffed5813055639b8afa6d5"
     },
     "strategies/gen0194/provenance.json": {
       "bytes": 584,
-      "sha256": "5c2960a846dff147b72260639b89250db09e59fe8471596aab1c8129d15ae051"
+      "sha256": "8813e1b1dc14a61b7900da4d21a8b346e0d27a75151b5f959a4cf23b96bb161b"
     },
     "strategies/gen0194/rebalances.json": {
       "bytes": 20856,
-      "sha256": "deebe80077086aa2f7b37f163d68be6de2c2a6bf327f7697d75349210f4378ad"
+      "sha256": "213240c4eba18f3b63330736a71a95a87e1a34f2aa42e7348a0eaf3b44bbba10"
     },
     "strategies/gen0194/research-full.json": {
-      "bytes": 1613172,
-      "sha256": "23b41779700649816d08f04948cb908d273ead468b1be59e4b1825ce27fd27d3"
+      "bytes": 1613207,
+      "sha256": "71d672ff6273ed5fc38f5ab6d7f284d7dde192f7ed7e810288bf1bc2fc1a9786"
     },
     "strategies/gen0194/summary.json": {
-      "bytes": 37075,
-      "sha256": "14e5753f39424c604ffceb80c3d8a245cf7e3d5def94fb7bb3761a17e7a53a8e"
+      "bytes": 37106,
+      "sha256": "470e1983dd5c5b85c0b45b7d836b92c0db01210d1d28923076cf022d14999d15"
     }
   },
-  "generated_at": "2026-09-18T00:00:00Z",
+  "generated_at": "2026-09-21T00:00:00Z",
   "schema_version": 1,
-  "snapshot_id": "5c1986cf0862217a93b8c97d8af2e10f9496c29a24d6bdccd069905a24317ac1"
+  "snapshot_id": "92bcac583cca61dd841158d62e9023ef06de47ac464ddc5bbbf487dd706ce822"
 }
