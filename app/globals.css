@@ -6,6 +6,7 @@
   color-scheme: dark;
   --font-inter: "Inter Variable";
   --font-mono: "JetBrains Mono Variable";
+  --font-serif: "Newsreader Variable";
 }
 
 html {
@@ -18,7 +19,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid #39d0d8;
+  outline: 2px solid #86a6c4;
   outline-offset: 3px;
 }
 

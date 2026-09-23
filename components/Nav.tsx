@@ -21,7 +21,7 @@ export function Nav() {
       <nav className="relative mx-auto flex w-full max-w-5xl items-center justify-between px-5 py-4 sm:px-6">
         <Link
           href="/"
-          className="text-sm font-semibold tracking-tight text-ink hover:text-accent"
+          className="font-serif text-lg font-medium tracking-tight text-ink hover:text-accent"
           onClick={() => setOpen(false)}
         >
           {site.name}

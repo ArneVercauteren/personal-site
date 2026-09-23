@@ -24,7 +24,7 @@ export function ContentList({
             className="group block py-6 transition-colors hover:bg-panel sm:px-4"
           >
             <div className="flex items-baseline justify-between gap-4">
-              <h2 className="max-w-2xl text-lg font-semibold tracking-tight text-ink group-hover:text-accent">
+              <h2 className="max-w-2xl font-serif text-xl font-medium tracking-tight text-ink group-hover:text-accent">
                 {frontmatter.title}
               </h2>
               <time className="num shrink-0 text-xs text-ink-muted">

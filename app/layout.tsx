@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/jetbrains-mono/wght.css";
+import "@fontsource-variable/newsreader/wght.css";
+import "@fontsource-variable/newsreader/wght-italic.css";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 import { Nav } from "@/components/Nav";
