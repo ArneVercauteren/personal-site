@@ -14,7 +14,7 @@ export function PageHeader({
           {eyebrow}
         </p>
       ) : null}
-      <h1 className="max-w-3xl text-3xl font-semibold tracking-[-0.035em] text-ink sm:text-4xl">{title}</h1>
+      <h1 className="max-w-3xl font-serif text-3xl font-medium tracking-tight text-ink sm:text-5xl">{title}</h1>
       {intro ? (
         <p className="mt-4 max-w-2xl leading-relaxed text-ink-muted">{intro}</p>
       ) : null}

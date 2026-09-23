@@ -16,7 +16,7 @@ function BookEntry({ book }: { book: Book }) {
     <article className="grid grid-cols-[4rem_1fr] gap-5 py-5 sm:grid-cols-[5rem_1fr]">
       <BookCover isbn={book.isbn} title={book.title} />
       <div className="min-w-0">
-        <h3 className="text-lg font-semibold tracking-tight text-ink">{title}</h3>
+        <h3 className="font-serif text-xl font-medium tracking-tight text-ink">{title}</h3>
         {book.author ? <p className="mt-1 text-sm text-ink-muted">{book.author}</p> : null}
         <p className="mt-3 max-w-xl leading-relaxed text-ink-muted">{book.note}</p>
       </div>

@@ -23,7 +23,7 @@ export async function Mdx({ source }: { source: string }) {
   });
 
   return (
-    <article className="prose prose-invert max-w-prose prose-headings:font-semibold prose-headings:tracking-tight prose-pre:border prose-pre:border-hair prose-pre:bg-panel">
+    <article className="prose prose-invert prose-lg max-w-prose font-serif prose-headings:font-medium prose-headings:tracking-tight prose-pre:border prose-pre:border-hair prose-pre:bg-panel">
       {content}
     </article>
   );

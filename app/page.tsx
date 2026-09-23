@@ -32,7 +32,7 @@ export default function HomePage() {
         <p className="mb-5 text-xs font-medium uppercase tracking-[0.16em] text-accent">
           Software · Quantitative research
         </p>
-        <h1 className="max-w-4xl text-4xl font-semibold leading-[1.04] tracking-[-0.045em] text-ink sm:text-6xl">
+        <h1 className="max-w-4xl font-serif text-4xl font-medium leading-[1.06] tracking-tight text-ink sm:text-6xl">
           {site.tagline}
           <span className="text-accent">.</span>
         </h1>
@@ -56,7 +56,7 @@ export default function HomePage() {
             <Link key={item.href} href={item.href} className="group grid gap-2 py-6 transition-colors hover:bg-panel sm:grid-cols-[10rem_1fr_auto] sm:items-baseline sm:gap-6 sm:px-4">
               <span className="text-xs font-medium uppercase tracking-[0.14em] text-accent">{item.eyebrow}</span>
               <span>
-                <span className="text-xl font-semibold tracking-tight text-ink group-hover:text-accent">{item.label}</span>
+                <span className="font-serif text-2xl font-medium tracking-tight text-ink group-hover:text-accent">{item.label}</span>
                 <span className="mt-1 block max-w-xl leading-relaxed text-ink-muted">{item.blurb}</span>
               </span>
               <span className="hidden text-sm text-ink-muted transition-transform group-hover:translate-x-1 sm:block">Open <span aria-hidden>→</span></span>
@@ -68,7 +68,7 @@ export default function HomePage() {
       <section className="mt-8 grid gap-0 divide-y divide-hair border-y border-hair sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {secondary.map((item) => (
           <Link key={item.href} href={item.href} className="group px-0 py-5 transition-colors hover:bg-panel sm:px-5">
-            <span className="text-base font-semibold tracking-tight text-ink group-hover:text-accent">{item.label}</span>
+            <span className="font-serif text-lg font-medium tracking-tight text-ink group-hover:text-accent">{item.label}</span>
             <span className="mt-1 block text-sm leading-relaxed text-ink-muted">{item.blurb}</span>
           </Link>
         ))}

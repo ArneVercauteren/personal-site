@@ -41,7 +41,7 @@ export default function LivePage() {
 
       <section>
         <div className="mb-4 border-b border-hair pb-3">
-          <h2 className="text-xl font-semibold tracking-tight text-ink">
+          <h2 className="font-serif text-2xl font-medium tracking-tight text-ink">
             Open strategies
           </h2>
           <p className="mt-1 text-sm text-ink-muted">
@@ -66,7 +66,7 @@ export default function LivePage() {
       {secured.length > 0 ? (
         <section className="mt-12">
           <div className="mb-4 border-b border-hair pb-3">
-            <h2 className="text-xl font-semibold tracking-tight text-ink">
+            <h2 className="font-serif text-2xl font-medium tracking-tight text-ink">
               Secured strategies
             </h2>
             <p className="mt-1 text-sm text-ink-muted">

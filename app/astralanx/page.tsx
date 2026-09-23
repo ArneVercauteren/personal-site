@@ -26,7 +26,7 @@ function Section({
       <p className="mb-2 font-mono text-xs uppercase tracking-widest text-accent">
         {eyebrow}
       </p>
-      <h2 className="text-2xl font-semibold tracking-tight text-ink">{title}</h2>
+      <h2 className="font-serif text-3xl font-medium tracking-tight text-ink">{title}</h2>
       <div className="mt-4 max-w-prose space-y-4 leading-relaxed text-ink-muted">
         {children}
       </div>
@@ -108,7 +108,7 @@ export default function AstralanxPage() {
       <div className="mt-10 flex flex-wrap items-center gap-4">
         <Link
           href="/astralanx/live"
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-semibold text-[#0a0c10] shadow-sm transition-transform hover:-translate-y-0.5"
+          className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-semibold text-[#0d0c0a] shadow-sm transition-transform hover:-translate-y-0.5"
         >
           View the strategies
           <span aria-hidden>→</span>
@@ -318,7 +318,7 @@ export default function AstralanxPage() {
       </Section>
 
       <aside className="mt-12 border-y border-hair py-8">
-        <h2 className="text-xl font-semibold tracking-tight text-ink">Limitations</h2>
+        <h2 className="font-serif text-2xl font-medium tracking-tight text-ink">Limitations</h2>
         <div className="mt-4 max-w-prose space-y-4 leading-relaxed text-ink-muted">
           <p>
             Every strategy is purely price-based and cross-sectional. There are no
@@ -402,7 +402,7 @@ export default function AstralanxPage() {
       <div className="mt-8">
         <Link
           href="/astralanx/live"
-          className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-semibold text-[#0a0c10] shadow-sm transition-transform hover:-translate-y-0.5"
+          className="inline-flex items-center gap-2 rounded-lg bg-accent px-6 py-3 text-base font-semibold text-[#0d0c0a] shadow-sm transition-transform hover:-translate-y-0.5"
         >
           View the strategies
           <span aria-hidden>→</span>

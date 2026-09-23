@@ -30,7 +30,7 @@ export default function AboutPage() {
         <img src="/profile.png" alt="Profile photo" width={200} height={200} className="aspect-square w-36 rounded-full object-cover ring-1 ring-hair sm:w-44" />
         <div>
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-accent">Quantitative research · Systems engineering</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.035em] text-ink">Arne Vercauteren</h2>
+          <h2 className="mt-3 font-serif text-4xl font-medium tracking-tight text-ink">Arne Vercauteren</h2>
           <p className="mt-1 text-sm text-ink-muted">{age(site.birthDate)} years old</p>
           <p className="mt-4 max-w-prose leading-relaxed text-ink-muted">Developer with a focus on systematic strategy development and high-performance software.</p>
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-muted">
@@ -68,7 +68,7 @@ export default function AboutPage() {
       </section>
 
       <section className="mt-10 border-t border-hair pt-8">
-        <h2 className="text-xl font-semibold text-ink">Get in touch</h2>
+        <h2 className="font-serif text-2xl font-medium text-ink">Get in touch</h2>
         <p className="mt-2 max-w-prose text-sm leading-relaxed text-ink-muted">For inquiries about Astralanx or other work, email is the best way to reach me.</p>
         <div className="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-sm font-medium">
           <a href={`mailto:${site.email}`} className="text-ink underline decoration-accent decoration-2 underline-offset-4 hover:text-accent">Send an email</a>

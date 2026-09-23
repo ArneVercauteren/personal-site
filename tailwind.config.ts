@@ -11,20 +11,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        base: "#0a0c10",
-        panel: "#11151c",
-        elevated: "#161b22",
-        hair: "#222a35",
+        base: "#0d0c0a",
+        panel: "#151411",
+        elevated: "#1c1a16",
+        hair: "#2a2823",
         ink: {
-          DEFAULT: "#e6edf3",
-          muted: "#9da7b3",
+          DEFAULT: "#ece7dd",
+          muted: "#a69f92",
         },
-        accent: "#39d0d8",
+        accent: "#86a6c4",
         gain: "#3fb950",
         loss: "#f85149",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        serif: ["var(--font-serif)", "Georgia", "serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       maxWidth: {
@@ -33,21 +34,21 @@ const config: Config = {
       typography: {
         invert: {
           css: {
-            "--tw-prose-body": "#9da7b3",
-            "--tw-prose-headings": "#e6edf3",
-            "--tw-prose-bold": "#e6edf3",
-            "--tw-prose-links": "#39d0d8",
-            "--tw-prose-code": "#e6edf3",
-            "--tw-prose-quotes": "#9da7b3",
-            "--tw-prose-bullets": "#222a35",
-            "--tw-prose-hr": "#222a35",
-            "--tw-prose-th-borders": "#222a35",
-            "--tw-prose-td-borders": "#222a35",
+            "--tw-prose-body": "#a69f92",
+            "--tw-prose-headings": "#ece7dd",
+            "--tw-prose-bold": "#ece7dd",
+            "--tw-prose-links": "#86a6c4",
+            "--tw-prose-code": "#ece7dd",
+            "--tw-prose-quotes": "#a69f92",
+            "--tw-prose-bullets": "#2a2823",
+            "--tw-prose-hr": "#2a2823",
+            "--tw-prose-th-borders": "#2a2823",
+            "--tw-prose-td-borders": "#2a2823",
             a: { textDecoration: "none" },
             "a:hover": { textDecoration: "underline" },
             code: {
               fontWeight: "400",
-              backgroundColor: "#161b22",
+              backgroundColor: "#1c1a16",
               padding: "0.1em 0.35em",
               borderRadius: "0.25rem",
             },

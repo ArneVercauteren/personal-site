@@ -20,7 +20,7 @@ export function Section({
       <p className="mb-1 font-mono text-xs uppercase tracking-widest text-accent">
         {eyebrow}
       </p>
-      <h2 className="text-xl font-semibold tracking-tight text-ink">{title}</h2>
+      <h2 className="font-serif text-2xl font-medium tracking-tight text-ink">{title}</h2>
       {intro ? (
         <p className="mt-2 max-w-prose text-sm text-ink-muted">{intro}</p>
       ) : null}
