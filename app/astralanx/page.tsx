@@ -40,15 +40,14 @@ function Bullets({ children }: { children: ReactNode }) {
   );
 }
 
-// Headline scale figures, gathered from the Astralanx source tree. Honest,
-// de-duplicated counts: src/ Python (~57,000 lines), the native_eval.c +
-// generator_native.c + ffill_fast.c kernels (~11,400 lines), and the
-// post-filter tradable universe (~3,500 names after the ≥$10 / ≥$5M median
-// dollar-volume screens; the raw listing file is far larger).
+// Headline scale figures, gathered from the Astralanx source tree. Counts cover
+// src/ Python (~94,000 lines) and native C (~12,000 lines). The post-filter
+// tradable-universe count varies by rebalance date; it is typically ~3,500 names
+// after the ≥$10 / ≥$5M median dollar-volume screens.
 const stats: { value: string; label: string }[] = [
-  { value: "~57K", label: "lines of Python" },
-  { value: "~11K", label: "lines of native C" },
-  { value: "~3,500", label: "names in the tradable universe" },
+  { value: "~94K", label: "lines of Python" },
+  { value: "~12K", label: "lines of native C" },
+  { value: "~3,500", label: "typically in the tradable universe" },
 ];
 
 const contents = [
