@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, time, timedelta, timezone
 import json
+import math
 import os
 import sys
 import tempfile
@@ -52,6 +53,11 @@ WARMUP_DAYS = 400
 # the usual 1 so CI still retries them; this one means a human has to accept or
 # reject a boundary correction before the updater can advance.
 EXIT_REVIEW_REQUIRED = 3
+
+# Both limits must hold, cumulatively until a new session is marked. Gross
+# impact prevents opposite-signed revisions from cancelling through the gate.
+MINOR_REVISION_MAX_PRICE_CHANGE = 0.001  # 0.1% per held ticker (raw and adjusted)
+MINOR_REVISION_MAX_EQUITY_FRACTION = 0.00001  # 0.1 basis points of the account
 
 # Yahoo exposes a moving daily bar while the regular US session is still open.
 # Wait until normal post-close finalization before treating that bar as an
@@ -223,7 +229,131 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
         frames.append(
             prices.get_ohlcv_chunked(sorted(tickers), start, end, session=session)
         )
-    return pd.concat(frames, ignore_index=True)
+    long = pd.concat(frames, ignore_index=True)
+    # A ticker may return historical bars while missing a review-date bar. Those
+    # stale symbols need the same targeted recovery as entirely missing names.
+    market_index = pd.DatetimeIndex(sorted(long["date"].unique()))
+    for spec in specs:
+        checkpoint = LEDGER_STORE.load_checkpoint(spec["id"])
+        if checkpoint is None:
+            continue
+        sessions = _upcoming_review_sessions(spec, checkpoint, market_index)
+        if not sessions:
+            continue
+        members = universe.resolve_universe(spec)
+        missing = prices.missing_price_tickers(long, members, sessions)
+        # Entirely absent tickers already exhausted the chunked fetch retries.
+        stale = sorted(set(missing) & set(long["ticker"]))
+        if stale:
+            _, start = _spec_fetch_window(spec)
+            recovered = prices.get_ohlcv_chunked(
+                stale, start, end, session=session, required_dates=sessions,
+                missing_retries=2,  # initial targeted attempt + two more = three
+            )
+            long = pd.concat([long, recovered], ignore_index=True).drop_duplicates(
+                ["ticker", "date"], keep="last",
+            )
+        missing = prices.missing_price_tickers(long, members, sessions)
+        if missing:
+            raise portfolio.BoundaryPriceUnavailable(
+                f"{spec['id']}: incomplete rebalance candidate prices for "
+                f"{', '.join(sessions)} after retries: {', '.join(missing)}. "
+                "No rebalance was accepted; a Yahoo warning is not proof of delisting."
+            )
+    return long.sort_values(["ticker", "date"]).reset_index(drop=True)
+
+
+def _upcoming_review_sessions(
+    spec: dict, checkpoint: dict, index: pd.DatetimeIndex,
+) -> tuple[str, ...]:
+    """Use the incremental simulator's observed-session counter, including catch-up."""
+    if spec.get("rebalance_cadence_unit", "calendar_days") != "trading_days":
+        return ()
+    remaining = checkpoint.get("sessions_until_review")
+    if remaining is None:
+        raise ValueError("incremental trading-day checkpoint lacks sessions_until_review")
+    remaining = int(remaining)
+    reviews = []
+    for day in index[index > pd.Timestamp(checkpoint["last_processed_session"])]:
+        remaining -= 1
+        if remaining <= 0:
+            reviews.append(day.strftime("%Y-%m-%d"))
+            remaining = int(spec["rebalance_cadence_days"])
+    return tuple(reviews)
+
+
+def _minor_revision_usage(checkpoint: dict, payload: dict) -> dict | None:
+    """Fail closed without a complete v3 plan; bound raw/adjusted moves and gross impact."""
+    revisions = payload.get("revisions") or {}
+    if checkpoint.get("price_snapshot_scope") != "held_positions_v3" or not revisions:
+        return None
+    equity = float(checkpoint["equity"])
+    if not math.isfinite(equity) or equity <= 0:
+        return None
+    prior = checkpoint.get("automatic_revision_usage") or {}
+    gross = float(prior.get("gross_equity_impact", 0.0))
+    changes = {ticker: dict(values) for ticker, values in prior.get("price_changes", {}).items()}
+    for ticker, change in revisions.items():
+        used = changes.setdefault(ticker, {"adjusted": 0.0, "raw": 0.0})
+        for basis in ("adjusted", "raw"):
+            accepted = float(change.get(f"accepted_{basis}") or 0.0)
+            observed = float(change.get(f"observed_{basis}") or 0.0)
+            if not all(math.isfinite(value) and value > 0 for value in (accepted, observed)):
+                return None
+            used[basis] += abs(observed / accepted - 1.0)
+            if not math.isfinite(used[basis]) or used[basis] > MINOR_REVISION_MAX_PRICE_CHANGE:
+                return None
+        # Recompute at full precision: rounded event impacts must not bypass a
+        # threshold when multiple tiny revisions occur.
+        gross += abs(float(checkpoint["shares"][ticker]) * (
+            float(change["observed_adjusted"]) - float(change["accepted_adjusted"])
+        ))
+    if not math.isfinite(gross) or gross / equity > MINOR_REVISION_MAX_EQUITY_FRACTION:
+        return None
+    return {"gross_equity_impact": gross, "price_changes": changes}
+
+
+def _accept_minor_revision(
+    strategy_id: str, checkpoint: dict, proposal: dict, usage: dict,
+) -> dict:
+    """Restamp the basis with auditable automatic acceptance; preserve historical marks."""
+    payload = proposal["payload"]
+    restated = portfolio.accept_boundary_revision(checkpoint, payload)
+    restated["automatic_revision_usage"] = usage
+    approval = make_event(strategy_id, "correction_accepted", proposal["session"], {
+        "kind": "price_revision",
+        "acceptance": "automatic_minor_price_revision",
+        "policy": {
+            "max_price_change": MINOR_REVISION_MAX_PRICE_CHANGE,
+            "max_gross_equity_fraction": MINOR_REVISION_MAX_EQUITY_FRACTION,
+        },
+        "cumulative_usage": usage,
+        "proposal_event_id": proposal["event_id"],
+        "checkpoint_hash": payload["checkpoint_hash"],
+        "accepted_equity": payload["accepted_equity"],
+        "observed_equity": payload["observed_equity"],
+        "accepted_price_snapshot_id": payload["observed_price_snapshot_id"],
+        "reviewed_tickers": sorted(payload["revisions"]),
+        "automatic_rebases": sorted(payload.get("automatic_rebases") or {}),
+    })
+    events = [proposal, approval]
+    rebases = payload.get("automatic_rebases") or {}
+    if rebases:
+        events.append(make_event(strategy_id, "basis_rebased", proposal["session"], {
+            "kind": "corporate_action_rebase",
+            "expected_price_snapshot_id": checkpoint["price_snapshot_id"],
+            "observed_price_snapshot_id": payload["observed_price_snapshot_id"],
+            "accepted_equity": round(float(checkpoint["equity"]), 6),
+            "factors": {
+                ticker: round(float(change["factor"]), 10)
+                for ticker, change in sorted(rebases.items())
+            },
+            "correction_proposal_event_id": proposal["event_id"],
+        }))
+    LEDGER_STORE.commit(strategy_id, events, restated)
+    print(f"{strategy_id}: automatically accepted minor boundary revision for "
+          f"{', '.join(sorted(payload['revisions']))}; historical equity unchanged")
+    return restated
 
 
 def _rebase_boundary(
@@ -345,13 +475,18 @@ def run(strategy_ids: set[str] | None = None) -> str:
                             "checkpoint_hash": content_hash(checkpoint),
                         },
                     )
-                    LEDGER_STORE.commit(spec["id"], [proposal], checkpoint)
-                    raise BoundaryReviewRequired(
-                        f"{spec['id']}: price revision recorded as correction proposal; "
-                        "accepted history was not changed. Review with "
-                        f"`python -m paper_trading.migrate --strategy {spec['id']} "
-                        "--accept-revision`."
-                    )
+                    usage = _minor_revision_usage(checkpoint, proposal["payload"])
+                    if usage is not None:
+                        checkpoint = _accept_minor_revision(spec["id"], checkpoint, proposal, usage)
+                        rebase = None  # mixed distribution factors were applied atomically
+                    else:
+                        LEDGER_STORE.commit(spec["id"], [proposal], checkpoint)
+                        raise BoundaryReviewRequired(
+                            f"{spec['id']}: material or unclassifiable price revision recorded "
+                            "as correction proposal; accepted history was not changed. Review with "
+                            f"`python -m paper_trading.migrate --strategy {spec['id']} "
+                            "--accept-revision`."
+                        )
                 if rebase is not None:
                     checkpoint = _rebase_boundary(spec["id"], checkpoint, boundary, rebase)
             result = portfolio.simulate_incremental(

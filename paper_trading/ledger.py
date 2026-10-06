@@ -235,7 +235,8 @@ class LedgerStore:
             if right["session"] < left["session"]:
                 raise ContractError("new event would make ledger non-monotonic")
         # An accepted correction is the one sanctioned way to restate a checkpoint
-        # in place: it carries a reviewer and an immutable record of what changed.
+        # in place: it carries a reviewer or bounded automatic policy and an
+        # immutable record of what changed.
         # Without one, a same-session checkpoint edit is a silent history rewrite.
         accepts_correction = any(
             event["event_type"] in {"correction_accepted", "basis_rebased"}

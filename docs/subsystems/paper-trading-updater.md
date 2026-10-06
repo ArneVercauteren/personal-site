@@ -85,13 +85,23 @@ are NaN, handled).
    contribute no bar. DSL warmup is sized from the formula's longest feature window.
    Each successful Yahoo chunk is written to the local OHLCV cache immediately, before simulation
    starts, so an interrupted fetch phase can reuse completed chunks on the next run.
+   Partial and empty batches retry only missing/unusable symbols up to three times, sequentially,
+   with 2/4/8-second backoff; incomplete batches are not cached. Historical bars alone do not prove
+   review-date completeness. For every unseen review session (including catch-up runs), the updater
+   retries stale candidate symbols with three targeted attempts and requires a real usable OHLCV
+   bar for every member of the declared universe on that session. The simulator repeats this guard
+   against the long frame before selection, so forward-filled prices cannot hide missing candidates.
+   Unresolved candidates fail as retryable data errors before a rebalance is accepted. Ordinary
+   non-review days can proceed with missing unheld candidates after retries. A provider's generic
+   "possibly delisted" message never authorizes removing a member from the strategy universe.
 2. Load the accepted checkpoint and verify deployment, formula, cost, boundary-price, and engine hashes.
    End-of-day boundary snapshots cover held positions only; full-universe causal inputs remain hashed
    on rebalance events. Legacy universe-wide checkpoints may transition only when every held price is
    present and cash plus marked holdings still reconciles to accepted equity. Missing held prices are
-   retryable data failures, while a revised held price is rejected as a correction proposal rather
-   than silently rewriting history. That rejection exits 3 and is not retried; a reviewer clears it
-   with `migrate --accept-revision` (see the runbook).
+   retryable data failures. Material or unclassifiable held-price revisions are recorded as
+   correction proposals and exit 3 without retries; a reviewer clears them with
+   `migrate --accept-revision` (see the runbook). Minor v3 corrections can be accepted automatically
+   under the bounded policy below. Historical equity is never rewritten.
 
    `closes` is Yahoo's **adjusted** close, which is not a fixed historical value: every corporate
    action rewrites each adjusted close before its ex-date. A `held_positions_v3` checkpoint therefore
@@ -104,7 +114,7 @@ are NaN, handled).
    | --- | --- | --- |
    | unchanged | unchanged | no action |
    | changed | unchanged | distribution; re-base that ticker automatically |
-   | changed or unchanged | changed | split/corrected print; require review for that ticker |
+   | changed or unchanged | changed | bounded minor correction: automatic acceptance; otherwise require review |
    | missing | missing or unavailable | retryable provider failure |
 
    This matters when changes are mixed. A corrected raw print in one holding must not prevent a
@@ -115,6 +125,17 @@ are NaN, handled).
    inverse adjustment factor. Cash, accepted equity and every published point remain unchanged.
    The correction delta enters on the next forward mark; the distribution does not disappear from
    performance.
+
+   Minor-correction policy (`update.py`): both raw and adjusted relative changes must be at most
+   **0.1% per revised ticker**, and the sum of **absolute** adjusted equity impacts must be at most
+   **0.1 basis points of accepted account equity**. Opposing changes do not cancel. These limits
+   accumulate in `automatic_revision_usage` across repeated acceptances at the same boundary and
+   reset only when a new session is marked. Legacy/incomplete plans remain fail-closed.
+   An automatic acceptance records linked `correction_proposed` and `correction_accepted` events
+   containing the observed price maps, explicit automatic policy, and cumulative usage. Independent
+   distribution factors are applied atomically with a linked `basis_rebased` event. Corrections
+   restamp adjusted/raw maps and hashes without changing shares, cash, or historical equity; their
+   delta enters the next forward mark. A raw-only minor correction also restamps its control map.
 
    `held_positions_v2` checkpoints contain an adjusted-price map but only one aggregate raw hash.
    They remain fail-closed because a raw-hash mismatch cannot be attributed safely. Their next
@@ -209,7 +230,8 @@ each other's data. The file-level `as_of` advances to the latest open bar date.
 Historical ledger events and equity marks are fixed once accepted. A routine run never recomputes
 them. A corporate action that re-bases the adjusted series is reconciled automatically against the
 raw-close control and recorded as `basis_rebased`; it changes share counts only, never cash or an
-accepted mark. Price revisions or changed deployment hashes fail closed; on CI failure, the runner uploads
+accepted mark. Material/unclassifiable price revisions or changed deployment hashes fail closed;
+minor corrections follow the recorded bounded acceptance policy. On CI failure, the runner uploads
 its ledger/checkpoint state as a short-lived review artifact without changing the branch. A full
 replay lives in the separate read-only audit command. Synthetic split-run tests
 prove incremental continuation matches a one-shot replay for identical inputs.

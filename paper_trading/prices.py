@@ -168,22 +168,30 @@ def get_ohlcv_chunked(
     pause: float = DEFAULT_FETCH_PAUSE,
     threads: bool = False,
     cache_dir: str | Path | None = None,
+    missing_retries: int = 3,
+    retry_pause: float = 2.0,
+    required_dates: tuple[str, ...] = (),
 ) -> pd.DataFrame:
     """Long-format OHLCV for many tickers, fetched politely in batches.
 
     For a large universe a single `yf.download` of every symbol bursts requests
     and trips Yahoo's rate limiter. This splits the symbols into `chunk`-sized
     batches, fetches each one (sequentially, `threads=False`) through an optional
-    rate-limited `session`, and pauses `pause` seconds between batches. A batch
-    that returns nothing is skipped rather than aborting the whole run. Synthetic
-    mode skips the pauses (and any session) since it never hits the network.
+    rate-limited `session`, and pauses `pause` seconds between batches. Any
+    missing symbols (including partial-batch failures) are retried separately
+    with backoff. ``required_dates`` also detects stale/missing review bars and
+    bypasses a cache that does not cover those dates. Synthetic mode skips the
+    pauses (and any session) since it never hits the network.
 
     Same long schema and post-processing as `get_ohlcv`.
     """
     if not tickers:
         raise RuntimeError("get_ohlcv_chunked: no tickers requested")
+    if chunk < 1 or missing_retries < 0 or retry_pause < 0:
+        raise ValueError("chunk must be positive; retry settings must be nonnegative")
     if use_synthetic():
         pause = 0.0
+        retry_pause = 0.0
         session = None
 
     frames: list[pd.DataFrame] = []
@@ -191,7 +199,7 @@ def get_ohlcv_chunked(
     for bi, i in enumerate(starts):
         group = tickers[i : i + chunk]
         df = _read_chunk_cache(group, start, end, cache_dir)
-        if df is not None:
+        if df is not None and not missing_price_tickers(df, group, required_dates):
             print(f"  cache hit batch {bi + 1}/{len(starts)} ({len(group)} tickers)")
             frames.append(df)
             continue
@@ -201,8 +209,31 @@ def get_ohlcv_chunked(
             print(f"  fetch batch {bi + 1}/{len(starts)} failed ({exc}); skipping")
             df = None
         if df is not None and not df.empty:
+            df = df.copy()
+        else:
+            df = pd.DataFrame(columns=_OHLCV_COLUMNS)
+        for attempt in range(missing_retries):
+            missing = missing_price_tickers(df, group, required_dates)
+            if not missing:
+                break
+            print(f"  retry {attempt + 1}/{missing_retries}: {len(missing)} missing/stale ticker(s)")
+            if retry_pause:
+                time.sleep(retry_pause * (2 ** attempt))
+            try:
+                recovered = get_ohlcv(missing, start, end, session=session, threads=False)
+            except Exception as exc:  # noqa: BLE001
+                print(f"  missing-symbol retry failed ({exc})")
+                continue
+            df = pd.concat([df, recovered], ignore_index=True).drop_duplicates(
+                ["ticker", "date"], keep="last",
+            )
+        missing = missing_price_tickers(df, group, required_dates)
+        if missing:
+            print(f"  unresolved prices after retries: {', '.join(missing)}")
+        if not df.empty:
             frames.append(df)
-            _write_chunk_cache(group, start, end, df, cache_dir)
+            if not missing:
+                _write_chunk_cache(group, start, end, df, cache_dir)
         if pause and bi < len(starts) - 1:
             time.sleep(pause)
 
@@ -210,6 +241,24 @@ def get_ohlcv_chunked(
         raise RuntimeError(f"get_ohlcv_chunked: no data for any of {len(tickers)} tickers")
     out = pd.concat(frames, ignore_index=True)
     return out.sort_values(["ticker", "date"]).reset_index(drop=True)
+
+
+def missing_price_tickers(
+    df: pd.DataFrame, tickers: list[str], required_dates: tuple[str, ...] = (),
+) -> list[str]:
+    """Require real, usable bars, never a forward-filled price or Yahoo metadata."""
+    if df.empty:
+        return sorted(set(tickers))
+    usable = pd.Series(True, index=df.index)
+    for field in ("open", "high", "low", "close", "adj_close", "volume"):
+        values = pd.to_numeric(df[field], errors="coerce")
+        usable &= np.isfinite(values) & (values >= 0 if field == "volume" else values > 0)
+    bars = df.loc[usable]
+    missing = set(tickers) - set(bars["ticker"])
+    for day in required_dates:
+        present = bars.loc[pd.to_datetime(bars["date"]) == pd.Timestamp(day), "ticker"]
+        missing.update(set(tickers) - set(present))
+    return sorted(missing)
 
 
 def use_synthetic() -> bool:

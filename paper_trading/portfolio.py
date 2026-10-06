@@ -762,7 +762,15 @@ def accept_boundary_revision(
         float(change["equity_impact"])
         for change in (payload.get("revisions") or {}).values()
     )
-    expected_mark = float(checkpoint["equity"]) + revision_delta
+    # A previous accepted correction at this same boundary may already have
+    # restamped the basis without changing historical equity.
+    accepted_prices = checkpoint.get("price_snapshot")
+    prior_basis_mark = float(checkpoint["equity"])
+    if isinstance(accepted_prices, dict) and all(ticker in accepted_prices for ticker in held):
+        prior_basis_mark = float(checkpoint["cash"]) + _position_value(
+            checkpoint["shares"], pd.Series(accepted_prices), held,
+        )
+    expected_mark = prior_basis_mark + revision_delta
     if abs(marked - expected_mark) > tolerance:
         raise ValueError(
             "reviewed boundary plan does not reconcile: "
@@ -1024,6 +1032,24 @@ def simulate_incremental(
 
         remaining -= 1
         if remaining <= 0:
+            if prices_long is not None:
+                # The wide accounting frame forward-fills gaps. Candidate
+                # completeness must use real bars on this review session.
+                from .prices import missing_price_tickers
+
+                missing = missing_price_tickers(
+                    prices_long, decision_universe, (session,),
+                )
+            else:
+                missing = [
+                    ticker for ticker in decision_universe
+                    if _finite_price(closes.loc[day], ticker) is None
+                ]
+            if missing:
+                raise BoundaryPriceUnavailable(
+                    f"{strategy['id']}: incomplete rebalance candidate prices on {session}: "
+                    + ", ".join(missing)
+                )
             equity_now = cash + _position_value(shares, closes.loc[day], tickers)
             prior_w = _current_weights(shares, closes.loc[day], equity_now, tickers)
             if "formula" in strategy:

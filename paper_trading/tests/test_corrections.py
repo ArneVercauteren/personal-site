@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from paper_trading import migrate, portfolio, update
-from paper_trading.contracts import CONTRACT_VERSION, ENGINE_VERSION, ContractError
+from paper_trading.contracts import CONTRACT_VERSION, ENGINE_VERSION, ContractError, content_hash
 from paper_trading.ledger import LedgerStore, make_event, validate_checkpoint
 
 BOUNDARY = "2026-01-02"
@@ -185,6 +185,119 @@ def _verify(checkpoint, adj, raw):
     return portfolio._verify_checkpoint_prices(
         checkpoint, pd.Series(adj), raw_row=None if raw is None else pd.Series(raw)
     )
+
+
+def _minor_checkpoint():
+    return {**_v3_checkpoint(), "cash": 999_920.0, "equity": 1_000_000.0,
+            "peak_equity": 1_000_000.0}
+
+
+def _revision_payload(checkpoint, adjusted, raw):
+    with pytest.raises(portfolio.BoundaryPriceRevision) as excinfo:
+        _verify(checkpoint, adjusted, raw)
+    return {**excinfo.value.details, "checkpoint_hash": content_hash(checkpoint)}
+
+
+def test_minor_revision_restamps_with_auditable_idempotent_acceptance(tmp_path, monkeypatch):
+    checkpoint = _minor_checkpoint()
+    store = LedgerStore(tmp_path)
+    store.commit("s", [make_event("s", "session_marked", BOUNDARY, {
+        "cash": checkpoint["cash"], "equity": checkpoint["equity"],
+        "shares": checkpoint["shares"],
+    })], checkpoint)
+    monkeypatch.setattr(update, "LEDGER_STORE", store)
+    revised = {"A": 10.005, "B": 20.0}
+    payload = _revision_payload(checkpoint, revised, revised)
+    usage = update._minor_revision_usage(checkpoint, payload)
+    assert usage is not None
+    proposal = make_event("s", "correction_proposed", BOUNDARY, payload)
+    accepted = update._accept_minor_revision("s", checkpoint, proposal, usage)
+    assert accepted["shares"] == checkpoint["shares"]
+    assert accepted["cash"] == checkpoint["cash"]
+    assert accepted["equity"] == checkpoint["equity"]
+    assert accepted["price_snapshot"] == revised
+    assert accepted["raw_price_snapshot"] == revised
+    validate_checkpoint(accepted)
+    assert _verify(accepted, revised, revised) is None
+    events = store.read_events("s")
+    assert events[-1]["payload"]["acceptance"] == "automatic_minor_price_revision"
+    assert events[-1]["payload"]["proposal_event_id"] == proposal["event_id"]
+    # Replaying the same immutable acceptance cannot append duplicate events.
+    assert store.commit("s", [proposal, events[-1]], accepted) == 0
+
+
+def test_actual_eric_revision_passes_policy():
+    checkpoint = _minor_checkpoint()
+    checkpoint["shares"]["ERIC"] = 383.08 / (9.2200002670 - 9.2150001526)
+    payload = {"revisions": {"ERIC": {
+        "accepted_adjusted": 9.2150001526, "observed_adjusted": 9.2200002670,
+        "accepted_raw": 9.2150001526, "observed_raw": 9.2200002670,
+    }}}
+    checkpoint["equity"] = 97_560_038.51
+    assert update._minor_revision_usage(checkpoint, payload) is not None
+
+
+def test_large_ticker_change_is_not_automatically_accepted_even_at_tiny_weight():
+    checkpoint = _minor_checkpoint()
+    revised = {"A": 10.02, "B": 20.0}
+    assert update._minor_revision_usage(checkpoint, _revision_payload(checkpoint, revised, revised)) is None
+
+
+def test_gross_portfolio_limit_does_not_allow_offsetting_revisions():
+    checkpoint = {**_v3_checkpoint(), "shares": {"A": 50_000.0, "B": 25_000.0},
+                  "cash": 0.0, "equity": 1_000_000.0, "peak_equity": 1_000_000.0}
+    revised = {"A": 10.005, "B": 19.99}
+    payload = _revision_payload(checkpoint, revised, revised)
+    assert payload["observed_equity"] == checkpoint["equity"]
+    assert update._minor_revision_usage(checkpoint, payload) is None
+
+
+def test_raw_only_minor_correction_is_restamped_and_large_one_is_reviewed():
+    checkpoint = _minor_checkpoint()
+    for value, allowed in [(10.005, True), (10.02, False)]:
+        payload = _revision_payload(checkpoint, ACCEPTED, {"A": value, "B": 20.0})
+        usage = update._minor_revision_usage(checkpoint, payload)
+        assert (usage is not None) == allowed
+        if allowed:
+            restated = portfolio.accept_boundary_revision(checkpoint, payload)
+            assert _verify(restated, ACCEPTED, {"A": value, "B": 20.0}) is None
+
+
+def test_repeated_same_boundary_corrections_share_one_budget():
+    checkpoint = _minor_checkpoint()
+    first = {"A": 10.006, "B": 20.0}
+    payload = _revision_payload(checkpoint, first, first)
+    usage = update._minor_revision_usage(checkpoint, payload)
+    assert usage is not None
+    accepted = portfolio.accept_boundary_revision(checkpoint, payload)
+    accepted["automatic_revision_usage"] = usage
+    second = {"A": 10.007, "B": 20.0}
+    second_payload = _revision_payload(accepted, second, second)
+    assert update._minor_revision_usage(accepted, second_payload) is not None
+    # The second acceptance reconciles against the restamped basis, not equity.
+    twice = portfolio.accept_boundary_revision(accepted, second_payload)
+    assert twice["equity"] == checkpoint["equity"]
+    too_far = {"A": 10.012, "B": 20.0}
+    assert update._minor_revision_usage(accepted, _revision_payload(accepted, too_far, too_far)) is None
+
+
+def test_legacy_checkpoint_does_not_get_automatic_approval():
+    checkpoint = _v2_checkpoint()
+    revised = {"A": 10.005, "B": 20.0}
+    assert update._minor_revision_usage(checkpoint, _revision_payload(checkpoint, revised, revised)) is None
+
+
+def test_minor_correction_and_distribution_are_applied_atomically():
+    checkpoint = _minor_checkpoint()
+    adjusted = {"A": 10.005, "B": 19.0}
+    raw = {"A": 10.005, "B": 20.0}
+    payload = _revision_payload(checkpoint, adjusted, raw)
+    assert update._minor_revision_usage(checkpoint, payload) is not None
+    accepted = portfolio.accept_boundary_revision(checkpoint, payload)
+    assert accepted["shares"]["A"] == checkpoint["shares"]["A"]
+    assert accepted["shares"]["B"] == pytest.approx(3.0 / 0.95)
+    assert accepted["equity"] == checkpoint["equity"]
+    assert _verify(accepted, adjusted, raw) is None
 
 
 def test_dividend_rebases_instead_of_failing():

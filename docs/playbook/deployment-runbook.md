@@ -26,16 +26,26 @@ freshness workflow fails when the last good manifest is more than four calendar 
 
 - Never edit a JSONL event or accepted checkpoint by hand.
 - Ordinary boundary hashes cover held positions; full-universe input hashes are retained on review
-  events. Missing held prices stop the run as retryable data failures. A held-position boundary
-  mismatch stops the updater and records a `correction_proposed` event; the failed CI job uploads
+  events. Missing held prices stop the run as retryable data failures. Missing/unusable candidate
+  bars are retried individually, and any unresolved declared-universe member on a review session
+  stops the run before selection, including reviews encountered during catch-up. A Yahoo delisting
+  warning is not evidence permitting automatic removal from the universe.
+  A material or unclassifiable held-position boundary mismatch stops the updater and records a
+  `correction_proposed` event; the failed CI job uploads
   its ledger/checkpoint state as a 14-day review artifact without changing the branch. It exits
   **3** — a status CI never retries, because the same inputs fail identically every time.
+- Minor v3 corrections are automatically accepted when cumulative raw and adjusted changes are
+  at most **0.1% per revised ticker** and cumulative gross equity impact is at most **0.1 basis
+  points** of account equity at the boundary. Opposing impacts cannot cancel, and repeated
+  corrections share the same limits until a new mark. Linked proposal/acceptance events record
+  `acceptance: "automatic_minor_price_revision"`, the thresholds, and usage; all historical marks
+  stay fixed. Material changes and legacy checkpoints still use manual review below.
 - A dividend or other distribution on a held name is **not** a revision: that ticker's raw close is
   unchanged, so the updater re-bases its share count, records `basis_rebased`, and continues without
   review. Classification is per ticker: an unrelated raw correction can stop for review without
   hiding safe distribution rebases elsewhere in the book. A raw-only change is also reviewable,
-  even when adjusted equity has not moved, because leaving a stale raw baseline would misclassify a
-  later distribution.
+  even when adjusted equity has not moved, unless it meets the minor-correction policy; either
+  acceptance path restamps the raw baseline to avoid misclassifying a later distribution.
 - To clear a boundary price revision:
   1. `python -m paper_trading.migrate --strategy <id> --accept-revision` re-fetches the boundary
      prices, reports each affected ticker's old/new adjusted and raw values, its equity impact, and

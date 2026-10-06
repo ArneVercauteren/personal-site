@@ -1,15 +1,15 @@
 """Reviewed mutations of an accepted live ledger.
 
-Two flows, both deliberately two-step — inspect first, write only when a
-reviewer is named — because everything here restates state the incremental
+Two manual flows, both deliberately two-step — inspect first, write only when
+a reviewer is named — because everything here restates state the incremental
 updater otherwise treats as immutable:
 
 * migration candidates (`--approve`): a one-time replay of published history
   into an accepted checkpoint.
 * boundary price revisions (`--accept-revision`): the updater refuses to
-  advance when a held position's accepted boundary price no longer matches the
-  vendor, and records a `correction_proposed` event instead. This is the only
-  way to clear that state without hand-editing the ledger.
+  advance on a material or unclassifiable held-price change, and records a
+  `correction_proposed` event instead. Minor v3 corrections within the updater's
+  cumulative policy are accepted automatically.
 
 Generation and review are read-only with respect to the authoritative ledger.
 """
