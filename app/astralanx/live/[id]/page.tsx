@@ -22,6 +22,7 @@ import {
   type StrategyMeta,
   type Stats,
 } from "@/lib/data";
+import { getStrategyNote } from "@/lib/content";
 import { money, pct, signedPct, shortDate } from "@/lib/format";
 
 export function generateStaticParams() {
@@ -229,6 +230,7 @@ export default async function StrategyDetailPage({
   // deployed today has none yet, so its live stats are "accruing", not 0%.
   const hasLiveData = Boolean(liveSince && lastD && lastD >= liveSince);
   const perf = meta?.performance;
+  const note = getStrategyNote(strategy.id);
 
   // Lifecycle chart bands: the in-sample training regime(s), the held-out
   // out-of-sample window, and the live tail — each shaded distinctly behind the
@@ -419,6 +421,15 @@ export default async function StrategyDetailPage({
               </p>
             </div>
           )}
+        </Section>
+      ) : null}
+
+      {note ? (
+        <Section eyebrow="Reflection" title={note.title} id="reflection">
+          <div className="max-w-prose space-y-4 text-sm text-ink-muted">
+            {note.paragraphs.map((p) => <p key={p}>{p}</p>)}
+            <p className="font-mono text-xs">Written {shortDate(note.date)}</p>
+          </div>
         </Section>
       ) : null}
 

@@ -63,3 +63,30 @@ export function getContentBySlug(
   const { data, content } = matter(fs.readFileSync(file, "utf8"));
   return { slug, frontmatter: data as Frontmatter, body: content };
 }
+
+export interface StrategyNote {
+  title: string;
+  /** ISO date, YYYY-MM-DD. */
+  date: string;
+  /** Plain-text paragraphs, split on blank lines. */
+  paragraphs: string[];
+}
+
+/**
+ * Editorial commentary on a deployed strategy, from
+ * `content/strategy-notes/<id>.md`. Kept outside the strategy spec because the
+ * spec is covered by the deployment bundle hash.
+ */
+export function getStrategyNote(id: string): StrategyNote | null {
+  const file = path.join(process.cwd(), "content", "strategy-notes", `${id}.md`);
+  if (!fs.existsSync(file)) return null;
+  const { data, content } = matter(fs.readFileSync(file, "utf8"));
+  const paragraphs = content
+    .split(/\n\s*\n/)
+    .map((p) => p.trim().replace(/\s+/g, " "))
+    .filter(Boolean);
+  // YAML parses bare dates into Date objects; normalize back to YYYY-MM-DD.
+  const date =
+    data.date instanceof Date ? data.date.toISOString().slice(0, 10) : String(data.date);
+  return { title: data.title, date, paragraphs };
+}
