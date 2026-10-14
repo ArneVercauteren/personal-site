@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from pathlib import Path
 
 from . import universe
 
@@ -36,20 +37,43 @@ def _env_int(name: str, default: int) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--archive-current", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--archive-current", action="store_true")
+    mode.add_argument("--shard-index", type=int)
+    mode.add_argument("--finalize-dir", type=Path)
+    parser.add_argument("--shard-count", type=int)
+    parser.add_argument("--shard-dir", type=Path)
     args = parser.parse_args(argv)
     if args.archive_current:
         path = universe.archive_current_universe()
         print(f"archived {path.relative_to(universe.REPO_ROOT)}")
         return
-    payload = universe.build_universe(
-        min_price=_env_float("UNIVERSE_MIN_PRICE", universe.DEFAULT_MIN_PRICE),
-        min_adv=_env_float("UNIVERSE_MIN_ADV", universe.DEFAULT_MIN_ADV),
-        cap=_env_int("UNIVERSE_CAP", universe.DEFAULT_CAP),
-        exclude_etf=os.environ.get("UNIVERSE_EXCLUDE_ETF", "") not in ("", "0", "false"),
-        fetch_chunk=_env_int("UNIVERSE_FETCH_CHUNK", universe.DEFAULT_FETCH_CHUNK),
-        fetch_pause=_env_float("UNIVERSE_FETCH_PAUSE", universe.DEFAULT_FETCH_PAUSE),
-    )
+    if args.shard_index is not None:
+        if args.shard_count is None or args.shard_dir is None:
+            parser.error("--shard-index requires --shard-count and --shard-dir")
+        universe.build_universe_shard(
+            args.shard_index, args.shard_count, args.shard_dir,
+            min_price=_env_float("UNIVERSE_MIN_PRICE", universe.DEFAULT_MIN_PRICE),
+            min_adv=_env_float("UNIVERSE_MIN_ADV", universe.DEFAULT_MIN_ADV),
+            cap=_env_int("UNIVERSE_CAP", universe.DEFAULT_CAP),
+            exclude_etf=os.environ.get("UNIVERSE_EXCLUDE_ETF", "") not in ("", "0", "false"),
+            fetch_chunk=_env_int("UNIVERSE_FETCH_CHUNK", universe.DEFAULT_FETCH_CHUNK),
+            fetch_pause=_env_float("UNIVERSE_FETCH_PAUSE", universe.DEFAULT_FETCH_PAUSE),
+        )
+        return
+    if args.shard_count is not None or args.shard_dir is not None:
+        parser.error("--shard-count and --shard-dir require --shard-index")
+    if args.finalize_dir is not None:
+        payload = universe.publish_universe_shards(args.finalize_dir)
+    else:
+        payload = universe.build_universe(
+            min_price=_env_float("UNIVERSE_MIN_PRICE", universe.DEFAULT_MIN_PRICE),
+            min_adv=_env_float("UNIVERSE_MIN_ADV", universe.DEFAULT_MIN_ADV),
+            cap=_env_int("UNIVERSE_CAP", universe.DEFAULT_CAP),
+            exclude_etf=os.environ.get("UNIVERSE_EXCLUDE_ETF", "") not in ("", "0", "false"),
+            fetch_chunk=_env_int("UNIVERSE_FETCH_CHUNK", universe.DEFAULT_FETCH_CHUNK),
+            fetch_pause=_env_float("UNIVERSE_FETCH_PAUSE", universe.DEFAULT_FETCH_PAUSE),
+        )
     print(f"done; as_of={payload['as_of']} count={payload['count']}")
 
 

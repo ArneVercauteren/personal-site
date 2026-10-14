@@ -139,3 +139,50 @@ def test_skipped_symbols_excluded_from_candidates():
     skipped = universe.active_skips(skip)
     candidates = [s for s in commons if s not in skipped]
     assert "AAPL" not in candidates and "MSFT" in candidates
+
+
+def test_sharded_refresh_allows_intentional_cap_below_prior_retention(tmp_path, monkeypatch):
+    current = tmp_path / "universe.json"
+    current.write_text(json.dumps({
+        "count": 4, "tickers": ["AAA", "BBB", "CCC", "DDD"],
+    }), encoding="utf-8")
+    candidates = ["AAA", "BBB", "CCC", "DDD"]
+    monkeypatch.setattr(universe, "_candidates", lambda *args: candidates)
+    monkeypatch.setattr(universe, "_make_session", lambda: None)
+
+    def fetch(symbols, *args, **kwargs):
+        return ({s: 10_000_000.0 + candidates.index(s) for s in symbols},
+                {s: 20.0 for s in symbols}, set())
+
+    monkeypatch.setattr(universe, "_fetch_liquidity", fetch)
+    shards = tmp_path / "shards"
+    for index in range(2):
+        universe.build_universe_shard(index, 2, shards, cap=2)
+    payload = universe.publish_universe_shards(
+        shards, out_path=current, skip_path=tmp_path / "skip.json",
+    )
+    assert payload["count"] == 2
+    assert payload["tickers"] == ["DDD", "CCC"]
+    assert json.loads(current.read_text())["snapshot_id"] == payload["snapshot_id"]
+
+
+def test_sharded_refresh_rejects_incomplete_or_provider_degraded_results(tmp_path, monkeypatch):
+    current = tmp_path / "universe.json"
+    original = json.dumps({"count": 4, "tickers": ["AAA", "BBB", "CCC", "DDD"]})
+    current.write_text(original, encoding="utf-8")
+    candidates = ["AAA", "BBB", "CCC", "DDD"]
+    monkeypatch.setattr(universe, "_candidates", lambda *args: candidates)
+    monkeypatch.setattr(universe, "_make_session", lambda: None)
+    monkeypatch.setattr(universe, "_fetch_liquidity", lambda symbols, *args, **kwargs: (
+        {s: 10_000_000.0 for s in symbols if s == "AAA"},
+        {s: 20.0 for s in symbols if s == "AAA"},
+        set(symbols) - {"AAA"},
+    ))
+    shards = tmp_path / "shards"
+    universe.build_universe_shard(0, 2, shards)
+    with pytest.raises(ValueError, match="incomplete"):
+        universe.publish_universe_shards(shards, out_path=current)
+    universe.build_universe_shard(1, 2, shards)
+    with pytest.raises(RuntimeError, match="price source returned only"):
+        universe.publish_universe_shards(shards, out_path=current)
+    assert current.read_text() == original

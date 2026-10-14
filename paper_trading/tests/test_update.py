@@ -135,17 +135,50 @@ def test_fetch_retries_stale_review_symbols_and_blocks_unresolved(monkeypatch, r
         with pytest.raises(portfolio.BoundaryPriceUnavailable, match="2026-01-05.*B"):
             update._fetch_all_prices([spec], "2026-01-05")
     assert calls[1][0] == ["B"]
-    assert calls[1][1]["required_dates"] == ("2026-01-05",)
+    assert calls[1][1]["required_dates"] == ("2026-01-02", "2026-01-05")
+    assert calls[0][1]["missing_retries"] == 0
 
 
 def test_non_review_day_can_continue_with_unheld_universe_gap(monkeypatch):
     spec = _live_spec()
+    spec["universe"].append("C")
     checkpoint = _live_checkpoint(spec, 5)
-    partial = _prices_at_boundary().query("ticker == 'A'")
+    partial = _prices_at_boundary()
+    calls = []
     monkeypatch.setattr(update.LEDGER_STORE, "load_checkpoint", lambda strategy_id: checkpoint)
-    monkeypatch.setattr(prices, "get_ohlcv_chunked", lambda *args, **kwargs: partial)
+    def fetch(tickers, *args, **kwargs):
+        calls.append((tickers, kwargs))
+        return partial
+    monkeypatch.setattr(prices, "get_ohlcv_chunked", fetch)
     monkeypatch.setattr(prices, "make_limiter_session", lambda: None)
-    assert set(update._fetch_all_prices([spec], "2026-01-05")["ticker"]) == {"A"}
+    assert set(update._fetch_all_prices([spec], "2026-01-05")["ticker"]) == {"A", "B"}
+    assert calls == [(["A", "B", "C"], {
+        "session": None, "missing_retries": 0,
+    })]
+
+
+def test_non_review_mark_ignores_unheld_gap_but_requires_held_bar():
+    spec = _live_spec()
+    spec["universe"].append("C")
+    checkpoint = _live_checkpoint(spec, 5)
+    full = _prices_at_boundary()
+    opens, closes = prices.long_to_wide(full)
+    raw, dv = prices.wide_raw_and_dollar_volume(full)
+    curve = [{"d": "2026-01-02", "v": checkpoint["equity"]}]
+    result = portfolio.simulate_incremental(
+        spec, checkpoint, curve, opens, closes, prices_long=full,
+        raw_closes=raw, dollar_volume=dv, active_universe=["A", "B", "C"],
+    )
+    assert result.as_of == "2026-01-05"
+
+    missing_held = full[~((full["ticker"] == "B") & (full["date"] == pd.Timestamp("2026-01-05")))]
+    opens, closes = prices.long_to_wide(missing_held)
+    raw, dv = prices.wide_raw_and_dollar_volume(missing_held)
+    with pytest.raises(portfolio.BoundaryPriceUnavailable, match="held.*2026-01-05.*B"):
+        portfolio.simulate_incremental(
+            spec, checkpoint, curve, opens, closes, prices_long=missing_held,
+            raw_closes=raw, dollar_volume=dv, active_universe=["A", "B", "C"],
+        )
 
 
 def test_simulator_rejects_forward_filled_candidate_on_catch_up_review():

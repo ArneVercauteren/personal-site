@@ -83,16 +83,16 @@ are NaN, handled).
    Yahoo bar before 17:00 New York time; before that cutoff it caps the fetch at the previous
    weekday. This guard applies to local/manual runs as well as CI. Exchange holidays naturally
    contribute no bar. DSL warmup is sized from the formula's longest feature window.
-   Each successful Yahoo chunk is written to the local OHLCV cache immediately, before simulation
+   Each complete Yahoo chunk is written to the local OHLCV cache immediately, before simulation
    starts, so an interrupted fetch phase can reuse completed chunks on the next run.
-   Partial and empty batches retry only missing/unusable symbols up to three times, sequentially,
-   with 2/4/8-second backoff; incomplete batches are not cached. Historical bars alone do not prove
-   review-date completeness. For every unseen review session (including catch-up runs), the updater
-   retries stale candidate symbols with three targeted attempts and requires a real usable OHLCV
-   bar for every member of the declared universe on that session. The simulator repeats this guard
-   against the long frame before selection, so forward-filled prices cannot hide missing candidates.
+   The bulk fetch makes one pass and does not retry missing unheld candidates on ordinary days.
+   It makes targeted attempts for held and pending-fill names at the accepted boundary and unseen
+   sessions, and for every candidate on an unseen review session (including catch-up runs).
+   A real usable OHLCV bar is required for every member of the declared universe on a review
+   session. The simulator checks actual held and pending-fill names on each mark, and repeats the
+   candidate guard at review, so forward-filled prices cannot hide either kind of required gap.
    Unresolved candidates fail as retryable data errors before a rebalance is accepted. Ordinary
-   non-review days can proceed with missing unheld candidates after retries. A provider's generic
+   non-review days can proceed with missing unheld candidates. A provider's generic
    "possibly delisted" message never authorizes removing a member from the strategy universe.
 2. Load the accepted checkpoint and verify deployment, formula, cost, boundary-price, and engine hashes.
    End-of-day boundary snapshots cover held positions only; full-universe causal inputs remain hashed

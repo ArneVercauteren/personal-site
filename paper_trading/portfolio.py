@@ -1007,6 +1007,23 @@ def simulate_incremental(
 
     for day in new_index:
         session = day.strftime("%Y-%m-%d")
+        if prices_long is not None:
+            # The wide accounting view forward-fills missing bars. That is
+            # harmless for an unheld candidate between reviews, but a real
+            # bar is required to mark current shares or execute a pending fill.
+            from .prices import missing_price_tickers
+
+            needed = sorted(
+                {ticker for ticker, amount in shares.items() if amount != 0}
+                | {ticker for ticker, weight in pending_target.items() if weight > 0}
+            )
+            day_bars = prices_long.loc[prices_long["date"] == day]
+            missing_held = missing_price_tickers(day_bars, needed) if needed else []
+            if missing_held:
+                raise BoundaryPriceUnavailable(
+                    f"{strategy['id']}: missing held or pending-fill prices on {session}: "
+                    + ", ".join(missing_held)
+                )
         if pending_target:
             equity_open = cash + _position_value(shares, opens.loc[day], tickers)
             shares, cash, trades = _apply_targets(

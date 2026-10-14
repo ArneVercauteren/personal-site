@@ -226,9 +226,21 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
     print(f"fetching {total} unique tickers in {len(by_start)} date-group(s) "
           f"through {end}")
     for start, tickers in sorted(by_start.items()):
-        frames.append(
-            prices.get_ohlcv_chunked(sorted(tickers), start, end, session=session)
-        )
+        try:
+            # A missing unheld candidate on an ordinary mark does not affect
+            # that day's account. Recover only the bars a held position or an
+            # upcoming rebalance actually needs.
+            frame = prices.get_ohlcv_chunked(
+                sorted(tickers), start, end, session=session, missing_retries=0,
+            )
+        except RuntimeError as exc:
+            if "no data for any" not in str(exc):
+                raise
+            print(f"  no prices for date-group beginning {start}; checking required symbols")
+            continue
+        frames.append(frame)
+    if not frames:
+        raise portfolio.BoundaryPriceUnavailable("no market price bars returned for any strategy")
     long = pd.concat(frames, ignore_index=True)
     # A ticker may return historical bars while missing a review-date bar. Those
     # stale symbols need the same targeted recovery as entirely missing names.
@@ -237,19 +249,47 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
         checkpoint = LEDGER_STORE.load_checkpoint(spec["id"])
         if checkpoint is None:
             continue
+        _, start = _spec_fetch_window(spec)
+        boundary = checkpoint["last_processed_session"]
+        new_sessions = tuple(
+            day.strftime("%Y-%m-%d")
+            for day in market_index[market_index > pd.Timestamp(boundary)]
+        )
+        held = sorted({
+            ticker for field in ("shares", "pending_target")
+            for ticker, amount in checkpoint.get(field, {}).items()
+            if float(amount) > 0
+        })
+        # These names may be needed to mark existing shares or fill a pending
+        # order. Retry gaps, but let the simulator decide whether they were
+        # actually held on each date before treating a remaining gap as fatal.
+        held_gaps = prices.missing_price_tickers(
+            long, held, (boundary, *new_sessions),
+        ) if held else []
+        if held_gaps:
+            try:
+                recovered = prices.get_ohlcv_chunked(
+                    held_gaps, start, end, session=session,
+                    required_dates=(boundary, *new_sessions), missing_retries=2,
+                )
+            except RuntimeError:
+                recovered = pd.DataFrame(columns=long.columns)
+            long = pd.concat([long, recovered], ignore_index=True).drop_duplicates(
+                ["ticker", "date"], keep="last",
+            )
         sessions = _upcoming_review_sessions(spec, checkpoint, market_index)
         if not sessions:
             continue
         members = universe.resolve_universe(spec)
         missing = prices.missing_price_tickers(long, members, sessions)
-        # Entirely absent tickers already exhausted the chunked fetch retries.
-        stale = sorted(set(missing) & set(long["ticker"]))
-        if stale:
-            _, start = _spec_fetch_window(spec)
-            recovered = prices.get_ohlcv_chunked(
-                stale, start, end, session=session, required_dates=sessions,
-                missing_retries=2,  # initial targeted attempt + two more = three
-            )
+        if missing:
+            try:
+                recovered = prices.get_ohlcv_chunked(
+                    missing, start, end, session=session, required_dates=sessions,
+                    missing_retries=2,  # initial targeted attempt + two more
+                )
+            except RuntimeError:
+                recovered = pd.DataFrame(columns=long.columns)
             long = pd.concat([long, recovered], ignore_index=True).drop_duplicates(
                 ["ticker", "date"], keep="last",
             )

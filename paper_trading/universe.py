@@ -83,6 +83,7 @@ SKIP_TTL_DAYS = 180
 
 # Safety: never overwrite a good universe with a husk from a rate-limited run.
 MIN_RETENTION = 0.6
+MIN_PRIOR_PRICE_COVERAGE = 0.9
 
 # --- symbol filters (vendored from Astralanx src/data/ticker_filtering.py) -------
 _NON_COMMON_SUFFIXES: set[str] = {
@@ -359,52 +360,73 @@ def build_universe(
     path = out_path or DEFAULT_UNIVERSE_PATH
     skip_path = skip_path or DEFAULT_SKIP_PATH
     today = dt.date.today()
-
-    skip = load_skip(skip_path)
-    skipped = active_skips(skip, today)
-
-    rows = fetch_symbol_directory()
-    commons = filter_common_symbols(rows, exclude_etf=exclude_etf)
-    candidates = [s for s in commons if s not in skipped]
-    print(f"listings: {len(rows)} rows → {len(commons)} common; "
-          f"{len(skipped)} known-dead skipped → {len(candidates)} to fetch")
+    candidates = _candidates(exclude_etf, skip_path, today)
 
     session = _make_session()
     dollar_volume, last_price, failed = _fetch_liquidity(
         candidates, lookback_days, session=session, chunk=fetch_chunk, pause=fetch_pause
     )
-    tickers = rank_by_liquidity(
-        dollar_volume, last_price, min_price=min_price, min_adv=min_adv, cap=cap
+    return _publish_universe(
+        candidates, dollar_volume, last_price, failed, today=today,
+        min_price=min_price, min_adv=min_adv, cap=cap, exclude_etf=exclude_etf,
+        path=path, skip_path=skip_path,
     )
 
-    # Retention guard: a sharp drop vs the last good universe means the run was
-    # likely rate-limited — fail loudly instead of clobbering the committed file.
-    prior = _prior_count(path)
-    if prior and len(tickers) < MIN_RETENTION * prior:
-        raise RuntimeError(
-            f"new universe has {len(tickers)} tickers vs prior {prior} "
-            f"(< {MIN_RETENTION:.0%}); likely a rate-limited run — keeping the existing "
-            f"universe.json. Re-run, or lower UNIVERSE_FETCH rate, then retry."
-        )
 
-    # Remember this run's failures so next month skips them (within TTL).
-    for sym in failed:
-        skip[sym] = today.isoformat()
+def _candidates(exclude_etf: bool, skip_path: Path, today: dt.date) -> list[str]:
+    skipped = active_skips(load_skip(skip_path), today)
+    rows = fetch_symbol_directory()
+    commons = filter_common_symbols(rows, exclude_etf=exclude_etf)
+    candidates = [symbol for symbol in commons if symbol not in skipped]
+    print(f"listings: {len(rows)} rows → {len(commons)} common; "
+          f"{len(skipped)} known-dead skipped → {len(candidates)} to fetch")
+    return candidates
+
+
+def _publish_universe(
+    candidates: list[str], dollar_volume: dict[str, float],
+    last_price: dict[str, float], failed: set[str], *, today: dt.date,
+    min_price: float, min_adv: float, cap: int, exclude_etf: bool,
+    path: Path, skip_path: Path,
+) -> dict:
+    if cap < 1:
+        raise ValueError("universe cap must be positive")
+    # Compare the *eligible* pool before the intentional cap. The June snapshot
+    # has 3,472 names, so comparing a 1,200-name cap to 60% of that snapshot
+    # made every future refresh impossible even with perfect price data.
+    eligible = rank_by_liquidity(
+        dollar_volume, last_price, min_price=min_price, min_adv=min_adv,
+        cap=max(len(dollar_volume), 1),
+    )
+    prior_payload = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    prior_tickers = set(prior_payload.get("tickers", []))
+    prior_candidates = prior_tickers & set(candidates)
+    covered = prior_candidates & set(dollar_volume)
+    if prior_candidates and len(covered) < MIN_PRIOR_PRICE_COVERAGE * len(prior_candidates):
+        raise RuntimeError(
+            f"price source returned only {len(covered)}/{len(prior_candidates)} "
+            "still-listed prior universe members; keeping the existing universe"
+        )
+    prior = int(prior_payload.get("count", 0))
+    if not eligible or (prior and len(eligible) < MIN_RETENTION * min(prior, len(candidates))):
+        raise RuntimeError(
+            f"new universe has only {len(eligible)} eligible names before the cap "
+            f"(prior {prior}); keeping the existing universe"
+        )
+    tickers = eligible[:cap]
+
+    skip = load_skip(skip_path)
+    for symbol in failed:
+        skip[symbol] = today.isoformat()
     skip = _prune_skip(skip, today)
     save_skip(skip, skip_path)
-
     payload = {
-        "as_of": today.isoformat(),
-        "source": "nasdaqtrader",
+        "as_of": today.isoformat(), "source": "nasdaqtrader",
         "filters": {
-            "min_price": min_price,
-            "min_median_dollar_volume": min_adv,
-            "cap": cap,
-            "exclude_etf": exclude_etf,
+            "min_price": min_price, "min_median_dollar_volume": min_adv,
+            "cap": cap, "exclude_etf": exclude_etf,
         },
-        "count": len(tickers),
-        "skipped": len(skip),
-        "tickers": tickers,
+        "count": len(tickers), "skipped": len(skip), "tickers": tickers,
     }
     snapshot_id = content_hash(payload)
     payload["snapshot_id"] = snapshot_id
@@ -413,9 +435,86 @@ def build_universe(
     snapshot_path = snapshot_dir / f"{today.isoformat()}-{snapshot_id[:16]}.json"
     snapshot_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    print(f"wrote {path.relative_to(REPO_ROOT)} — {len(tickers)} tickers "
-          f"({len(failed)} new dead symbols recorded; {len(skip)} skipped total)")
+    print(f"wrote {path} — {len(tickers)} tickers "
+          f"({len(failed)} missing symbols recorded; {len(skip)} skipped total)")
     return payload
+
+
+def build_universe_shard(
+    shard_index: int, shard_count: int, out_dir: Path, *,
+    min_price: float = DEFAULT_MIN_PRICE, min_adv: float = DEFAULT_MIN_ADV,
+    cap: int = DEFAULT_CAP, lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    exclude_etf: bool = False, fetch_chunk: int = DEFAULT_FETCH_CHUNK,
+    fetch_pause: float = DEFAULT_FETCH_PAUSE,
+    skip_path: Path | None = None,
+) -> Path:
+    """Fetch one bounded slice of the monthly symbol directory for CI."""
+    if shard_count < 1 or not 0 <= shard_index < shard_count:
+        raise ValueError("invalid universe shard index/count")
+    today = dt.date.today()
+    candidates = _candidates(exclude_etf, skip_path or DEFAULT_SKIP_PATH, today)
+    selected = candidates[shard_index::shard_count]
+    dollar_volume, last_price, failed = _fetch_liquidity(
+        selected, lookback_days, session=_make_session(),
+        chunk=fetch_chunk, pause=fetch_pause,
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"shard-{shard_index:02d}.json"
+    path.write_text(json.dumps({
+        "as_of": today.isoformat(), "shard_index": shard_index,
+        "shard_count": shard_count, "candidate_snapshot_id": content_hash(candidates),
+        "settings": {
+            "min_price": min_price, "min_adv": min_adv, "cap": cap,
+            "exclude_etf": exclude_etf, "lookback_days": lookback_days,
+        },
+        "candidates": selected, "dollar_volume": dollar_volume,
+        "last_price": last_price, "failed": sorted(failed),
+    }, sort_keys=True), encoding="utf-8")
+    print(f"wrote {path} — {len(dollar_volume)}/{len(selected)} symbols returned prices")
+    return path
+
+
+def publish_universe_shards(
+    shard_dir: Path, *, out_path: Path | None = None,
+    skip_path: Path | None = None,
+) -> dict:
+    """Validate all shard artifacts, then publish one complete universe."""
+    paths = sorted(shard_dir.glob("shard-*.json"))
+    if not paths:
+        raise ValueError("no universe shard artifacts found")
+    shards = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
+    first = shards[0]
+    count = int(first["shard_count"])
+    if len(shards) != count or {s["shard_index"] for s in shards} != set(range(count)):
+        raise ValueError("universe shard artifacts are incomplete")
+    if any(s["as_of"] != first["as_of"] or
+           s["candidate_snapshot_id"] != first["candidate_snapshot_id"] or
+           s["settings"] != first["settings"] or
+           s["shard_count"] != count for s in shards):
+        raise ValueError("universe shard artifacts disagree on source or settings")
+    candidates = sorted(symbol for shard in shards for symbol in shard["candidates"])
+    if len(candidates) != len(set(candidates)) or content_hash(candidates) != first["candidate_snapshot_id"]:
+        raise ValueError("universe shard candidates are incomplete or duplicated")
+    dollar_volume: dict[str, float] = {}
+    last_price: dict[str, float] = {}
+    failed: set[str] = set()
+    for shard in shards:
+        expected = set(shard["candidates"])
+        got = set(shard["dollar_volume"])
+        if got - expected or set(shard["last_price"]) != got or set(shard["failed"]) != expected - got:
+            raise ValueError("universe shard prices do not match its candidates")
+        dollar_volume.update(shard["dollar_volume"])
+        last_price.update(shard["last_price"])
+        failed.update(shard["failed"])
+    settings = first["settings"]
+    return _publish_universe(
+        candidates, dollar_volume, last_price, failed,
+        today=dt.date.fromisoformat(first["as_of"]),
+        min_price=float(settings["min_price"]), min_adv=float(settings["min_adv"]),
+        cap=int(settings["cap"]), exclude_etf=bool(settings["exclude_etf"]),
+        path=out_path or DEFAULT_UNIVERSE_PATH,
+        skip_path=skip_path or DEFAULT_SKIP_PATH,
+    )
 
 
 def _prior_count(path: Path) -> int:

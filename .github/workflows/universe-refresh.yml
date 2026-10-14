@@ -1,13 +1,13 @@
-name: Universe — monthly refresh
+name: Universe — scheduled refresh
 
-# Rebuilds the shared tradable universe (public/data/universe.json) from the
-# Nasdaq Trader symbol directory + liquidity filters. Heavy (fetches bars for a
-# few thousand names), so it runs monthly — independent of the daily mark, which
-# only reads the committed file. See docs/subsystems/universe.md.
+# Rebuilds the shared tradable universe from the Nasdaq Trader directory and
+# liquidity filters. Price fetches are sharded so a slow provider batch cannot
+# consume the entire monthly job timeout. See docs/subsystems/universe.md.
 
 on:
   schedule:
     - cron: "0 6 1 * *"     # 06:00 UTC on the 1st of each month
+    - cron: "0 6 * * 1"     # retry on Mondays while the universe is stale
   workflow_dispatch:
     inputs:
       cap:
@@ -23,9 +23,42 @@ permissions:
   contents: write
 
 jobs:
-  refresh:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      refresh: ${{ steps.age.outputs.refresh }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check universe age
+        id: age
+        env:
+          FORCE_REFRESH: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path('public/data/universe.json')
+          as_of = json.loads(path.read_text())['as_of'] if path.exists() else '1900-01-01'
+          age = (dt.date.today() - dt.date.fromisoformat(as_of)).days
+          refresh = os.environ['FORCE_REFRESH'] == 'true' or age >= 25
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"refresh={'true' if refresh else 'false'}\n")
+          print(f'universe age={age} days; refresh={refresh}')
+          PY
+
+  fetch:
+    needs: check
+    if: needs.check.outputs.refresh == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -41,10 +74,47 @@ jobs:
       - name: Install dependencies
         run: pip install -r paper_trading/requirements-lock.txt
 
-      - name: Rebuild the shared universe
+      - name: Fetch universe prices for this shard
         env:
           UNIVERSE_CAP: ${{ github.event.inputs.cap || '1200' }}
-        run: python -m paper_trading.update_universe
+        run: python -m paper_trading.update_universe --shard-index ${{ matrix.shard }} --shard-count 16 --shard-dir universe-shards
+
+      - name: Preserve shard for publication
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: universe-shard-${{ matrix.shard }}
+          path: universe-shards/*.json
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [check, fetch]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            paper_trading/requirements-lock.txt
+
+      - name: Install dependencies
+        run: pip install -r paper_trading/requirements-lock.txt
+
+      - name: Download complete shard set
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: universe-shard-*
+          path: universe-shards
+          merge-multiple: true
+
+      - name: Validate and publish refreshed universe
+        run: python -m paper_trading.update_universe --finalize-dir universe-shards
 
       - name: Commit refreshed universe (if changed)
         run: |

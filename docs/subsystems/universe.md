@@ -34,8 +34,11 @@ would also pull a keyed paid feed + Darwin's data into the public repo, breaking
 
 ## Cadence — heavy work monthly, daily stays light
 
-`update_universe.py` (the monthly `universe-refresh.yml` cron) does steps 1–3 — fetching bars for
-a few thousand names is the expensive part — and commits both the current pointer in
+`update_universe.py` (the `universe-refresh.yml` cron) does steps 1–3. It runs on the first of
+each month and checks again each Monday while the snapshot is at least 25 days old; a manual
+dispatch always rebuilds. The workflow
+splits the full symbol directory across 16 independent price-fetch jobs, then validates and
+combines all 16 artifacts before committing the current pointer in
 `public/data/universe.json` and an effective-date/hash snapshot under `universe_snapshots/`. The
 **daily** updater never rebuilds it; it just reads the committed file via `resolve_universe`. So
 the thousands of fetches happen ~monthly, not daily, keeping the site cheap and CI reliable.
@@ -81,17 +84,21 @@ never renders it. Env overrides for the build: `UNIVERSE_CAP`, `UNIVERSE_MIN_PRI
 The liquidity step is built to stay under Yahoo's rate limit (the `YFRateLimitError` you'll
 otherwise see), since yfinance fetches per-ticker and bursts easily:
 
-- **Rate-limited session.** Requests go through a `requests_ratelimiter` session capped at
-  `DEFAULT_REQUESTS_PER_SEC` (4/s) — the yfinance-recommended fix. If the package isn't installed
-  the build falls back to sequential fetch + pauses (gentler but slower).
+- **Bounded jobs.** Sixteen shards spread the full directory over separate CI runners. A shard
+  cannot publish by itself; the final job requires every artifact from the same date, listing
+  snapshot, and settings. A local full rebuild remains available via
+  `python -m paper_trading.update_universe`.
+- **Paced requests.** Each shard fetches sequential batches with pauses and passes a
+  `requests_ratelimiter` session to yfinance when available.
 - **Sequential, batched, paced.** `threads=False`, `UNIVERSE_FETCH_CHUNK` symbols per batch
   (default 120), `UNIVERSE_FETCH_PAUSE`s between batches (default 1.5).
 - **Retry the missing subset.** yfinance doesn't raise on a per-ticker rate-limit — it returns that
   name empty — so the build detects which requested symbols are missing and re-fetches **only
   those** with back-off (default 3 rounds). Rate-limited names recover; genuinely dead ones don't.
-- **Retention guard.** If a run yields fewer than `MIN_RETENTION` (60%) of the previous universe's
-  tickers, it's treated as a rate-limited failure: the build **raises** rather than overwrite the
-  committed `universe.json` with a husk. Re-run (or lower the rate) and it recovers.
+- **Source-quality guards.** At least 90% of still-listed members of the previous universe must
+  return prices, and the eligible pool *before the intentional cap* must retain at least 60% of
+  the previous count. A 1,200-symbol cap can therefore replace the older 3,472-symbol snapshot
+  without weakening the check for a provider-wide outage.
 
 ## Skip-list — remembering dead symbols
 
@@ -101,8 +108,8 @@ are recorded in **`public/data/universe_skip.json`** as `{symbol: last_failed_da
 from the next build's fetch. Entries **expire after `SKIP_TTL_DAYS` (180)** so a symbol that
 relists gets re-checked. This is the only cross-run "memory" the builder keeps — the universe
 itself is still a full rebuild each month (liquidity must be recomputed from fresh prices). The
-monthly workflow commits `universe_skip.json` alongside `universe.json`. The 120-minute job timeout
-absorbs the pauses.
+monthly workflow commits `universe_skip.json` alongside `universe.json`. Each shard has its own
+120-minute timeout; incomplete or degraded fetches leave the committed universe untouched.
 
 ## Source files
 
