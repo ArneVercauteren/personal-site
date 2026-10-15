@@ -186,3 +186,13 @@ def test_sharded_refresh_rejects_incomplete_or_provider_degraded_results(tmp_pat
     with pytest.raises(RuntimeError, match="price source returned only"):
         universe.publish_universe_shards(shards, out_path=current)
     assert current.read_text() == original
+
+
+def test_make_session_defers_to_yfinance_on_modern_versions(monkeypatch):
+    # A plain requests session is rate-limited on every call by yfinance >= 0.2.66.
+    monkeypatch.setattr(universe.prices, "use_synthetic", lambda: False)
+    monkeypatch.setattr(
+        universe.prices, "_package_version_at_least",
+        lambda package, minimum: package == "yfinance",
+    )
+    assert universe._make_session() is None

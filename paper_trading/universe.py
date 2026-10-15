@@ -217,19 +217,14 @@ def rank_by_liquidity(
 
 
 def _make_session():
-    """A rate-limited requests session so yfinance stays under Yahoo's cap.
+    """The shared yfinance session policy from `prices.make_limiter_session`.
 
-    Uses `requests_ratelimiter` if installed (the yfinance-recommended way to
-    avoid `YFRateLimitError`). Returns None if it isn't — the fetch then falls
-    back to sequential requests + inter-batch pauses, which is gentler but slower.
+    Modern yfinance needs its own curl_cffi session: a plain `requests` session
+    (which `LimiterSession` is) gets `YFRateLimitError` on every request, which
+    stalled every monthly refresh from July to October 2026. That helper returns None for
+    those versions; the fetch then relies on sequential batches + pauses.
     """
-    try:
-        from requests_ratelimiter import LimiterSession
-
-        return LimiterSession(per_second=DEFAULT_REQUESTS_PER_SEC)
-    except Exception as exc:  # noqa: BLE001
-        print(f"  (no rate-limited session — pip install requests-ratelimiter; {exc})")
-        return None
+    return prices.make_limiter_session(DEFAULT_REQUESTS_PER_SEC)
 
 
 # --- persistent skip-list -----------------------------------------------------
