@@ -1057,10 +1057,12 @@ def simulate_incremental(
         remaining -= 1
         if remaining <= 0:
             review_excluded: tuple[str, ...] = ()
+            review_renamed: tuple[tuple[str, str], ...] = ()
             if review_universe is not None:
                 chosen = review_universe(session)
                 decision_universe = list(chosen.members)
                 review_excluded = tuple(chosen.excluded)
+                review_renamed = tuple(chosen.renamed)
             if prices_long is not None:
                 # The wide accounting frame forward-fills gaps. Candidate
                 # completeness must use real bars on this review session.
@@ -1134,6 +1136,8 @@ def simulate_incremental(
                 # Members that had stopped trading before this session; the
                 # snapshot id alone would not reproduce the reviewed candidates.
                 common["excluded_delisted"] = list(review_excluded)
+            if review_renamed:
+                common["renamed_symbols"] = dict(review_renamed)
             ledger_events.append(make_event(strategy["id"], "rebalance_reviewed", session, common))
             ledger_events.append(make_event(
                 strategy["id"], "targets_computed", session,

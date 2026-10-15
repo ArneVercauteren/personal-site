@@ -253,3 +253,35 @@ def test_delisting_record_requires_a_source(tmp_path):
     }}), encoding="utf-8")
     with pytest.raises(ValueError, match="source"):
         universe.load_delistings(delistings)
+
+
+def test_review_sees_a_renamed_member_under_its_new_symbol_from_the_change(tmp_path):
+    snaps = tmp_path / "snaps"
+    _write_snapshot(snaps, "2026-06-02", ["AAA", "OLD"])
+    records = tmp_path / "delistings.json"
+    records.write_text(json.dumps({"symbol_changes": {
+        "OLD": {"new_symbol": "NEW", "effective_session": "2026-06-24",
+                "source": "https://example.test/rename"},
+    }}), encoding="utf-8")
+
+    before = universe.review_universe(
+        {"id": "s"}, "2026-06-23", snapshot_dir=snaps, delistings_path=records,
+    )
+    after = universe.review_universe(
+        {"id": "s"}, "2026-06-24", snapshot_dir=snaps, delistings_path=records,
+    )
+
+    assert before.members == ("AAA", "OLD") and before.renamed == ()
+    # Same security, still trading: kept as a candidate, never excluded.
+    assert after.members == ("AAA", "NEW")
+    assert after.renamed == (("OLD", "NEW"),) and after.excluded == ()
+
+
+def test_committed_listing_records_are_complete_and_sourced():
+    records = json.loads(universe.DEFAULT_DELISTINGS_PATH.read_text(encoding="utf-8"))
+    delisted = universe.load_delistings()
+    renamed = universe.load_symbol_changes()
+    assert set(delisted).isdisjoint(renamed)
+    for section in ("delistings", "symbol_changes"):
+        for record in records[section].values():
+            assert record["source"].startswith("https://")

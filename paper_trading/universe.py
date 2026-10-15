@@ -56,6 +56,7 @@ __all__ = [
     "ReviewUniverse",
     "snapshot_for_session",
     "load_delistings",
+    "load_symbol_changes",
     "review_universe",
     "review_members_between",
 ]
@@ -598,6 +599,7 @@ class ReviewUniverse:
     snapshot_id: str
     members: tuple[str, ...]
     excluded: tuple[str, ...]
+    renamed: tuple[tuple[str, str], ...] = ()
 
 
 def _archived_snapshots(snapshot_dir: Path | None = None) -> list[tuple[str, str, list[str]]]:
@@ -637,19 +639,40 @@ def snapshot_for_session(
     return snapshot_id, members
 
 
-def load_delistings(path: Path | None = None) -> dict[str, str]:
-    """Reviewed `{ticker: last_trading_session}` records (see delistings.json)."""
+def _load_listing_records(path: Path | None) -> dict:
     p = path or DEFAULT_DELISTINGS_PATH
     if not p.exists():
         return {}
     payload = json.loads(p.read_text(encoding="utf-8"))
+    for section in ("delistings", "symbol_changes"):
+        for ticker, record in payload.get(section, {}).items():
+            if not record.get("source"):
+                raise ValueError(f"{section} record for {ticker} has no source")
+    return payload
+
+
+def load_delistings(path: Path | None = None) -> dict[str, str]:
+    """Reviewed `{ticker: last_trading_session}` records (see delistings.json)."""
     out: dict[str, str] = {}
-    for ticker, record in payload.get("delistings", {}).items():
+    for ticker, record in _load_listing_records(path).get("delistings", {}).items():
         last = str(record["last_trading_session"])
         dt.date.fromisoformat(last)
-        if not record.get("source"):
-            raise ValueError(f"delisting record for {ticker} has no source")
         out[normalize_ticker(ticker)] = last
+    return out
+
+
+def load_symbol_changes(path: Path | None = None) -> dict[str, tuple[str, str]]:
+    """Reviewed `{old: (new, first_session_under_new)}` ticker changes.
+
+    The same security kept trading under a new symbol, so it is not delisted:
+    a later review sees it under the new symbol, whose history the provider
+    carries back across the change.
+    """
+    out: dict[str, tuple[str, str]] = {}
+    for ticker, record in _load_listing_records(path).get("symbol_changes", {}).items():
+        effective = str(record["effective_session"])
+        dt.date.fromisoformat(effective)
+        out[normalize_ticker(ticker)] = (normalize_ticker(record["new_symbol"]), effective)
     return out
 
 
@@ -666,11 +689,21 @@ def review_universe(
     """
     snapshot_id, members = snapshot_for_session(spec, session, snapshot_dir)
     delisted = load_delistings(delistings_path)
+    changes = load_symbol_changes(delistings_path)
     excluded = {ticker for ticker in members if delisted.get(ticker, "9999-12-31") < session}
+    renamed = {
+        ticker: changes[ticker][0]
+        for ticker in members
+        if ticker in changes and changes[ticker][1] <= session
+    }
+    kept = [renamed.get(ticker, ticker) for ticker in members if ticker not in excluded]
+    if len(set(kept)) != len(kept):
+        raise ValueError(f"symbol changes collide with other members on {session}")
     return ReviewUniverse(
         snapshot_id=snapshot_id,
-        members=tuple(ticker for ticker in members if ticker not in excluded),
+        members=tuple(kept),
         excluded=tuple(sorted(excluded)),
+        renamed=tuple(sorted(renamed.items())),
     )
 
 
@@ -680,17 +713,20 @@ def review_members_between(
     """Every snapshot member a review in (`after`, `through`] could use."""
     explicit = spec.get("universe")
     if isinstance(explicit, list) and explicit:
-        return set(snapshot_for_session(spec, through, snapshot_dir)[1])
-    snapshots = _archived_snapshots(snapshot_dir)
-    # The snapshot in force on the first unseen session, plus any built later.
-    first = [item for item in snapshots if item[0] <= after]
-    floor = max((as_of for as_of, _, _ in first), default="")
-    return {
-        ticker
-        for as_of, _, members in snapshots
-        if floor <= as_of < through
-        for ticker in members
-    }
+        members = set(snapshot_for_session(spec, through, snapshot_dir)[1])
+    else:
+        snapshots = _archived_snapshots(snapshot_dir)
+        # The snapshot in force on the first unseen session, plus any built later.
+        first = [item for item in snapshots if item[0] <= after]
+        floor = max((as_of for as_of, _, _ in first), default="")
+        members = {
+            ticker
+            for as_of, _, tickers in snapshots
+            if floor <= as_of < through
+            for ticker in tickers
+        }
+    changes = load_symbol_changes()
+    return members | {changes[t][0] for t in members if t in changes}
 
 
 def archive_current_universe(path: Path | None = None) -> Path:

@@ -1,0 +1,260 @@
+{
+  "_doc": "Reviewed listing events for universe members. A review on session S drops a delisted member only if last_trading_session < S, and sees a renamed member under new_symbol from effective_session on. Where a source gives only the closing date, that date is used as an upper bound so a name is never dropped early. See docs/subsystems/universe.md.",
+  "delistings": {
+    "APGE": {
+      "last_trading_session": "2026-09-02",
+      "event": "AbbVie merger; Nasdaq halt requested after the close on 2026-09-02",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001974640/000114036126035537/ef20081397_8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "AVB": {
+      "last_trading_session": "2026-08-17",
+      "event": "merged into Equity Residential (now Vivmark, VMRK); merger closed 2026-08-17 (upper bound)",
+      "source": "https://www.sec.gov/Archives/edgar/data/0000906107/000114036126033377/ef20080318_8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "AVNS": {
+      "last_trading_session": "2026-07-27",
+      "event": "acquired by American Industrial Partners; closed 2026-07-27 (upper bound)",
+      "source": "https://americanindustrial.com/news/avanos-medical-inc-agrees-to-be-acquired-by-american-industrial-partners-for-approximately-1-272-billion/",
+      "reviewed": "2026-10-15"
+    },
+    "AXIA": {
+      "last_trading_session": "2026-08-06",
+      "event": "voluntary NYSE delisting of the ADSs; last NYSE day on or about 2026-08-06, then OTC",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001439124/000129281426003685/axia20260706_6k2.htm",
+      "reviewed": "2026-10-15"
+    },
+    "BLD": {
+      "last_trading_session": "2026-06-30",
+      "event": "acquired by QXO; NYSE trading suspended before the open on 2026-07-01",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001633931/000110465926079876/tm2618991d10_8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "BLFS": {
+      "last_trading_session": "2026-10-06",
+      "event": "acquired by Repligen; merger completed 2026-10-06 (upper bound)",
+      "source": "https://www.sec.gov/Archives/edgar/data/0000730272/000119312526415015/d240327d8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "CNTA": {
+      "last_trading_session": "2026-06-24",
+      "event": "acquired by Eli Lilly; completed 2026-06-24 (upper bound)",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001847903/000119312526280337/d150381d8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "CPRX": {
+      "last_trading_session": "2026-07-15",
+      "event": "acquired by Angelini Pharma; merger consummated 2026-07-15 (upper bound)",
+      "source": "https://www.sahmcapital.com/news/content/catalyst-pharmaceuticals-shares-face-nasdaq-suspension-as-company-moves-to-delist-after-merger-2026-07-16",
+      "reviewed": "2026-10-15"
+    },
+    "CRNX": {
+      "last_trading_session": "2026-09-01",
+      "event": "acquired by Vertex; completed 2026-09-01 (upper bound)",
+      "source": "https://www.panabee.com/news/vertex-completes-10-billion-acquisition-of-crinetics-pharmaceuticals",
+      "reviewed": "2026-10-15"
+    },
+    "CWAN": {
+      "last_trading_session": "2026-06-25",
+      "event": "taken private by Permira/Warburg Pincus; closed and Form 25 filed 2026-06-25",
+      "source": "https://stockti.com/clearwater-analytics-exits-nyse-after-8-4b-buyout",
+      "reviewed": "2026-10-15"
+    },
+    "DBRG": {
+      "last_trading_session": "2026-09-30",
+      "event": "acquired by SoftBank Group; completed 2026-09-30 (upper bound)",
+      "source": "https://group.softbank/en/news/press/20260930",
+      "reviewed": "2026-10-15"
+    },
+    "EA": {
+      "last_trading_session": "2026-08-04",
+      "event": "taken private by PIF/Silver Lake/Affinity; closed and delisted 2026-08-04",
+      "source": "https://www.gaming.net/ea-completes-55b-saudi-backed-buyout-and-exits-nasdaq/",
+      "reviewed": "2026-10-15"
+    },
+    "FBRX": {
+      "last_trading_session": "2026-08-27",
+      "event": "acquired by argenx; merger completion 8-K dated 2026-08-27 (upper bound)",
+      "source": "https://www.boardroomalpha.com/sec/fbrx-8-k-2026-08-27-0001140361-26-034698",
+      "reviewed": "2026-10-15"
+    },
+    "GTLS": {
+      "last_trading_session": "2026-07-16",
+      "event": "acquired by Baker Hughes; completed 2026-07-16 (upper bound)",
+      "source": "https://www.sec.gov/Archives/edgar/data/0000892553/000119312526305482/d10289d8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "JHG": {
+      "last_trading_session": "2026-06-30",
+      "event": "taken private by Trian/General Catalyst/QIA; closed and delisted 2026-06-30",
+      "source": "https://www.janushenderson.com/corporate/press-releases/janus-henderson-completes-take-private-transaction-with-trian-general-catalyst-and-qia/",
+      "reviewed": "2026-10-15"
+    },
+    "KALV": {
+      "last_trading_session": "2026-06-10",
+      "event": "acquired by Chiesi; Nasdaq trading halted before the open on 2026-06-11",
+      "source": "https://app.edgar.tools/news/3925b617f13ea67e",
+      "reviewed": "2026-10-15"
+    },
+    "KW": {
+      "last_trading_session": "2026-06-16",
+      "event": "taken private by Fairfax; closed 2026-06-16 (upper bound)",
+      "source": "https://ir.kennedywilson.com/press-releases/2026/06-16-2026-134216957",
+      "reviewed": "2026-10-15"
+    },
+    "LBRDA": {
+      "last_trading_session": "2026-08-19",
+      "event": "merged into Charter; closed 2026-08-19 (upper bound)",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001611983/000114036126033932/ef20080711_8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "LBRDK": {
+      "last_trading_session": "2026-08-19",
+      "event": "merged into Charter; closed 2026-08-19 (upper bound)",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001611983/000114036126033932/ef20080711_8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "MASI": {
+      "last_trading_session": "2026-06-10",
+      "event": "acquired by Danaher; stopped trading on the 2026-06-10 closing (upper bound)",
+      "source": "https://respiratory-therapy.com/products-treatment/industry-regulatory-news/business-news/danaher-completes-acquisition-of-masimo/",
+      "reviewed": "2026-10-15"
+    },
+    "NSA": {
+      "last_trading_session": "2026-07-21",
+      "event": "acquired by Public Storage; NYSE trading suspended before the open on the 2026-07-22 closing",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001618563/000110465926085888/tm2620871d8_8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "NUVL": {
+      "last_trading_session": "2026-07-14",
+      "event": "acquired by GSK; Nasdaq halt after the close on 2026-07-14",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001861560/000119312526304126/d52896d8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "ORLA": {
+      "last_trading_session": "2026-07-31",
+      "event": "combined into Equinox Gold (EQX); completed 2026-07-31 (upper bound)",
+      "source": "https://www.placera.se/pressmeddelanden/equinox-gold-equinox-gold-and-orla-mining-complete-business-combination-creating-north-america-s-new-senior-gold-producer-20260731",
+      "reviewed": "2026-10-15"
+    },
+    "PRA": {
+      "last_trading_session": "2026-06-26",
+      "event": "acquired by The Doctors Company; completed 2026-06-26 (upper bound)",
+      "source": "https://www.thedoctors.com/about-the-doctors-company/newsroom/press-releases/2026/the-doctors-companycompletes-acquisitionofproassurance-corporation",
+      "reviewed": "2026-10-15"
+    },
+    "QRVO": {
+      "last_trading_session": "2026-10-05",
+      "event": "combined into Skyworks (SWKS); completed 2026-10-05 (upper bound)",
+      "source": "https://www.qorvo.com/about/news-events/news-releases/2026/skyworks-completes-combination-with-qorvo",
+      "reviewed": "2026-10-15"
+    },
+    "SEM": {
+      "last_trading_session": "2026-06-30",
+      "event": "taken private by founders/WCAS; closed 2026-06-30, stopped trading 2026-07-01",
+      "source": "https://www.panabee.com/news/select-medical-finalizes-1-7-billion-go-private-transaction",
+      "reviewed": "2026-10-15"
+    },
+    "SILA": {
+      "last_trading_session": "2026-07-01",
+      "event": "acquired by Blue Owl funds; completed 2026-07-01 (upper bound)",
+      "source": "https://www.sahmcapital.com/news/content/blue-owl-managed-funds-complete-acquisition-of-sila-realty-trust-for-usd-3038-per-share-2026-07-01",
+      "reviewed": "2026-10-15"
+    },
+    "SKYT": {
+      "last_trading_session": "2026-07-30",
+      "event": "acquired by IonQ; Nasdaq trading halted before the open on 2026-07-31",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001819974/000119312526327137/d49031d8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "STEL": {
+      "last_trading_session": "2026-06-30",
+      "event": "merged into Prosperity Bancshares; NYSE trading suspended before the open on 2026-07-01",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001473844/000119312526291511/d116708d8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "TBPH": {
+      "last_trading_session": "2026-09-23",
+      "event": "acquired by Zymeworks; completed 2026-09-23 (upper bound)",
+      "source": "https://finviz.com/news/394889/zymeworks-completes-acquisition-of-theravance-biopharma",
+      "reviewed": "2026-10-15"
+    },
+    "TMHC": {
+      "last_trading_session": "2026-07-24",
+      "event": "acquired by Berkshire Hathaway; NYSE trading suspended after the close on 2026-07-24",
+      "source": "https://www.sec.gov/Archives/edgar/data/0001562476/000119312526316037/d148123d8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "TWO": {
+      "last_trading_session": "2026-08-25",
+      "event": "acquired by CrossCountry Mortgage; merger completed 2026-08-25 (upper bound)",
+      "source": "https://www.boardroomalpha.com/sec/two-8-k-2026-08-25-0001104659-26-100622",
+      "reviewed": "2026-10-15"
+    },
+    "WBD": {
+      "last_trading_session": "2026-10-06",
+      "event": "acquired by Skydance; merger effective 2026-10-06 (upper bound)",
+      "source": "https://stockanalysis.com/stocks/wbd/",
+      "reviewed": "2026-10-15"
+    },
+    "WBS": {
+      "last_trading_session": "2026-08-19",
+      "event": "acquired by Banco Santander; last NYSE session 2026-08-19",
+      "source": "https://www.retailbankerinternational.com/news/santander-completes-us-webster-purchase/",
+      "reviewed": "2026-10-15"
+    }
+  },
+  "symbol_changes": {
+    "EQR": {
+      "new_symbol": "VMRK",
+      "effective_session": "2026-08-18",
+      "event": "renamed Vivmark Residential after absorbing AvalonBay",
+      "source": "https://www.sec.gov/Archives/edgar/data/0000906107/000114036126033377/ef20080318_8k.htm",
+      "reviewed": "2026-10-15"
+    },
+    "FDP": {
+      "new_symbol": "DMC",
+      "effective_session": "2026-06-29",
+      "event": "renamed Del Monte Corporation",
+      "source": "https://secure.businesswire.com/news/home/20260609093698/en/Fresh-Del-Monte-Produce-Inc.-Announces-Name-Change-to-Del-Monte-Corporation-and-NYSE-Ticker-Symbol-Change-to-DMC",
+      "reviewed": "2026-10-15"
+    },
+    "IAC": {
+      "new_symbol": "PPLI",
+      "effective_session": "2026-06-04",
+      "event": "renamed People Incorporated",
+      "source": "https://people.gcs-web.com/news-releases/news-release-details/iac-now-people-incorporated-new-ticker-symbol",
+      "reviewed": "2026-10-15"
+    },
+    "ISSC": {
+      "new_symbol": "IA",
+      "effective_session": "2026-08-18",
+      "event": "Innovative Aerosystems ticker change",
+      "source": "https://boxexchange.com/assets/BOXOnnMemo207839.pdf",
+      "reviewed": "2026-10-15"
+    },
+    "LC": {
+      "new_symbol": "HAPN",
+      "effective_session": "2026-06-22",
+      "event": "LendingClub moved to Nasdaq as Happen",
+      "source": "https://lendingclub.gcs-web.com/news-releases/news-release-details/lendingclub-transfer-listing-nasdaq-new-ticker-symbol-hapn",
+      "reviewed": "2026-10-15"
+    },
+    "SATS": {
+      "new_symbol": "ECHO",
+      "effective_session": "2026-06-24",
+      "event": "EchoStar ticker change",
+      "source": "https://echostar.gcs-web.com/news-releases/news-release-details/echostar-changing-stocker-ticker-sats-echo-marking-companys-next",
+      "reviewed": "2026-10-15"
+    },
+    "SCVL": {
+      "new_symbol": "SHOE",
+      "effective_session": "2026-06-12",
+      "event": "renamed Shoe Station Group",
+      "source": "https://www.sec.gov/Archives/edgar/data/0000895447/000119312526266625/scvl-20260610.htm",
+      "reviewed": "2026-10-15"
+    }
+  }
+}

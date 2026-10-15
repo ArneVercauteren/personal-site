@@ -68,7 +68,13 @@ using `paper_trading/delistings.json`: reviewed `{ticker: {last_trading_session,
 A member is excluded only when its `last_trading_session` is strictly before the review session, so
 a name that still traded that day stays a candidate and must have a real bar. A provider's
 "possibly delisted" warning is never enough to add a record: each needs a source showing when trading
-ended. Excluded names are listed in the review's `excluded_delisted` ledger field.
+ended. Excluded names are listed in the review's `excluded_delisted` ledger field. Where a source
+only gives a deal's closing date, that date is recorded as an upper bound, so a name is never dropped
+before it actually stopped trading.
+
+A ticker change is not a delisting: the same security kept trading. `symbol_changes` in the same
+file maps the old symbol to its `new_symbol` from the `effective_session` on (the provider carries
+history back under the new symbol), and the review records the mapping as `renamed_symbols`.
 
 ## Fidelity note
 
