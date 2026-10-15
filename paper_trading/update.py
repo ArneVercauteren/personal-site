@@ -171,15 +171,22 @@ def merge_by_id(existing: list[dict], owned: list[dict], owned_ids: set[str]) ->
     return preserved + owned
 
 
-def _spec_fetch_window(spec: dict) -> tuple[list[str], str]:
+def _spec_fetch_window(spec: dict, end: str) -> tuple[list[str], str]:
     """The tickers and earliest start date this spec's simulation needs.
 
     The Yahoo-backed window begins `warmup` days before the simulation curve
     start (the Astralanx prefix's last date when present, else `backfill_start` /
     `deployed_on`), with enough lookback for the longest feature window.
+    Candidates come from the point-in-time snapshots any review through `end`
+    may use, not from the moving current universe.
     """
-    tickers = universe.resolve_universe(spec)
     checkpoint = LEDGER_STORE.load_checkpoint(spec["id"])
+    if checkpoint is None:
+        tickers = universe.resolve_universe(spec)
+    else:
+        tickers = sorted(universe.review_members_between(
+            spec, checkpoint["last_processed_session"], end,
+        ))
     if checkpoint is not None:
         # Continue marking positions selected under an older point-in-time
         # universe even if the current membership has since changed.
@@ -210,7 +217,7 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
     """
     earliest: dict[str, str] = {}
     for spec in specs:
-        tickers, start = _spec_fetch_window(spec)
+        tickers, start = _spec_fetch_window(spec, end)
         for t in tickers:
             cur = earliest.get(t)
             if cur is None or start < cur:
@@ -249,7 +256,7 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
         checkpoint = LEDGER_STORE.load_checkpoint(spec["id"])
         if checkpoint is None:
             continue
-        _, start = _spec_fetch_window(spec)
+        _, start = _spec_fetch_window(spec, end)
         boundary = checkpoint["last_processed_session"]
         new_sessions = tuple(
             day.strftime("%Y-%m-%d")
@@ -280,8 +287,18 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
         sessions = _upcoming_review_sessions(spec, checkpoint, market_index)
         if not sessions:
             continue
-        members = universe.resolve_universe(spec)
-        missing = prices.missing_price_tickers(long, members, sessions)
+        candidates = {
+            review: universe.review_universe(spec, review).members for review in sessions
+        }
+
+        def unresolved() -> list[str]:
+            return sorted({
+                ticker
+                for review, members in candidates.items()
+                for ticker in prices.missing_price_tickers(long, list(members), (review,))
+            })
+
+        missing = unresolved()
         if missing:
             try:
                 recovered = prices.get_ohlcv_chunked(
@@ -293,7 +310,7 @@ def _fetch_all_prices(specs: list[dict], end: str) -> pd.DataFrame:
             long = pd.concat([long, recovered], ignore_index=True).drop_duplicates(
                 ["ticker", "date"], keep="last",
             )
-        missing = prices.missing_price_tickers(long, members, sessions)
+        missing = unresolved()
         if missing:
             raise portfolio.BoundaryPriceUnavailable(
                 f"{spec['id']}: incomplete rebalance candidate prices for "
@@ -483,7 +500,7 @@ def run(strategy_ids: set[str] | None = None) -> str:
     long_all = _fetch_all_prices(specs, end)
 
     for spec in specs:
-        tickers, start = _spec_fetch_window(spec)
+        tickers, start = _spec_fetch_window(spec, end)
         wanted = set(tickers)
         long = long_all[
             long_all["ticker"].isin(wanted) & (long_all["date"] >= pd.Timestamp(start))
@@ -533,7 +550,7 @@ def run(strategy_ids: set[str] | None = None) -> str:
                 spec, checkpoint, previous["equity_curve"], opens, closes,
                 prices_long=long if "formula" in spec else None,
                 dollar_volume=dollar_volume, raw_closes=raw_closes,
-                active_universe=universe.resolve_universe(spec),
+                review_universe=lambda session, spec=spec: universe.review_universe(spec, session),
             )
         else:
             raise ValueError(

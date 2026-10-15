@@ -196,3 +196,60 @@ def test_make_session_defers_to_yfinance_on_modern_versions(monkeypatch):
         lambda package, minimum: package == "yfinance",
     )
     assert universe._make_session() is None
+
+
+def _write_snapshot(directory, as_of, tickers):
+    directory.mkdir(exist_ok=True)
+    payload = {"as_of": as_of, "snapshot_id": f"snap-{as_of}", "tickers": tickers}
+    (directory / f"{as_of}.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_review_uses_newest_snapshot_built_strictly_before_the_session(tmp_path):
+    snaps = tmp_path / "snaps"
+    _write_snapshot(snaps, "2026-06-02", ["AAA", "OLD"])
+    _write_snapshot(snaps, "2026-10-15", ["AAA", "NEW"])
+    spec = {"id": "s"}
+    # A catch-up review on Oct 8 must not see a refresh built on Oct 15, nor
+    # one built on the review day itself.
+    assert universe.snapshot_for_session(spec, "2026-10-08", snaps) == (
+        "snap-2026-06-02", ["AAA", "OLD"],
+    )
+    assert universe.snapshot_for_session(spec, "2026-10-15", snaps)[0] == "snap-2026-06-02"
+    assert universe.snapshot_for_session(spec, "2026-10-16", snaps)[0] == "snap-2026-10-15"
+    with pytest.raises(ValueError, match="predates"):
+        universe.snapshot_for_session(spec, "2026-06-02", snaps)
+    assert universe.review_members_between(spec, "2026-10-07", "2026-10-15", snaps) == {
+        "AAA", "OLD",
+    }
+    assert universe.review_members_between(spec, "2026-10-07", "2026-10-16", snaps) == {
+        "AAA", "OLD", "NEW",
+    }
+
+
+def test_review_excludes_only_members_whose_last_session_precedes_it(tmp_path):
+    snaps = tmp_path / "snaps"
+    _write_snapshot(snaps, "2026-06-02", ["AAA", "GONE", "LAST", "LATER"])
+    delistings = tmp_path / "delistings.json"
+    delistings.write_text(json.dumps({"delistings": {
+        "GONE": {"last_trading_session": "2026-08-19", "source": "https://example.test/gone"},
+        "LAST": {"last_trading_session": "2026-10-08", "source": "https://example.test/last"},
+        "LATER": {"last_trading_session": "2026-10-12", "source": "https://example.test/later"},
+    }}), encoding="utf-8")
+
+    review = universe.review_universe(
+        {"id": "s"}, "2026-10-08", snapshot_dir=snaps, delistings_path=delistings,
+    )
+
+    assert review.snapshot_id == "snap-2026-06-02"
+    # Traded on the review session or after it: still a candidate (no lookahead).
+    assert review.members == ("AAA", "LAST", "LATER")
+    assert review.excluded == ("GONE",)
+
+
+def test_delisting_record_requires_a_source(tmp_path):
+    delistings = tmp_path / "delistings.json"
+    delistings.write_text(json.dumps({"delistings": {
+        "GONE": {"last_trading_session": "2026-08-19"},
+    }}), encoding="utf-8")
+    with pytest.raises(ValueError, match="source"):
+        universe.load_delistings(delistings)

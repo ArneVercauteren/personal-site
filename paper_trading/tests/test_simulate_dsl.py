@@ -405,3 +405,57 @@ def test_benchmark_dependent_features_without_market_series_do_not_warn(
         )
 
     assert not any("Could not compute feature" in record.message for record in caplog.records)
+
+
+def _checkpoint_one_session_before_review(spec, opens, closes, long_prices):
+    cutoff = closes.loc["2024-06-01":].index[35]
+    first = portfolio.simulate(
+        spec, opens.loc[:cutoff], closes.loc[:cutoff],
+        prices_long=long_prices[long_prices["date"] <= cutoff],
+    )
+    remaining = first.checkpoint["sessions_until_review"]
+    cutoff = closes.index[closes.index.get_loc(cutoff) + remaining - 1]
+    result = portfolio.simulate(
+        spec, opens.loc[:cutoff], closes.loc[:cutoff],
+        prices_long=long_prices[long_prices["date"] <= cutoff],
+    )
+    assert result.checkpoint["sessions_until_review"] == 1
+    return result, closes.index[closes.index > cutoff][0]
+
+
+def test_review_skips_members_that_stopped_trading_before_the_session(universe, long_prices):
+    from paper_trading.universe import ReviewUniverse
+
+    opens, closes = prices.long_to_wide(long_prices)
+    spec = _spec(universe, _roc_topn())
+    spec["rebalance_cadence_days"] = 42
+    spec["rebalance_cadence_unit"] = "trading_days"
+    before, review_day = _checkpoint_one_session_before_review(spec, opens, closes, long_prices)
+    gone = next(t for t in universe if t not in before.checkpoint["shares"])
+    # The departed member has no bar on the review session.
+    long_cut = long_prices[
+        (long_prices["date"] <= review_day)
+        & ~((long_prices["ticker"] == gone) & (long_prices["date"] == review_day))
+    ]
+
+    def run(excluded):
+        return portfolio.simulate_incremental(
+            spec, before.checkpoint, before.equity_curve,
+            opens.loc[:review_day], closes.loc[:review_day], prices_long=long_cut,
+            review_universe=lambda session: ReviewUniverse(
+                snapshot_id="snapshot-before-review",
+                members=tuple(t for t in universe if t not in excluded),
+                excluded=tuple(sorted(excluded)),
+            ),
+        )
+
+    with pytest.raises(portfolio.BoundaryPriceUnavailable, match=gone):
+        run(set())
+
+    result = run({gone})
+    events = {event["event_type"]: event for event in result.ledger_events}
+    reviewed = events["rebalance_reviewed"]["payload"]
+    assert reviewed["universe_snapshot_id"] == "snapshot-before-review"
+    assert reviewed["excluded_delisted"] == [gone]
+    assert gone not in events["targets_computed"]["payload"]["weights"]
+    assert result.checkpoint["universe_snapshot_id"] == "snapshot-before-review"

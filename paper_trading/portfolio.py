@@ -18,8 +18,10 @@ history always yields the same result (see `docs/concepts/paper-trading-only.md`
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 import hashlib
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -945,8 +947,13 @@ def simulate_incremental(
     dollar_volume: pd.DataFrame | None = None,
     raw_closes: pd.DataFrame | None = None,
     active_universe: list[str] | None = None,
+    review_universe: Callable[[str], Any] | None = None,
 ) -> SimResult:
     """Advance an accepted checkpoint across unseen sessions only.
+
+    ``review_universe(session)`` (a ``universe.ReviewUniverse``) supplies the
+    point-in-time candidates for each review; ``active_universe`` is the legacy
+    fixed membership used when it is absent.
 
     Historical accounting comes exclusively from ``checkpoint`` and
     ``prior_curve``.  Older bars may be supplied as causal feature warm-up, but
@@ -1049,6 +1056,11 @@ def simulate_incremental(
 
         remaining -= 1
         if remaining <= 0:
+            review_excluded: tuple[str, ...] = ()
+            if review_universe is not None:
+                chosen = review_universe(session)
+                decision_universe = list(chosen.members)
+                review_excluded = tuple(chosen.excluded)
             if prices_long is not None:
                 # The wide accounting frame forward-fills gaps. Candidate
                 # completeness must use real bars on this review session.
@@ -1103,10 +1115,13 @@ def simulate_incremental(
             equity_at_prev_rebal = equity_now
             last_review = session
             remaining = cadence
-            decision_universe_snapshot_id = (
-                strategy.get("_universe_snapshot_id")
-                or content_hash(sorted(decision_universe))
-            )
+            if review_universe is not None:
+                decision_universe_snapshot_id = chosen.snapshot_id
+            else:
+                decision_universe_snapshot_id = (
+                    strategy.get("_universe_snapshot_id")
+                    or content_hash(sorted(decision_universe))
+                )
             common = {
                 "formula_hash": expected["formula_hash"],
                 "cost_model_hash": expected["cost_model_hash"],
@@ -1115,6 +1130,10 @@ def simulate_incremental(
                     day, closes.loc[day], decision_universe, prices_long,
                 ),
             }
+            if review_excluded:
+                # Members that had stopped trading before this session; the
+                # snapshot id alone would not reproduce the reviewed candidates.
+                common["excluded_delisted"] = list(review_excluded)
             ledger_events.append(make_event(strategy["id"], "rebalance_reviewed", session, common))
             ledger_events.append(make_event(
                 strategy["id"], "targets_computed", session,

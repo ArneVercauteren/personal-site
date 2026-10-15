@@ -53,7 +53,7 @@ def generate(strategy_id: str) -> Path:
     boundary = public["as_of"]
     end = (pd.Timestamp(boundary) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
     long_all = update._fetch_all_prices([spec], end)
-    tickers, start = update._spec_fetch_window(spec)
+    tickers, start = update._spec_fetch_window(spec, end)
     long = long_all[
         long_all["ticker"].isin(set(tickers))
         & (long_all["date"] >= pd.Timestamp(start))

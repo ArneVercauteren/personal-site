@@ -55,6 +55,21 @@ So a king is deployed **once**; new tickers flow in via the monthly refresh, not
 from stale Darwin. The Darwin "deploy to site" export therefore doesn't need to embed a universe —
 leaving it empty resolves to the shared file.
 
+### Reviews are point-in-time
+
+A rebalance review does **not** read the moving `universe.json`. `universe.review_universe(spec,
+session)` picks the newest archived snapshot under `universe_snapshots/` whose `as_of` is strictly
+before the review session; a refresh fetches bars through its own `as_of` day, so it may only
+inform later sessions. A catch-up run that reaches an older review after a refresh therefore still
+uses the snapshot that was in force on that day. The audit replay applies the same rule.
+
+Members that had stopped trading before the review session (acquired, delisted) are then removed
+using `paper_trading/delistings.json`: reviewed `{ticker: {last_trading_session, source}}` records.
+A member is excluded only when its `last_trading_session` is strictly before the review session, so
+a name that still traded that day stays a candidate and must have a real bar. A provider's
+"possibly delisted" warning is never enough to add a record: each needs a source showing when trading
+ended. Excluded names are listed in the review's `excluded_delisted` ledger field.
+
 ## Fidelity note
 
 This is not bit-identical to Darwin's curated Tiingo universe (different vendor, different

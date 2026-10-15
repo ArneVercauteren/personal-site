@@ -49,22 +49,14 @@ def run(strategy_id: str) -> None:
     if content_hash(curve) != migration["payload"]["curve_hash"]:
         raise ValueError("published history before the migration boundary was rewritten")
 
-    review_snapshots = {
-        event["session"]: event["payload"]["universe_snapshot_id"]
-        for event in events
-        if event["event_type"] == "rebalance_reviewed"
-        and migration_boundary < event["session"] <= boundary
-    }
-    memberships = {
-        snapshot_id: universe.load_universe_snapshot(snapshot_id, spec)
-        for snapshot_id in set(review_snapshots.values()) | {checkpoint["universe_snapshot_id"]}
-    }
-
     if migration_boundary < boundary:
+        # Reviews are re-derived with the same point-in-time rule the updater
+        # uses; the event comparison below then checks the recorded snapshot ids
+        # and delisting exclusions.
         all_tickers = sorted(
             set(checkpoint.get("shares", {}))
             | set(checkpoint.get("pending_target", {}))
-            | {ticker for members in memberships.values() for ticker in members}
+            | universe.review_members_between(spec, migration_boundary, boundary)
         )
         fetch_spec = {**spec, "universe": all_tickers}
         end = (pd.Timestamp(boundary) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
@@ -73,14 +65,11 @@ def run(strategy_id: str) -> None:
         raw_closes, dollar_volume = prices.wide_raw_and_dollar_volume(long)
         generated: list[dict] = []
         for day in closes.index[(closes.index > pd.Timestamp(migration_boundary)) & (closes.index <= pd.Timestamp(boundary))]:
-            session = day.strftime("%Y-%m-%d")
-            snapshot_id = review_snapshots.get(session, checkpoint["universe_snapshot_id"])
-            day_spec = {**spec, "_universe_snapshot_id": snapshot_id}
             result = portfolio.simulate_incremental(
-                day_spec, checkpoint, curve, opens.loc[:day], closes.loc[:day],
+                spec, checkpoint, curve, opens.loc[:day], closes.loc[:day],
                 prices_long=long[long["date"] <= day] if "formula" in spec else None,
                 dollar_volume=dollar_volume.loc[:day], raw_closes=raw_closes.loc[:day],
-                active_universe=memberships[snapshot_id],
+                review_universe=lambda session: universe.review_universe(spec, session),
             )
             if result.checkpoint is None:
                 raise ValueError("point-in-time audit produced no checkpoint")

@@ -93,7 +93,10 @@ are NaN, handled).
    candidate guard at review, so forward-filled prices cannot hide either kind of required gap.
    Unresolved candidates fail as retryable data errors before a rebalance is accepted. Ordinary
    non-review days can proceed with missing unheld candidates. A provider's generic
-   "possibly delisted" message never authorizes removing a member from the strategy universe.
+   "possibly delisted" message never authorizes removing a member from the strategy universe;
+   only a sourced `paper_trading/delistings.json` record whose last trading session precedes the
+   review does. Each review uses the point-in-time snapshot and exclusions described in
+   [universe.md](universe.md#reviews-are-point-in-time), never the current `universe.json`.
 2. Load the accepted checkpoint and verify deployment, formula, cost, boundary-price, and engine hashes.
    End-of-day boundary snapshots cover held positions only; full-universe causal inputs remain hashed
    on rebalance events. Legacy universe-wide checkpoints may transition only when every held price is

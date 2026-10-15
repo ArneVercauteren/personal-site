@@ -33,6 +33,7 @@ import json
 import re
 import time
 import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -52,10 +53,19 @@ __all__ = [
     "resolve_universe_snapshot_id",
     "load_universe_snapshot",
     "archive_current_universe",
+    "ReviewUniverse",
+    "snapshot_for_session",
+    "load_delistings",
+    "review_universe",
+    "review_members_between",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_UNIVERSE_PATH = REPO_ROOT / "public" / "data" / "universe.json"
+DEFAULT_SNAPSHOT_DIR = DEFAULT_UNIVERSE_PATH.parent / "universe_snapshots"
+# Reviewed last trading sessions for members that stopped trading (acquired,
+# delisted). A provider "possibly delisted" warning never creates an entry.
+DEFAULT_DELISTINGS_PATH = REPO_ROOT / "paper_trading" / "delistings.json"
 
 NASDAQ_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt"
 OTHER_LISTED_URL = "https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt"
@@ -578,6 +588,109 @@ def load_universe_snapshot(snapshot_id: str, spec: dict | None = None) -> list[s
         if observed == snapshot_id:
             return list(payload.get("tickers", []))
     raise ValueError(f"universe snapshot {snapshot_id} is not archived")
+
+
+# --- point-in-time review membership ------------------------------------------
+@dataclass(frozen=True)
+class ReviewUniverse:
+    """The membership a review session may see, and the names removed from it."""
+
+    snapshot_id: str
+    members: tuple[str, ...]
+    excluded: tuple[str, ...]
+
+
+def _archived_snapshots(snapshot_dir: Path | None = None) -> list[tuple[str, str, list[str]]]:
+    """`(as_of, snapshot_id, tickers)` for every archived shared snapshot."""
+    directory = snapshot_dir or DEFAULT_SNAPSHOT_DIR
+    out = []
+    for candidate in sorted(directory.glob("*.json")):
+        payload = json.loads(candidate.read_text(encoding="utf-8"))
+        snapshot_id = str(payload.get("snapshot_id") or content_hash({
+            key: value for key, value in payload.items() if key != "snapshot_id"
+        }))
+        out.append((str(payload["as_of"]), snapshot_id, list(payload.get("tickers", []))))
+    return out
+
+
+def snapshot_for_session(
+    spec: dict, session: str, snapshot_dir: Path | None = None,
+) -> tuple[str, list[str]]:
+    """The newest shared snapshot built strictly before `session`.
+
+    A refresh fetches prices through its own `as_of` day, so it may only inform
+    reviews on later sessions. Using the moving `universe.json` instead would
+    hand a catch-up review a membership ranked on bars after that review.
+    """
+    explicit = spec.get("universe")
+    if isinstance(explicit, list) and explicit:
+        members = [normalize_ticker(t) for t in explicit]
+        return content_hash(sorted(members)), members
+    usable = [item for item in _archived_snapshots(snapshot_dir) if item[0] < session]
+    if not usable:
+        raise ValueError(f"no archived universe snapshot predates review session {session}")
+    latest = max(as_of for as_of, _, _ in usable)
+    chosen = [item for item in usable if item[0] == latest]
+    if len({snapshot_id for _, snapshot_id, _ in chosen}) != 1:
+        raise ValueError(f"several different universe snapshots are dated {latest}")
+    _, snapshot_id, members = chosen[0]
+    return snapshot_id, members
+
+
+def load_delistings(path: Path | None = None) -> dict[str, str]:
+    """Reviewed `{ticker: last_trading_session}` records (see delistings.json)."""
+    p = path or DEFAULT_DELISTINGS_PATH
+    if not p.exists():
+        return {}
+    payload = json.loads(p.read_text(encoding="utf-8"))
+    out: dict[str, str] = {}
+    for ticker, record in payload.get("delistings", {}).items():
+        last = str(record["last_trading_session"])
+        dt.date.fromisoformat(last)
+        if not record.get("source"):
+            raise ValueError(f"delisting record for {ticker} has no source")
+        out[normalize_ticker(ticker)] = last
+    return out
+
+
+def review_universe(
+    spec: dict, session: str, *,
+    snapshot_dir: Path | None = None, delistings_path: Path | None = None,
+) -> ReviewUniverse:
+    """Point-in-time candidates for a review on `session`.
+
+    Members whose reviewed last trading session is strictly before `session`
+    had stopped trading by then, so the review cannot see them. A member that
+    still traded on `session` stays and must have a real bar, whatever a price
+    provider now says about it.
+    """
+    snapshot_id, members = snapshot_for_session(spec, session, snapshot_dir)
+    delisted = load_delistings(delistings_path)
+    excluded = {ticker for ticker in members if delisted.get(ticker, "9999-12-31") < session}
+    return ReviewUniverse(
+        snapshot_id=snapshot_id,
+        members=tuple(ticker for ticker in members if ticker not in excluded),
+        excluded=tuple(sorted(excluded)),
+    )
+
+
+def review_members_between(
+    spec: dict, after: str, through: str, snapshot_dir: Path | None = None,
+) -> set[str]:
+    """Every snapshot member a review in (`after`, `through`] could use."""
+    explicit = spec.get("universe")
+    if isinstance(explicit, list) and explicit:
+        return set(snapshot_for_session(spec, through, snapshot_dir)[1])
+    snapshots = _archived_snapshots(snapshot_dir)
+    # The snapshot in force on the first unseen session, plus any built later.
+    first = [item for item in snapshots if item[0] <= after]
+    floor = max((as_of for as_of, _, _ in first), default="")
+    return {
+        ticker
+        for as_of, _, members in snapshots
+        if floor <= as_of < through
+        for ticker in members
+    }
 
 
 def archive_current_universe(path: Path | None = None) -> Path:
