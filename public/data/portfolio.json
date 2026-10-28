@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-10-27",
+  "as_of": "2026-10-28",
   "base_currency": "USD",
   "strategies": [
     {
@@ -26986,10 +26986,14 @@
         {
           "d": "2026-10-27",
           "v": 94064526.52
+        },
+        {
+          "d": "2026-10-28",
+          "v": 94254420.39
         }
       ],
       "stats": {
-        "cagr": 0.1853,
+        "cagr": 0.1854,
         "sharpe": 0.82,
         "max_dd": -0.5407
       },
@@ -26999,15 +27003,15 @@
         "max_dd": -0.5407
       },
       "stats_live": {
-        "cagr": -0.3405,
-        "sharpe": -3.08,
+        "cagr": -0.3349,
+        "sharpe": -3.01,
         "max_dd": -0.1541
       },
       "live_since": "2026-06-15",
       "positions": [
         {
           "ticker": "PTEN",
-          "weight": 0.0138
+          "weight": 0.0142
         },
         {
           "ticker": "CRVS",
@@ -27015,22 +27019,18 @@
         },
         {
           "ticker": "TRVI",
-          "weight": 0.0132
-        },
-        {
-          "ticker": "ERAS",
-          "weight": 0.0128
+          "weight": 0.0133
         },
         {
           "ticker": "PSNL",
-          "weight": 0.0128
+          "weight": 0.0127
+        },
+        {
+          "ticker": "ERAS",
+          "weight": 0.0126
         },
         {
           "ticker": "NVDY",
-          "weight": 0.012
-        },
-        {
-          "ticker": "SAN",
           "weight": 0.0119
         },
         {
@@ -27038,16 +27038,20 @@
           "weight": 0.0117
         },
         {
-          "ticker": "BGC",
-          "weight": 0.0113
+          "ticker": "BKD",
+          "weight": 0.0115
         },
         {
           "ticker": "NOK",
-          "weight": 0.0111
+          "weight": 0.0115
         },
         {
-          "ticker": "BKD",
-          "weight": 0.011
+          "ticker": "BGC",
+          "weight": 0.0114
+        },
+        {
+          "ticker": "SAN",
+          "weight": 0.0111
         },
         {
           "ticker": "NVTS",
@@ -27063,34 +27067,30 @@
         },
         {
           "ticker": "ALM",
-          "weight": 0.0104
+          "weight": 0.0102
         },
         {
           "ticker": "NXE",
-          "weight": 0.0098
+          "weight": 0.0099
         },
         {
           "ticker": "AGNC",
-          "weight": 0.0096
-        },
-        {
-          "ticker": "CTVA",
-          "weight": 0.0089
+          "weight": 0.0095
         },
         {
           "ticker": "WULF",
-          "weight": 0.0089
+          "weight": 0.0095
+        },
+        {
+          "ticker": "CTVA",
+          "weight": 0.0087
         },
         {
           "ticker": "BB",
-          "weight": 0.0081
+          "weight": 0.008
         },
         {
           "ticker": "LPTH",
-          "weight": 0.0076
-        },
-        {
-          "ticker": "UMC",
           "weight": 0.0075
         },
         {
@@ -27099,23 +27099,23 @@
         },
         {
           "ticker": "HIMX",
-          "weight": 0.0072
+          "weight": 0.0073
+        },
+        {
+          "ticker": "UMC",
+          "weight": 0.0073
         },
         {
           "ticker": "UEC",
-          "weight": 0.0069
+          "weight": 0.0072
         },
         {
           "ticker": "VISN",
-          "weight": 0.0067
+          "weight": 0.0068
         },
         {
           "ticker": "IAG",
-          "weight": 0.0061
-        },
-        {
-          "ticker": "OSS",
-          "weight": 0.0061
+          "weight": 0.0062
         },
         {
           "ticker": "DRH",
@@ -27126,24 +27126,32 @@
           "weight": 0.0057
         },
         {
+          "ticker": "OSS",
+          "weight": 0.0056
+        },
+        {
+          "ticker": "TTI",
+          "weight": 0.0055
+        },
+        {
           "ticker": "HL",
           "weight": 0.0052
         },
         {
-          "ticker": "TTI",
-          "weight": 0.0052
-        },
-        {
           "ticker": "CIFR",
-          "weight": 0.0047
+          "weight": 0.0049
         },
         {
           "ticker": "AMPX",
-          "weight": 0.0045
+          "weight": 0.0047
         },
         {
           "ticker": "F",
-          "weight": 0.0043
+          "weight": 0.0044
+        },
+        {
+          "ticker": "AXTI",
+          "weight": 0.0035
         },
         {
           "ticker": "SGHC",
@@ -27151,19 +27159,15 @@
         },
         {
           "ticker": "POET",
-          "weight": 0.0033
-        },
-        {
-          "ticker": "AXTI",
-          "weight": 0.0032
+          "weight": 0.0034
         },
         {
           "ticker": "LWLG",
-          "weight": 0.0032
+          "weight": 0.0033
         },
         {
           "ticker": "ONDS",
-          "weight": 0.0031
+          "weight": 0.0032
         },
         {
           "ticker": "PBI",
@@ -27171,7 +27175,7 @@
         },
         {
           "ticker": "PRCH",
-          "weight": 0.0031
+          "weight": 0.0028
         },
         {
           "ticker": "QUBT",
@@ -27187,7 +27191,7 @@
         },
         {
           "ticker": "APLD",
-          "weight": 0.0016
+          "weight": 0.0017
         },
         {
           "ticker": "UMAC",
@@ -27198,16 +27202,16 @@
           "weight": 0.0014
         },
         {
+          "ticker": "RDW",
+          "weight": 0.0014
+        },
+        {
           "ticker": "ASX",
           "weight": 0.0013
         },
         {
-          "ticker": "RDW",
-          "weight": 0.0013
-        },
-        {
           "ticker": "QBTS",
-          "weight": 0.0011
+          "weight": 0.001
         },
         {
           "ticker": "HBM",
@@ -27223,7 +27227,7 @@
         },
         {
           "ticker": "JOBY",
-          "weight": 0.0006
+          "weight": 0.0007
         },
         {
           "ticker": "RGTI",
