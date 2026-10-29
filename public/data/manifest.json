@@ -1,40 +1,40 @@
 {
-  "as_of": "2026-10-28",
+  "as_of": "2026-10-29",
   "files": {
     "benchmarks/sp500.json": {
-      "bytes": 290083,
-      "sha256": "ada1027a32a1c4baa6c8a21833fdb674d3add71dd4c5957ee735d12f2127fdee"
+      "bytes": 290118,
+      "sha256": "80845ac2d32bb99e5533c36fe45d518f6916d8af24a90f003e1a3f88269f0ffc"
     },
     "index.json": {
-      "bytes": 9909,
-      "sha256": "500ae511d4a7a2b2250e6c92c5795435fc467122e78736a17aa3a2bc3d3cadb7"
+      "bytes": 9942,
+      "sha256": "83769b29678d654274da2ff95cf4dafedde9e94703bba311c10935e6259b2763"
     },
     "strategies/gen0194/analytics.json": {
       "bytes": 1381227,
-      "sha256": "02b07ea415cbd283b29efe7880cd236580e6ac62013fa3bbd8ecfaa79a8262c8"
+      "sha256": "224dc2757ca0c65413d5702a25b4ecb3d59661b4e610d64b09c51abbc5508102"
     },
     "strategies/gen0194/live.json": {
-      "bytes": 27849,
-      "sha256": "343cda24f3bae59d445982ca1574ffdbd5748e8a7888ba9bd973687a5951061f"
+      "bytes": 27879,
+      "sha256": "45ce0e0e7ded33a8060a5f4ddae62db4415b34ba62493d7aea6a4c0a045fb561"
     },
     "strategies/gen0194/provenance.json": {
       "bytes": 584,
-      "sha256": "3d18a32714ffb27692fc3640033a7d106cabd0f5dd2aba579fa5711b098bcdf7"
+      "sha256": "d8f7e1e966c5c33e58e97c812dd22b5d42f37d244c8cabc31c2f916b49222aea"
     },
     "strategies/gen0194/rebalances.json": {
-      "bytes": 56672,
-      "sha256": "4bc4bfdafc5557830251d1b3916a4eb7f9b990e324b88af3e7d66cc1bec74ae7"
+      "bytes": 61529,
+      "sha256": "2501bd516c6b892cd58acf80e23a565a9833a2fb9855624b397c73215538953f"
     },
     "strategies/gen0194/research-full.json": {
-      "bytes": 1614147,
-      "sha256": "3e5f6531ab063e22ec08fc8955d912d44942074e45eba831cb9d21fe5d34db17"
+      "bytes": 1614182,
+      "sha256": "43ee44b081821d47eb2f6df5e67f8c4ac0073a74f55811c89636f222c934333c"
     },
     "strategies/gen0194/summary.json": {
-      "bytes": 37313,
-      "sha256": "cfc929aaa56797ab13001ff436eea3ac74d3378520fd5e002c9ba8eaa82483df"
+      "bytes": 37343,
+      "sha256": "1a689d416c87ab1affa3bbb43fbf26dd5bcba6d032bdad5ed4197e05fad508cb"
     }
   },
-  "generated_at": "2026-10-28T00:00:00Z",
+  "generated_at": "2026-10-29T00:00:00Z",
   "schema_version": 1,
-  "snapshot_id": "0fc0b8f7c5a36337d49e285003f139e75dafade88b8430e8d316b9c4c0c53380"
+  "snapshot_id": "dfd23fcb9f459e59ecebc6238fc0dc8f2598fc619c83305c3fa154d787216f7a"
 }
