@@ -130,7 +130,7 @@ are NaN, handled).
    performance.
 
    Minor-correction policy (`update.py`): both raw and adjusted relative changes must be at most
-   **0.1% per revised ticker**, and the sum of **absolute** adjusted equity impacts must be at most
+   **0.15% per revised ticker**, and the sum of **absolute** adjusted equity impacts must be at most
    **0.1 basis points of accepted account equity**. Opposing changes do not cancel. These limits
    accumulate in `automatic_revision_usage` across repeated acceptances at the same boundary and
    reset only when a new session is marked. Legacy/incomplete plans remain fail-closed.

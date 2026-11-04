@@ -35,7 +35,7 @@ freshness workflow fails when the last good manifest is more than four calendar 
   its ledger/checkpoint state as a 14-day review artifact without changing the branch. It exits
   **3** — a status CI never retries, because the same inputs fail identically every time.
 - Minor v3 corrections are automatically accepted when cumulative raw and adjusted changes are
-  at most **0.1% per revised ticker** and cumulative gross equity impact is at most **0.1 basis
+  at most **0.15% per revised ticker** and cumulative gross equity impact is at most **0.1 basis
   points** of account equity at the boundary. Opposing impacts cannot cancel, and repeated
   corrections share the same limits until a new mark. Linked proposal/acceptance events record
   `acceptance: "automatic_minor_price_revision"`, the thresholds, and usage; all historical marks

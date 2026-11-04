@@ -211,8 +211,9 @@ def test_updater_runs_minor_correction_through_publication_and_second_run_is_ide
         "strategies": [{"id": "s", "equity_curve": curve}],
     }))
     revised = _prices_at_boundary()
+    # A 0.12% revision should publish under the 0.15% per-ticker cap.
     for field in ("open", "high", "low", "close", "adj_close"):
-        revised.loc[(revised["ticker"] == "A") & (revised["date"] == pd.Timestamp("2026-01-02")), field] = 10.005
+        revised.loc[(revised["ticker"] == "A") & (revised["date"] == pd.Timestamp("2026-01-02")), field] = 10.012
     monkeypatch.setattr(update, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(update, "DATA_DIR", data)
     monkeypatch.setattr(update, "LEDGER_STORE", store)

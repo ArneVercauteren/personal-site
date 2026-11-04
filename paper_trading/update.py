@@ -56,7 +56,7 @@ EXIT_REVIEW_REQUIRED = 3
 
 # Both limits must hold, cumulatively until a new session is marked. Gross
 # impact prevents opposite-signed revisions from cancelling through the gate.
-MINOR_REVISION_MAX_PRICE_CHANGE = 0.001  # 0.1% per held ticker (raw and adjusted)
+MINOR_REVISION_MAX_PRICE_CHANGE = 0.0015  # 0.15% per held ticker (raw and adjusted)
 MINOR_REVISION_MAX_EQUITY_FRACTION = 0.00001  # 0.1 basis points of the account
 
 # Yahoo exposes a moving daily bar while the regular US session is still open.

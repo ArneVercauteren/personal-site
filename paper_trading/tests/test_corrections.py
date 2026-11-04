@@ -277,7 +277,7 @@ def test_repeated_same_boundary_corrections_share_one_budget():
     # The second acceptance reconciles against the restamped basis, not equity.
     twice = portfolio.accept_boundary_revision(accepted, second_payload)
     assert twice["equity"] == checkpoint["equity"]
-    too_far = {"A": 10.012, "B": 20.0}
+    too_far = {"A": 10.016, "B": 20.0}
     assert update._minor_revision_usage(accepted, _revision_payload(accepted, too_far, too_far)) is None
 
 
