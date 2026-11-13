@@ -1,40 +1,40 @@
 {
-  "as_of": "2026-11-12",
+  "as_of": "2026-11-13",
   "files": {
     "benchmarks/sp500.json": {
-      "bytes": 290468,
-      "sha256": "d2a2c43f31b734a729264bd1cbff864450f53826d572af77f713572b42bafd3d"
+      "bytes": 290503,
+      "sha256": "cf852d87ff287a05f26a7c6d2256eafc8697e8df4a077aec88aa7344a5bd165c"
     },
     "index.json": {
-      "bytes": 10294,
-      "sha256": "f30442b87568527fa6a41f005df44af4b90423043f4eac8b38c8408e43e1588c"
+      "bytes": 10342,
+      "sha256": "dbd5d48d4306ffe109d43db50285d230dd8354ec28b1aa8fc839b3013c489683"
     },
     "strategies/gen0194/analytics.json": {
       "bytes": 1381227,
-      "sha256": "cd0edf695739c354f247bd3975a7c6a02a6c3ba02436fc47171c830629306a6e"
+      "sha256": "bd505ff00e083a200acc3c1ba929f7af498b65198faa39d25157a6d056a6b0d9"
     },
     "strategies/gen0194/live.json": {
-      "bytes": 28229,
-      "sha256": "8d57242a67ad24b3e017e76b17ac7233b9d049c8f1cef4dc00abde524a7f0223"
+      "bytes": 28263,
+      "sha256": "34213c0ed70ab2d40c0c7fa25c39b9327db4bdc9bbfa60d9ce0e34fc8d335330"
     },
     "strategies/gen0194/provenance.json": {
       "bytes": 584,
-      "sha256": "f21909c237eada4639e4cd067b65548cd6299e924c4eb91b9afbac356b722e49"
+      "sha256": "e7306c20f5e1e27248e32371843017ddcaf605cbd1fe5170657b59150c343ef5"
     },
     "strategies/gen0194/rebalances.json": {
       "bytes": 76111,
-      "sha256": "48d8f584beeab2aa34fbdf4c858b825d5f1a01d3d594925fc6477a9ef771d312"
+      "sha256": "35272abd7193d64980dff129bdb489bc947baba1fec7ba4fb14e5011dd4e5234"
     },
     "strategies/gen0194/research-full.json": {
-      "bytes": 1614531,
-      "sha256": "8f823f669bceee37b4fe1ae9a861090200ef8a99ab358c2f3de294bb3f8414b5"
+      "bytes": 1614566,
+      "sha256": "e7cba3c88e2114e5f69e60eb85306a4ea6d8b7d2507460768d1e8dd91d7f9794"
     },
     "strategies/gen0194/summary.json": {
-      "bytes": 37354,
-      "sha256": "3f3c1949d661ba983d59ea7e60b7be037da4217df31abb577a0fcd8aaefe8474"
+      "bytes": 37329,
+      "sha256": "ee4dd0e07daeac5070144a8caabf3b3abed87231fe6b93424e4d4985d7cada33"
     }
   },
-  "generated_at": "2026-11-12T00:00:00Z",
+  "generated_at": "2026-11-13T00:00:00Z",
   "schema_version": 1,
-  "snapshot_id": "97bf11d16efe5a2632920fc0cb5eb63490c9952bd280a647003cf8a59b86f3f3"
+  "snapshot_id": "3342d9adb0ecbe63abb70f159431068f2a8ebb1e1f232700cc78b695a90c8280"
 }
