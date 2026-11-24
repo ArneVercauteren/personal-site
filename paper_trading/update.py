@@ -57,6 +57,8 @@ EXIT_REVIEW_REQUIRED = 3
 # Both limits must hold, cumulatively until a new session is marked. Gross
 # impact prevents opposite-signed revisions from cancelling through the gate.
 MINOR_REVISION_MAX_PRICE_CHANGE = 0.0015  # 0.15% per held ticker (raw and adjusted)
+MINOR_REVISION_MAX_ABSOLUTE_PRICE_CHANGE = 0.005  # half a US cent per held ticker
+MINOR_REVISION_ABSOLUTE_EPSILON = 1e-6  # tolerate vendor float32 representation
 MINOR_REVISION_MAX_EQUITY_FRACTION = 0.00001  # 0.1 basis points of the account
 
 # Yahoo exposes a moving daily bar while the regular US session is still open.
@@ -350,15 +352,37 @@ def _minor_revision_usage(checkpoint: dict, payload: dict) -> dict | None:
     prior = checkpoint.get("automatic_revision_usage") or {}
     gross = float(prior.get("gross_equity_impact", 0.0))
     changes = {ticker: dict(values) for ticker, values in prior.get("price_changes", {}).items()}
+    absolute_changes = {
+        ticker: dict(values) for ticker, values in prior.get("absolute_price_changes", {}).items()
+    }
     for ticker, change in revisions.items():
         used = changes.setdefault(ticker, {"adjusted": 0.0, "raw": 0.0})
+        # Legacy usage recorded only relative moves. Do not grant a fresh absolute
+        # budget on that same boundary when earlier dollar usage is unknown.
+        absolute_used = absolute_changes.setdefault(ticker, {
+            basis: 0.0 if used[basis] == 0.0 else None
+            for basis in ("adjusted", "raw")
+        })
         for basis in ("adjusted", "raw"):
             accepted = float(change.get(f"accepted_{basis}") or 0.0)
             observed = float(change.get(f"observed_{basis}") or 0.0)
             if not all(math.isfinite(value) and value > 0 for value in (accepted, observed)):
                 return None
+            delta = abs(observed - accepted)
             used[basis] += abs(observed / accepted - 1.0)
-            if not math.isfinite(used[basis]) or used[basis] > MINOR_REVISION_MAX_PRICE_CHANGE:
+            if absolute_used[basis] is not None:
+                absolute_used[basis] += delta
+                if not math.isfinite(absolute_used[basis]):
+                    return None
+            if not math.isfinite(used[basis]):
+                return None
+            # Either cumulative price budget may qualify, but the independent
+            # gross account-impact limit below must always hold.
+            if used[basis] > MINOR_REVISION_MAX_PRICE_CHANGE and (
+                absolute_used[basis] is None or absolute_used[basis] > (
+                    MINOR_REVISION_MAX_ABSOLUTE_PRICE_CHANGE + MINOR_REVISION_ABSOLUTE_EPSILON
+                )
+            ):
                 return None
         # Recompute at full precision: rounded event impacts must not bypass a
         # threshold when multiple tiny revisions occur.
@@ -367,7 +391,10 @@ def _minor_revision_usage(checkpoint: dict, payload: dict) -> dict | None:
         ))
     if not math.isfinite(gross) or gross / equity > MINOR_REVISION_MAX_EQUITY_FRACTION:
         return None
-    return {"gross_equity_impact": gross, "price_changes": changes}
+    return {
+        "gross_equity_impact": gross, "price_changes": changes,
+        "absolute_price_changes": absolute_changes,
+    }
 
 
 def _accept_minor_revision(
@@ -382,6 +409,8 @@ def _accept_minor_revision(
         "acceptance": "automatic_minor_price_revision",
         "policy": {
             "max_price_change": MINOR_REVISION_MAX_PRICE_CHANGE,
+            "max_absolute_price_change": MINOR_REVISION_MAX_ABSOLUTE_PRICE_CHANGE,
+            "absolute_price_epsilon": MINOR_REVISION_ABSOLUTE_EPSILON,
             "max_gross_equity_fraction": MINOR_REVISION_MAX_EQUITY_FRACTION,
         },
         "cumulative_usage": usage,

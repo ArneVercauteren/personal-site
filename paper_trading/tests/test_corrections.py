@@ -532,3 +532,58 @@ def test_mixed_review_acceptance_records_tickers_and_a_rebase_event(tmp_path, mo
     approval = events[-2]["payload"]
     assert approval["reviewed_tickers"] == ["B"]
     assert approval["automatic_rebases"] == ["A"]
+
+def test_lwlg_half_cent_revision_with_nvdy_distribution():
+    # Actual 2026-11-17 boundary values from the failed updater artifact.
+    checkpoint = _minor_checkpoint()
+    checkpoint.update(equity=89264572.54136124, shares={"LWLG": 65352.34, "NVDY": 95270.0})
+    payload = {
+        "revisions": {"LWLG": {
+            "accepted_adjusted": 3.1549999713897705,
+            "observed_adjusted": 3.1600000858306885,
+            "accepted_raw": 3.1549999713897705,
+            "observed_raw": 3.1600000858306885,
+        }},
+        "automatic_rebases": {"NVDY": {"factor": 0.992900113432}},
+    }
+    usage = update._minor_revision_usage(checkpoint, payload)
+    assert usage is not None
+    assert usage["price_changes"]["LWLG"]["raw"] > 0.0015
+    assert usage["absolute_price_changes"]["LWLG"]["raw"] == pytest.approx(0.005000114440918)
+    assert usage["gross_equity_impact"] == pytest.approx(326.769157, abs=0.001)
+    # Same correction remains blocked when the account impact is material.
+    assert update._minor_revision_usage({**checkpoint, "equity": 1_000_000.0}, payload) is None
+
+
+def test_half_cent_budget_is_cumulative_and_legacy_usage_is_conservative():
+    checkpoint = {**_minor_checkpoint(), "shares": {"A": 2.0}}
+    def payload(old, new):
+        return {"revisions": {"A": {
+            "accepted_adjusted": old, "observed_adjusted": new,
+            "accepted_raw": old, "observed_raw": new,
+        }}}
+    first = update._minor_revision_usage(checkpoint, payload(3.0, 3.003))
+    assert first is not None
+    checkpoint["automatic_revision_usage"] = first
+    second = update._minor_revision_usage(checkpoint, payload(3.003, 3.005))
+    assert second is not None
+    checkpoint["automatic_revision_usage"] = second
+    # Reversing direction still consumes the cumulative gross price budget.
+    assert update._minor_revision_usage(checkpoint, payload(3.005, 3.004)) is None
+    assert update._minor_revision_usage(checkpoint, payload(3.005, 3.011)) is None
+    checkpoint["automatic_revision_usage"] = {
+        "gross_equity_impact": first["gross_equity_impact"],
+        "price_changes": first["price_changes"],
+    }
+    assert update._minor_revision_usage(checkpoint, payload(3.003, 3.005)) is None
+
+
+def test_absolute_price_budget_respects_raw_and_adjusted_independently():
+    checkpoint = _minor_checkpoint()
+    payload = {"revisions": {"A": {
+        "accepted_adjusted": 3.155, "observed_adjusted": 3.160,
+        "accepted_raw": 3.155, "observed_raw": 3.161,
+    }}}
+    assert update._minor_revision_usage(checkpoint, payload) is None
+    payload["revisions"]["A"]["observed_raw"] = 3.160
+    assert update._minor_revision_usage(checkpoint, payload) is not None

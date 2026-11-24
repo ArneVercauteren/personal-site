@@ -10,6 +10,13 @@ on:
     # Once on weekdays after the regular US session and normal data finalization.
     - cron: "30 22 * * 1-5"
   workflow_dispatch: {}
+  # Reconcile missed sessions immediately when the updater's policy changes.
+  # Data-only bot commits do not match these paths.
+  push:
+    branches: [main]
+    paths:
+      - 'paper_trading/update.py'
+      - '.github/workflows/open-strategies-update.yml'
 
 # Never let two updater runs commit on top of each other.
 concurrency:
